@@ -17,6 +17,8 @@ extern "C" {
 #include "core/stackless_structs.h"
 #include "pickling/prickelpit.h"
 
+#include <tealet/tealet.h>
+
 #undef STACKLESS_SPY
 /*
  * if a platform wants to support self-inspection via _peek,

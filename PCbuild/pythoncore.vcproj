@@ -16,6 +16,9 @@
 		/>
 	</Platforms>
 	<ToolFiles>
+		<DefaultToolFile
+			FileName="masm.rules"
+		/>
 	</ToolFiles>
 	<Configurations>
 		<Configuration
@@ -30,6 +33,9 @@
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="MASM"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
@@ -104,6 +110,9 @@
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="MASM"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
@@ -182,6 +191,9 @@
 				Name="VCCustomBuildTool"
 			/>
 			<Tool
+				Name="MASM"
+			/>
+			<Tool
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
@@ -257,6 +269,9 @@
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="MASM"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
@@ -337,6 +352,9 @@
 				Name="VCCustomBuildTool"
 			/>
 			<Tool
+				Name="MASM"
+			/>
+			<Tool
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
@@ -409,6 +427,9 @@
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="MASM"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
@@ -487,6 +508,9 @@
 				Name="VCCustomBuildTool"
 			/>
 			<Tool
+				Name="MASM"
+			/>
+			<Tool
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
@@ -559,6 +583,9 @@
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="MASM"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
@@ -655,11 +682,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Include\bytes_methods.h"
+				RelativePath="..\Include\bytearrayobject.h"
 				>
 			</File>
 			<File
-				RelativePath="..\Include\bytearrayobject.h"
+				RelativePath="..\Include\bytes_methods.h"
 				>
 			</File>
 			<File
@@ -1411,11 +1438,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Objects\bytes_methods.c"
+				RelativePath="..\Objects\bytearrayobject.c"
 				>
 			</File>
 			<File
-				RelativePath="..\Objects\bytearrayobject.c"
+				RelativePath="..\Objects\bytes_methods.c"
 				>
 			</File>
 			<File
@@ -2018,7 +2045,7 @@
 						<Tool
 							Name="VCCustomBuildTool"
 							Description="Running ml64"
-							CommandLine="ml64 /nologo /c /Zi /Fo &quot;$(IntDir)\$(InputName) .obj&quot; &quot;$(InputPath)&quot;"
+							CommandLine="ml64 /nologo /c /Zi /Fo &quot;$(IntDir)\$(InputName) .obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
 							Outputs="$(IntDir)\$(InputName) .obj"
 						/>
 					</FileConfiguration>
@@ -2036,7 +2063,7 @@
 						<Tool
 							Name="VCCustomBuildTool"
 							Description="Running ml64"
-							CommandLine="ml64 /nologo /c /Zi /Fo &quot;$(IntDir)\$(InputName) .obj&quot; &quot;$(InputPath)&quot;"
+							CommandLine="ml64 /nologo /c /Zi /Fo &quot;$(IntDir)\$(InputName) .obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
 							Outputs="$(IntDir)\$(InputName) .obj"
 						/>
 					</FileConfiguration>
@@ -2054,7 +2081,7 @@
 						<Tool
 							Name="VCCustomBuildTool"
 							Description="Running ml64"
-							CommandLine="ml64 /nologo /c /Zi /Fo &quot;$(IntDir)\$(InputName) .obj&quot; &quot;$(InputPath)&quot;"
+							CommandLine="ml64 /nologo /c /Zi /Fo &quot;$(IntDir)\$(InputName) .obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
 							Outputs="$(IntDir)\$(InputName) .obj"
 						/>
 					</FileConfiguration>
@@ -2072,7 +2099,7 @@
 						<Tool
 							Name="VCCustomBuildTool"
 							Description="Running ml64"
-							CommandLine="ml64 /nologo /c /Zi /Fo &quot;$(IntDir)\$(InputName) .obj&quot; &quot;$(InputPath)&quot;"
+							CommandLine="ml64 /nologo /c /Zi /Fo &quot;$(IntDir)\$(InputName) .obj&quot; &quot;$(InputPath)&quot;&#x0D;&#x0A;"
 							Outputs="$(IntDir)\$(InputName) .obj"
 						/>
 					</FileConfiguration>
@@ -2103,6 +2130,102 @@
 				</File>
 				<File
 					RelativePath="..\Stackless\pickling\safe_pickle.c"
+					>
+				</File>
+			</Filter>
+			<Filter
+				Name="tealet"
+				>
+				<File
+					RelativePath="..\Stackless\tealet\slp_platformselect.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Stackless\tealet\switch_x64_msvc.asm"
+					>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="MASM"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="MASM"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="PGInstrument|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="MASM"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="PGUpdate|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="MASM"
+						/>
+					</FileConfiguration>
+				</File>
+				<File
+					RelativePath="..\Stackless\tealet\switch_x64_msvc.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Stackless\tealet\switch_x86_msvc.asm"
+					>
+					<FileConfiguration
+						Name="Release|x64"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="MASM"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug|x64"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="MASM"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="PGInstrument|x64"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="MASM"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="PGUpdate|x64"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="MASM"
+						/>
+					</FileConfiguration>
+				</File>
+				<File
+					RelativePath="..\Stackless\tealet\switch_x86_msvc.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Stackless\tealet\tealet.c"
+					>
+				</File>
+				<File
+					RelativePath="..\Stackless\tealet\tealet.h"
 					>
 				</File>
 			</Filter>
