@@ -2,7 +2,7 @@
 
 typedef struct _sts {
     /* the blueprint for new stacks */
-    struct _cstack *initial_stub;
+    struct tealet_t *initial_stub;
     /* "serial" is incremented each time we create a new stub.
      * (enter "stackless" from the outside)
      * and "serial_last_jump" indicates to which stub the current
@@ -16,10 +16,7 @@ typedef struct _sts {
     long serial;
     long serial_last_jump;
 #endif
-    /* the base address for hijacking stacks. XXX deprecating */
-    intptr_t *cstack_base;
-    /* stack overflow check and init flag */
-    intptr_t *cstack_root;
+    struct tealet_t *tealet_main;
     /* main tasklet */
     struct _tasklet *main;
     /* runnable tasklets */
@@ -54,8 +51,7 @@ typedef struct _sts {
     tstate->st.initial_stub = NULL; \
     tstate->st.serial = 0; \
     tstate->st.serial_last_jump = 0; \
-    tstate->st.cstack_base = NULL; \
-    tstate->st.cstack_root = NULL; \
+    tstate->st.tealet_main = 0; \
     tstate->st.ticker = 0; \
     tstate->st.interval = 0; \
     tstate->st.interrupt = NULL; \
@@ -77,6 +73,7 @@ typedef struct _sts {
 
 struct _ts; /* Forward */
 
+/* TODO, make this also call tealet_finalize */
 void slp_kill_tasks_with_stacks(struct _ts *tstate);
 
 #define __STACKLESS_PYSTATE_CLEAR \

@@ -8,6 +8,8 @@ extern "C" {
 /* platform specific constants (mainly SEH stuff to store )*/
 #include "platf/slp_platformselect.h"
 
+#include <tealet/tealet.h>
+
 
 
 /*** important structures: tasklet ***/
@@ -85,7 +87,9 @@ typedef struct _tasklet {
     /* bits stuff */
     struct _tasklet_flags flags;
     int recursion_depth;
-    struct _cstack *cstate;
+    int nesting_level;
+    PyThreadState *tstate;
+    struct tealet_t *cstate;
     PyObject *def_globals;
     PyObject *tsk_weakreflist;
 } PyTaskletObject;
@@ -108,8 +112,7 @@ typedef struct _cstack {
 #ifdef _SEH32
     DWORD exception_list; /* SEH handler on Win32 */
 #endif
-    intptr_t *startaddr;
-    intptr_t stack[1];
+    tealet_t *tealet;
 } PyCStackObject;
 
 

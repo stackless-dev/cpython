@@ -331,7 +331,44 @@ slp_schedule_hook_func *_slp_schedule_fasthook;
 PyObject *_slp_schedule_hook;
 
 static int
-transfer_with_exc(PyCStackObject **cstprev, PyCStackObject *cst, PyTaskletObject *prev)
+slp_transfer(tealet_t **cstprev, tealet_t *cst, PyTaskletObject *prev)
+{
+    int result;
+    int nesting_level;
+    assert(cstprev && *cstprev == NULL);
+    nesting_level = prev->tstate->st.nesting_level;
+    prev->nesting_level = nesting_level;
+    /* mark the old tasklet as having cstate */
+    *cstprev = tealet_current(cst);
+
+    result = tealet_switch(cst, NULL);
+    /* we are back, or failed, no cstate in tasklet */
+    *cstprev = NULL;
+    prev->tstate->st.nesting_level = nesting_level;
+    if (!result)
+        return 0;
+    if (result == TEALET_ERR_MEM)
+        PyErr_NoMemory();
+    else
+        PyErr_SetString(PyExc_RuntimeError, "Invalid tasklet");
+    return -1;
+}
+
+static int
+slp_transfer_return(tealet_t *cst)
+{
+    int result = tealet_exit(cst, NULL, TEALET_EXIT_DEFAULT);
+    if (result) {
+        /* emergency switch back to main tealet */
+        PyThreadState *ts = PyThreadState_GET();
+        PyErr_SetString(PyExc_RuntimeError, "Invalid tealet");
+        tealet_exit(ts->st.tealet_main, NULL, TEALET_EXIT_DEFAULT);
+    }
+    return 0;
+}
+
+static int
+transfer_with_exc(tealet_t **cstprev, tealet_t *cst, PyTaskletObject *prev)
 {
     PyThreadState *ts = PyThreadState_GET();
 
@@ -525,17 +562,6 @@ jump_soft_to_hard(PyFrameObject *f, int exc, PyObject *retval)
 
 /* combined soft/hard switching */
 
-int
-slp_ensure_linkage(PyTaskletObject *t)
-{
-    if (t->cstate->task == t)
-        return 0;
-    if (!slp_cstack_new(&t->cstate, t->cstate->tstate->st.cstack_base, t))
-        return -1;
-    t->cstate->nesting_level = 0;
-    return 0;
-}
-
 
 /* check whether a different thread can be run */
 
@@ -725,7 +751,7 @@ schedule_task_interthread(PyObject **result,
                             int stackless,
                             int *did_switch)
 {
-    PyThreadState *nts = next->cstate->tstate;
+    PyThreadState *nts = next->tstate;
     int fail;
 
     /* get myself ready, since the previous task is going to continue on the
@@ -822,8 +848,7 @@ slp_schedule_task(PyObject **result, PyTaskletObject *prev, PyTaskletObject *nex
         return schedule_task_block(result, prev, stackless, did_switch);
 
 #ifdef WITH_THREAD
-    /* note that next->cstate is undefined if it is ourself */
-    if (next->cstate != NULL && next->cstate->tstate != ts) {
+    if (next->tstate != ts) {
         return schedule_task_interthread(result, prev, next, stackless, did_switch);
     }
 #endif
@@ -867,10 +892,10 @@ static int
 slp_schedule_task_prepared(PyThreadState *ts, PyObject **result, PyTaskletObject *prev, PyTaskletObject *next, int stackless,
                   int *did_switch)
 {
-    PyCStackObject **cstprev;
+    tealet_t **cstprev;
 
     PyObject *retval;
-    int (*transfer)(PyCStackObject **, PyCStackObject *, PyTaskletObject *);
+    int (*transfer)(tealet_t **, tealet_t *, PyTaskletObject *);
 
     /* remove the no-soft-irq flag from the runflags */
     int no_soft_irq = ts->st.runflags & PY_WATCHDOG_NO_SOFT_IRQ;
@@ -897,17 +922,6 @@ slp_schedule_task_prepared(PyThreadState *ts, PyObject **result, PyTaskletObject
         goto hard_switching;
 
     /* start of soft switching code */
-
-    if (prev->cstate != ts->st.initial_stub) {
-        Py_DECREF(prev->cstate);
-        prev->cstate = ts->st.initial_stub;
-        Py_INCREF(prev->cstate);
-    }
-    if (ts != slp_initial_tstate) {
-        /* ensure to get all tasklets into the other thread's chain */
-        if (slp_ensure_linkage(prev) || slp_ensure_linkage(next))
-            return -1;
-    }
 
     /* handle exception */
     if (ts->exc_type == Py_None) {
@@ -959,7 +973,7 @@ slp_schedule_task_prepared(PyThreadState *ts, PyObject **result, PyTaskletObject
         *did_switch = 1;
 
     assert(next->cstate != NULL);
-    if (next->cstate->nesting_level != 0) {
+    if (next->cstate) {
         /* create a helper frame to restore the target stack */
         ts->frame = (PyFrameObject *)
                     slp_cframe_new(jump_soft_to_hard, 1);
@@ -993,7 +1007,7 @@ hard_switching:
     /* since we change the stack we must assure that the protocol was met */
     STACKLESS_ASSERT();
 
-    /* note: nesting_level is handled in cstack_new */
+    /* note: nesting_level is handled in slp_transfer */
     cstprev = &prev->cstate;
 
     ts->st.current = next;
@@ -1192,8 +1206,8 @@ tasklet_end(PyObject *retval)
          * the original stub if necessary. (Meanwhile, task->cstate may be an old nesting state and not
          * the original stub, so we take the stub from the tstate)
          */
-        if (ts->st.serial_last_jump != ts->st.initial_stub->serial)
-            slp_transfer_return(ts->st.initial_stub);
+        if (tealet_current(ts->st.tealet_main) != ts->st.tealet_main)
+            slp_transfer_return(ts->st.tealet_main);
     }
 
     /* remove from runnables */

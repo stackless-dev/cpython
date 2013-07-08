@@ -38,8 +38,9 @@ extern "C" {
 PyAPI_DATA(int) slp_enable_softswitch;
 PyAPI_DATA(int) slp_in_psyco;
 PyAPI_DATA(int) slp_try_stackless;
-PyAPI_DATA(PyCStackObject *) slp_cstack_chain;
+PyAPI_DATA(PyTaskletObject *) slp_tasklet_chain;
 
+#if 0
 PyAPI_FUNC(PyCStackObject *) slp_cstack_new(PyCStackObject **cst,
                                             intptr_t *stackref,
                                             PyTaskletObject *task);
@@ -54,6 +55,7 @@ PyAPI_FUNC(int) slp_transfer_return(PyCStackObject *cst);
 #else
 #define slp_transfer_return(cst) \
                 slp_transfer(NULL, (cst), NULL)
+#endif
 #endif
 
 PyAPI_FUNC(int) _PyStackless_InitTypes(void);

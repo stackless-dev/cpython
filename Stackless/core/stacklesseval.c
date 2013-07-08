@@ -37,8 +37,8 @@ int slp_in_psyco = 0;
  */
 int slp_try_stackless = 0;
 
-/* the list of all stacks of all threads */
-struct _cstack *slp_cstack_chain = NULL;
+/* the list of all tasklets of all threads */
+PyTaskletObject *slp_tasklet_chain = NULL;
 
 
 /******************************************************
@@ -47,231 +47,117 @@ struct _cstack *slp_cstack_chain = NULL;
 
  ******************************************************/
 
-static PyCStackObject *cstack_cache[CSTACK_SLOTS] = { NULL };
-static int cstack_cachecount = 0;
 
 /* this function will get called by PyStacklessEval_Fini */
-static void slp_cstack_cacheclear(void)
+
+
+
+/****************************************************************
+ *Implement copyable stubs by using a trampoline
+ */
+struct slp_stub_arg
 {
-    int i;
-    PyCStackObject *stack;
-
-    for (i=0; i < CSTACK_SLOTS; i++) {
-        while (cstack_cache[i] != NULL) {
-            stack = cstack_cache[i];
-            cstack_cache[i] = (PyCStackObject *) stack->startaddr;
-            PyObject_Del(stack);
-        }
-    }
-    cstack_cachecount = 0;
-}
-
-static void
-cstack_dealloc(PyCStackObject *cst)
-{
-    slp_cstack_chain = cst;
-    SLP_CHAIN_REMOVE(PyCStackObject, &slp_cstack_chain, cst, next,
-                     prev);
-    if (cst->ob_size >= CSTACK_SLOTS) {
-        PyObject_Del(cst);
-    }
-    else {
-        if (cstack_cachecount >= CSTACK_MAXCACHE)
-            slp_cstack_cacheclear();
-    cst->startaddr = (intptr_t *) cstack_cache[cst->ob_size];
-        cstack_cache[cst->ob_size] = cst;
-        ++cstack_cachecount;
-    }
-}
-
-
-PyCStackObject *
-slp_cstack_new(PyCStackObject **cst, intptr_t *stackref, PyTaskletObject *task)
-{
-    PyThreadState *ts = PyThreadState_GET();
-    intptr_t *stackbase = ts->st.cstack_base;
-    ptrdiff_t size = stackbase - stackref;
-
-    assert(size >= 0);
-
-    if (*cst != NULL) {
-        if ((*cst)->task == task)
-            (*cst)->task = NULL;
-        Py_DECREF(*cst);
-    }
-    if (size < CSTACK_SLOTS && ((*cst) = cstack_cache[size])) {
-        /* take stack from cache */
-        cstack_cache[size] = (PyCStackObject *) (*cst)->startaddr;
-        --cstack_cachecount;
-        _Py_NewReference((PyObject *)(*cst));
-    }
-    else
-        *cst = PyObject_NewVar(PyCStackObject, &PyCStack_Type, size);
-    if (*cst == NULL) return NULL;
-
-    (*cst)->startaddr = stackbase;
-    (*cst)->next = (*cst)->prev = NULL;
-    SLP_CHAIN_INSERT(PyCStackObject, &slp_cstack_chain, *cst, next, prev);
-    (*cst)->serial = ts->st.serial_last_jump;
-    (*cst)->task = task;
-    (*cst)->tstate = ts;
-    (*cst)->nesting_level = ts->st.nesting_level;
-#ifdef _SEH32
-    //save the SEH handler
-    (*cst)->exception_list = (DWORD)
-                __readfsdword(FIELD_OFFSET(NT_TIB, ExceptionList));
-#endif
-    return *cst;
-}
-
-size_t
-slp_cstack_save(PyCStackObject *cstprev)
-{
-    size_t stsizeb = (cstprev)->ob_size * sizeof(intptr_t);
-
-    memcpy((cstprev)->stack, (cstprev)->startaddr -
-                             (cstprev)->ob_size, stsizeb);
-#ifdef _SEH32
-    //save the SEH handler
-    cstprev->exception_list = (DWORD)
-                __readfsdword(FIELD_OFFSET(NT_TIB, ExceptionList));
-#endif
-    return stsizeb;
-}
-
-void
-#ifdef _SEH32
-#pragma warning(disable:4733) /* disable warning about modifying FS[0] */
-#endif
-slp_cstack_restore(PyCStackObject *cst)
-{
-    cst->tstate->st.nesting_level = cst->nesting_level;
-    /* mark task as no longer responsible for cstack instance */
-    cst->task = NULL;
-    memcpy(cst->startaddr - cst->ob_size, &cst->stack,
-           (cst->ob_size) * sizeof(intptr_t));
-#ifdef _SEH32
-    //restore the SEH handler
-    __writefsdword(FIELD_OFFSET(NT_TIB, ExceptionList), (DWORD)(cst->exception_list));
-    #pragma warning(default:4733)
-#endif
-}
-
-
-static char cstack_doc[] =
-"A CStack object serves to save the stack slice which is involved\n\
-during a recursive Python call. It will also be used for pickling\n\
-of program state. This structure is highly platform dependant.\n\
-Note: For inspection, str() can dump it as a string.\
-";
-
-#if SIZEOF_VOIDP == SIZEOF_INT
-#define T_ADDR T_UINT
-#else
-#define T_ADDR T_ULONG
-#endif
-
-
-static PyMemberDef cstack_members[] = {
-    {"size", T_INT, offsetof(PyCStackObject, ob_size), READONLY},
-    {"next", T_OBJECT, offsetof(PyCStackObject, next), READONLY},
-    {"prev", T_OBJECT, offsetof(PyCStackObject, prev), READONLY},
-    {"task", T_OBJECT, offsetof(PyCStackObject, task), READONLY},
-    {"startaddr", T_ADDR, offsetof(PyCStackObject, startaddr), READONLY},
-    {0}
+    tealet_t *current;
+    tealet_run_t run;
+    void *runarg;
 };
 
-/* simple string interface for inspection */
-
-static PyObject *
-cstack_str(PyObject *o)
+static tealet_t *slp_stub_main(tealet_t *current, void *arg)
 {
-    PyCStackObject *cst = (PyCStackObject*)o;
-    return PyString_FromStringAndSize((char*)&cst->stack,
-        cst->ob_size*sizeof(cst->stack[0]));
+    void *myarg = 0;
+    /* the caller is in arg, return right back to him */
+    tealet_switch((tealet_t*)arg, &myarg);
+    /* now we are back, myarg should contain the arg to the run function.
+     * We were possibly duplicated, so can't trust the original function args.
+     */
+    {
+        struct slp_stub_arg sarg = *(struct slp_stub_arg*)myarg;
+        tealet_free(sarg.current, myarg);
+        return (sarg.run)(sarg.current, sarg.runarg);
+    }
 }
 
-PyTypeObject PyCStack_Type = {
-    PyObject_HEAD_INIT(&PyType_Type)
-    0,
-    "stackless.cstack",
-    sizeof(PyCStackObject),
-    sizeof(PyObject *),
-    (destructor)cstack_dealloc,         /* tp_dealloc */
-    0,                                  /* tp_print */
-    0,                                  /* tp_getattr */
-    0,                                  /* tp_setattr */
-    0,                                  /* tp_compare */
-    0,                                  /* tp_repr */
-    0,                                  /* tp_as_number */
-    0,                                  /* tp_as_sequence */
-    0,                                  /* tp_as_mapping */
-    0,                                  /* tp_hash */
-    0,                                  /* tp_call */
-    (reprfunc)cstack_str,               /* tp_str */
-    PyObject_GenericGetAttr,            /* tp_getattro */
-    PyObject_GenericSetAttr,            /* tp_setattro */
-    0,                                  /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
-    cstack_doc,                         /* tp_doc */
-    0,                                  /* tp_traverse */
-    0,                                  /* tp_clear */
-    0,                                  /* tp_richcompare */
-    0,                                  /* tp_weaklistoffset */
-    0,                                  /* tp_iter */
-    0,                                  /* tp_iternext */
-    0,                                  /* tp_methods */
-    cstack_members,                     /* tp_members */
-};
+/* create a stub and return it */
+tealet_t *slp_stub_new(tealet_t *t) {
+    void *arg = (void*)tealet_current(t);
+    return tealet_new(t, slp_stub_main, &arg);
+}
 
+/* run a stub */
+int slp_stub_run(tealet_t *stub, tealet_run_t run, void **parg)
+{
+    int result;
+    void *myarg;
+    /* we cannot pass arguments to a different tealet on the stack */
+    struct slp_stub_arg *psarg = (struct slp_stub_arg*)tealet_malloc(stub, sizeof(struct slp_stub_arg));
+    if (!psarg)
+        return TEALET_ERR_MEM;
+    psarg->current = stub;
+    psarg->run = run;
+    psarg->runarg = parg ? *parg : NULL;
+    myarg = (void*)psarg;
+    result = tealet_switch(stub, &myarg);
+    if (result) {
+        /* failure */
+        tealet_free(stub, psarg);
+        return result;
+    }
+    /* pass back the arg value from the switch */
+    if (parg)
+        *parg = myarg;
+    return 0;
+}
 
+/* the current mechanism is based on the generic callable stubs
+ * above.  This can be simplified, TODO
+ */
 static int
 make_initial_stub(void)
 {
     PyThreadState *ts = PyThreadState_GET();
-    int result;
-
-    if (ts->st.initial_stub != NULL) {
-        Py_DECREF(ts->st.initial_stub);
-        ts->st.initial_stub = NULL;
+    if (ts->st.tealet_main == NULL) {
+        tealet_alloc_t ta = {
+            (tealet_malloc_t)&PyMem_Malloc,
+            (tealet_free_t)&PyMem_Free,
+            0};
+        ts->st.tealet_main = tealet_initialize(&ta);
+        if (!ts->st.tealet_main) {
+            PyErr_NoMemory();
+            return -1;
+        }
     }
-    ts->st.serial_last_jump = ++ts->st.serial;
-    result = slp_transfer(&ts->st.initial_stub, NULL, NULL);
-    if (result < 0)
-        return result;
-    /*
-     * from here, we always arrive with a compatible cstack
-     * that also can be used by main, if it is running
-     * in soft-switching mode.
-     * To insure that, it was necessary to re-create the
-     * initial stub for *every* run of a new main.
-     * This will vanish with greenlet-like stack management.
-     */
-
-    return result;
+    ts->st.initial_stub = slp_stub_new(ts->st.tealet_main);
+    if (!ts->st.initial_stub) {
+        PyErr_NoMemory();
+        return -1;
+    }
+    return 0;
 }
 
-static PyObject *
-climb_stack_and_eval_frame(PyFrameObject *f)
+static tealet_t *stub_func(tealet_t *me, void *arg)
 {
-    /*
-     * a similar case to climb_stack_and_transfer,
-     * but here we need to incorporate a gap in the
-     * stack into main and keep this gap on the stack.
-     * This way, initial_stub is always valid to be
-     * used to return to the main c stack.
-     */
     PyThreadState *ts = PyThreadState_GET();
-    intptr_t probe;
-    ptrdiff_t needed = &probe - ts->st.cstack_base;
-    /* in rare cases, the need might have vanished due to the recursion */
-    intptr_t *goobledigoobs;
-    if (needed > 0) {
-    goobledigoobs = alloca(needed * sizeof(intptr_t));
-        if (goobledigoobs == NULL)
-            return NULL;
+    PyFrameObject *f = ts->frame;
+    ts->frame = NULL;
+    slp_run_tasklet(f);
+    /* We should never return.  The switch back is performed
+     * lower on the stack, in tasklet_end
+     */
+    assert(0);
+    return NULL;
+}
+
+static int
+run_initial_stub()
+{
+    PyThreadState *ts = PyThreadState_GET();
+    tealet_t *stub = tealet_duplicate(ts->st.initial_stub);
+    if (stub) {
+        if (! slp_stub_run(ts->st.initial_stub, &stub_func, NULL))
+            return 0;
     }
-    return slp_eval_frame(f);
+    PyErr_NoMemory();
+    return -1;
 }
 
 
@@ -280,7 +166,6 @@ slp_eval_frame(PyFrameObject *f)
 {
     PyThreadState *ts = PyThreadState_GET();
     PyFrameObject *fprev = f->f_back;
-    intptr_t * stackref;
 
     if (fprev == NULL && ts->st.main == NULL) {
         int returning;
@@ -295,12 +180,6 @@ slp_eval_frame(PyFrameObject *f)
          * with a __del__ method is destroyed. This __del__
          * will run as a toplevel frame, with f_back == NULL!
          */
-
-        stackref = STACK_REFPLUS + (intptr_t *) &f;
-        if (ts->st.cstack_base == NULL)
-            ts->st.cstack_base = stackref - CSTACK_GOODGAP;
-        if (stackref > ts->st.cstack_base)
-            return climb_stack_and_eval_frame(f);
 
         returning = make_initial_stub();
         if (returning < 0)
@@ -322,6 +201,7 @@ slp_eval_frame(PyFrameObject *f)
 
 void slp_kill_tasks_with_stacks(PyThreadState *target_ts)
 {
+#if 0 /* todo, change wrt tasklet_chain
     PyThreadState *ts = PyThreadState_GET();
     int count = 0;
 
@@ -416,6 +296,7 @@ void slp_kill_tasks_with_stacks(PyThreadState *target_ts)
             Py_DECREF(t);
         }
     }
+#endif
 }
 
 void PyStackless_kill_tasks_with_stacks(int allthreads)
@@ -435,6 +316,8 @@ void PyStackless_kill_tasks_with_stacks(int allthreads)
 
 
 /* cstack spilling for recursive calls */
+#if 0
+/* re-enable stack spilling separately */
 
 static PyObject *
 eval_frame_callback(PyFrameObject *f, int exc, PyObject *retval)
@@ -513,7 +396,6 @@ slp_eval_frame_newstack(PyFrameObject *f, int exc, PyObject *retval)
         /* and reset it.  We may reenter stackless at a completely different
          * depth later
          */
-        ts->st.cstack_root = NULL;
         return retval;
     }
 
@@ -543,6 +425,7 @@ finally:
     cur->cstate = cst;
     return retval;
 }
+#endif
 
 /******************************************************
 
@@ -815,7 +698,6 @@ slp_frame_dispatch_top(PyObject *retval)
 void
 slp_stacklesseval_fini(void)
 {
-    slp_cstack_cacheclear();
 }
 
 #endif /* STACKLESS */

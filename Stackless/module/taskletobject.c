@@ -13,7 +13,7 @@
 void
 slp_current_insert(PyTaskletObject *task)
 {
-    PyThreadState *ts = task->cstate->tstate;
+    PyThreadState *ts = task->tstate;
     PyTaskletObject **chain = &ts->st.current;
 
     SLP_CHAIN_INSERT(PyTaskletObject, chain, task, next, prev);
@@ -23,7 +23,7 @@ slp_current_insert(PyTaskletObject *task)
 void
 slp_current_insert_after(PyTaskletObject *task)
 {
-    PyThreadState *ts = task->cstate->tstate;
+    PyThreadState *ts = task->tstate;
     PyTaskletObject *hold = ts->st.current;
     PyTaskletObject **chain = &ts->st.current;
 
@@ -36,7 +36,7 @@ slp_current_insert_after(PyTaskletObject *task)
 void
 slp_current_uninsert(PyTaskletObject *task)
 {
-    PyThreadState *ts = task->cstate->tstate;
+    PyThreadState *ts = task->tstate;
     PyTaskletObject *hold = ts->st.current;
     PyTaskletObject **chain = &ts->st.current;
     
@@ -74,7 +74,7 @@ slp_current_unremove(PyTaskletObject* task)
 static int
 tasklet_has_c_stack(PyTaskletObject *t)
 {
-    return t->f.frame && t->cstate && t->cstate->nesting_level != 0 ;
+    return t->f.frame && t->cstate;
 }
 
 static int
@@ -118,11 +118,6 @@ tasklet_clear(PyTaskletObject *t)
 {
     tasklet_clear_frames(t);
     TASKLET_SETVAL(t, Py_None); /* always non-zero */
-
-    /* unlink task from cstate */
-    if (t->cstate != NULL && t->cstate->task == t)
-        t->cstate->task = NULL;
-    Py_CLEAR(t->cstate);
 }
 
 /*
@@ -141,7 +136,7 @@ kill_finally (PyObject *ob)
 {
     PyThreadState *ts = PyThreadState_GET();
     PyTaskletObject *self = (PyTaskletObject *) ob;
-    int is_mine = ts == self->cstate->tstate;
+    int is_mine = ts == self->tstate;
 
     /* this could happen if we have a refcount bug, so catch it here.
     assert(self != ts->st.current);
@@ -183,10 +178,6 @@ tasklet_dealloc(PyTaskletObject *t)
     tasklet_clear_frames(t);
     if (t->tsk_weakreflist != NULL)
         PyObject_ClearWeakRefs((PyObject *)t);
-    if (t->cstate != NULL) {
-        assert(t->cstate->task != t || t->cstate->ob_size == 0);
-        Py_DECREF(t->cstate);
-    }
     Py_DECREF(t->tempval);
     Py_XDECREF(t->def_globals);
     t->ob_type->tp_free((PyObject*)t);
@@ -227,16 +218,11 @@ PyTasklet_New(PyTypeObject *type, PyObject *func)
         t->tempval = func;
         t->tsk_weakreflist = NULL;
         Py_INCREF(ts->st.initial_stub);
-        t->cstate = ts->st.initial_stub;
+        t->cstate = 0;
+        t->tstate = ts;
+        t->nesting_level = 0;
         t->def_globals = PyEval_GetGlobals();
         Py_XINCREF(t->def_globals);
-        if (ts != slp_initial_tstate) {
-            /* make sure to kill tasklets with their thread */
-            if (slp_ensure_linkage(t)) {
-                Py_DECREF(t);
-                return NULL;
-            }
-        }
     }
     return t;
 }
@@ -330,7 +316,7 @@ tasklet_reduce(PyTaskletObject * t)
                         t->ob_type,
                         t->flags,
                         t->tempval,
-                        t->cstate->nesting_level,
+                        t->nesting_level,
                         lis
                         );
 err_exit:
@@ -522,7 +508,7 @@ static TASKLET_INSERT_HEAD(impl_tasklet_insert)
         /* The tasklet may belong to a different thread, and that thread may
          * be blocked, waiting for something to do!
          */
-        slp_thread_unblock(task->cstate->tstate);
+        slp_thread_unblock(task->tstate);
     }
     return 0;
 }
@@ -711,20 +697,13 @@ tasklet_set_ignore_nesting(PyObject *self, PyObject *flag)
 static int
 bind_tasklet_to_frame(PyTaskletObject *task, PyFrameObject *frame)
 {
-    PyThreadState *ts = task->cstate->tstate;
-
+    PyThreadState *ts = PyThreadState_GET();
+    
     if (task->f.frame != NULL)
         RUNTIME_ERROR("tasklet is already bound to a frame", -1);
     task->f.frame = frame;
-    if (task->cstate != ts->st.initial_stub) {
-        PyCStackObject *hold = task->cstate;
-        task->cstate = ts->st.initial_stub;
-        Py_INCREF(task->cstate);
-        Py_DECREF(hold);
-        if (ts != slp_initial_tstate)
-            if (slp_ensure_linkage(task))
-                return -1;
-    }
+    task->tstate = ts;
+    task->nesting_level = 0;
     return 0;
     /* note: We expect that f_back is NULL, or will be adjusted immediately */
 }
@@ -831,7 +810,7 @@ static TASKLET_THROW_HEAD(impl_tasklet_throw)
      * f.frame is null for the running tasklet and a dead tasklet
      * A new tasklet has a CFrame
      */
-    if (self->f.frame == NULL && self != self->cstate->tstate->st.current) {
+    if (self->f.frame == NULL && self != self->tstate->st.current) {
         /* however, allow tasklet exit errors for already dead tasklets */
         if (PyObject_IsSubclass(((PyBombObject*)bomb)->curexc_type, PyExc_TaskletExit)) {
             Py_DECREF(bomb);
@@ -1147,7 +1126,7 @@ tasklet_get_recursion_depth(PyTaskletObject *task)
     PyThreadState *ts;
 
     assert(task->cstate != NULL);
-    ts = task->cstate->tstate;
+    ts = task->tstate;
     return PyInt_FromLong(ts->st.current == task ? ts->recursion_depth
                                                  : task->recursion_depth);
 }
@@ -1158,7 +1137,7 @@ PyTasklet_GetRecursionDepth(PyTaskletObject *task)
     PyThreadState *ts;
 
     assert(task->cstate != NULL);
-    ts = task->cstate->tstate;
+    ts = task->tstate;
     return ts->st.current == task ? ts->recursion_depth
                                   : task->recursion_depth;
 }
@@ -1170,10 +1149,10 @@ tasklet_get_nesting_level(PyTaskletObject *task)
     PyThreadState *ts;
 
     assert(task->cstate != NULL);
-    ts = task->cstate->tstate;
+    ts = task->tstate;
     return PyInt_FromLong(
         ts->st.current == task ? ts->st.nesting_level
-                               : task->cstate->nesting_level);
+                               : task->nesting_level);
 }
 
 int
@@ -1182,9 +1161,9 @@ PyTasklet_GetNestingLevel(PyTaskletObject *task)
     PyThreadState *ts;
 
     assert(task->cstate != NULL);
-    ts = task->cstate->tstate;
+    ts = task->tstate;
     return ts->st.current == task ? ts->st.nesting_level
-                                  : task->cstate->nesting_level;
+                                  : task->nesting_level;
 }
 
 
@@ -1235,10 +1214,10 @@ tasklet_restorable(PyTaskletObject *task)
     PyThreadState *ts;
 
     assert(task->cstate != NULL);
-    ts = task->cstate->tstate;
+    ts = task->tstate;
     return PyBool_FromLong(
         0 == (ts->st.current == task ? ts->st.nesting_level
-                                     : task->cstate->nesting_level) );
+                                     : task->nesting_level) );
 }
 
 int
@@ -1247,9 +1226,9 @@ PyTasklet_Restorable(PyTaskletObject *task)
     PyThreadState *ts;
 
     assert(task->cstate != NULL);
-    ts = task->cstate->tstate;
+    ts = task->tstate;
     return 0 == (ts->st.current == task ? ts->st.nesting_level
-                                        : task->cstate->nesting_level);
+                                        : task->nesting_level);
 }
 
 static PyObject *
@@ -1292,7 +1271,7 @@ tasklet_get_prev(PyTaskletObject *task)
 static PyObject *
 tasklet_thread_id(PyTaskletObject *task)
 {
-    return PyInt_FromLong(task->cstate->tstate->thread_id);
+    return PyInt_FromLong(task->tstate->thread_id);
 }
 
 static PyMemberDef tasklet_members[] = {

@@ -9,7 +9,7 @@
 /* safe pickling */
 
 static int(*cPickle_save)(PyObject *, PyObject *, int) = NULL;
-
+#if 0 /* add stack spilling later */
 static PyObject *
 pickle_callback(PyFrameObject *f, int exc, PyObject *retval)
 {
@@ -44,6 +44,7 @@ pickle_callback(PyFrameObject *f, int exc, PyObject *retval)
     return NULL;
 }
 
+#endif
 static int pickle_M(PyObject *self, PyObject *args, int pers_save);
 
 int
@@ -53,6 +54,7 @@ slp_safe_pickling(int(*save)(PyObject *, PyObject *, int),
     PyThreadState *ts = PyThreadState_GET();
     PyTaskletObject *cur = ts->st.current;
     int ret = -1;
+#if 0
     PyCFrameObject *cf = NULL;
     PyCStackObject *cst;
 
@@ -67,7 +69,9 @@ slp_safe_pickling(int(*save)(PyObject *, PyObject *, int),
     cPickle_save = save;
 
     if (ts->st.main == NULL)
+#endif
         return pickle_M(self, args, pers_save);
+#if 0
 
     cf = slp_cframe_new(pickle_callback, 1);
     if (cf == NULL)
@@ -88,6 +92,7 @@ slp_safe_pickling(int(*save)(PyObject *, PyObject *, int),
 finally:
     Py_XDECREF(cf);
     return ret;
+#endif
 }
 
 /* safe unpickling is not needed */
@@ -124,10 +129,14 @@ pickle_M(PyObject *self, PyObject *args, int pers_save)
     _self = self;
     _args = args;
     _pers_save = pers_save;
+#if 0
     old_root = ts->st.cstack_root;
     ts->st.cstack_root = STACK_REFPLUS + (intptr_t *) &self;
+#endif
     ret = slp_int_wrapper(slp_eval_frame((PyFrameObject *)cf));
+#if 0
     ts->st.cstack_root = old_root;
+#endif
     return ret;
 }
 

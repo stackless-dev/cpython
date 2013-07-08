@@ -80,29 +80,6 @@ extern int slp_switch(void);
 
 #endif
 
-static int
-climb_stack_and_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
-                         PyTaskletObject *prev)
-{
-    /*
-     * there are cases where we have been initialized
-     * in some deep stack recursion, but later on we
-     * need to switch from a higher stacklevel, and the
-     * needed stack size becomes *negative* :-))
-     */
-    PyThreadState *ts = PyThreadState_GET();
-    intptr_t probe;
-    ptrdiff_t needed = &probe - ts->st.cstack_base;
-    /* in rare cases, the need might have vanished due to the recursion */
-    intptr_t *goobledigoobs;
-    if (needed > 0) {
-        goobledigoobs = alloca(needed * sizeof(intptr_t));
-        if (goobledigoobs == NULL)
-            return -1;
-    }
-    return slp_transfer(cstprev, cst, prev);
-}
-
 /* This function returns -1 on error, 1 if a switch occurred and 0
  * if only a stack save was performed
  */
@@ -116,9 +93,7 @@ slp_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
     /* since we change the stack we must assure that the protocol was met */
     STACKLESS_ASSERT();
 
-    if ((intptr_t *) &ts > ts->st.cstack_base)
-        return climb_stack_and_transfer(cstprev, cst, prev);
-    if (cst == NULL || cst->ob_size == 0)
+    if (cst == NULL)
         cst = ts->st.initial_stub;
     if (cst != NULL) {
         if (cst->tstate != ts) {
@@ -139,6 +114,10 @@ slp_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
         if (cstprev && *cstprev == cst && cst->ob_refcnt == 1)
             cst = NULL;
     }
+    /* allocate a fresh 
+    if (!slp_cstack_new(cstprev, NULL, t))
+        return NULL;
+    
     _cstprev = cstprev;
     _cst = cst;
     _prev = prev;
