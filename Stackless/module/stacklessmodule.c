@@ -590,7 +590,7 @@ test_outside(PyObject *self)
 {
     PyThreadState *ts = PyThreadState_GET();
     PyTaskletObject *stmain = ts->st.main;
-    PyCStackObject *cst = ts->st.initial_stub;
+    tealet_t *cst = ts->st.initial_stub;
     PyFrameObject *f = ts->frame;
     int recursion_depth = ts->recursion_depth;
     int nesting_level = ts->st.nesting_level;
@@ -1147,6 +1147,7 @@ static PyObject *
 slpmodule_getuncollectables(PySlpModuleObject *mod, void *context)
 {
     PyObject *lis = PyList_New(0);
+#if 0 /* todo: finish this */
     PyCStackObject *cst = slp_cstack_chain;
 
     if (lis == NULL)
@@ -1160,6 +1161,7 @@ slpmodule_getuncollectables(PySlpModuleObject *mod, void *context)
         }
         cst = cst->next;
     } while (cst != slp_cstack_chain);
+#endif
     return lis;
 }
 
@@ -1353,7 +1355,6 @@ _PyStackless_Init(void)
 
     INSERT("slpmodule", PySlpModule_TypePtr);
     INSERT("cframe",    &PyCFrame_Type);
-    INSERT("cstack",    &PyCStack_Type);
     INSERT("bomb",          &PyBomb_Type);
     INSERT("tasklet",   &PyTasklet_Type);
     INSERT("channel",   &PyChannel_Type);

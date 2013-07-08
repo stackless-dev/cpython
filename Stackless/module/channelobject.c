@@ -450,7 +450,7 @@ generic_channel_action(PyChannelObject *self, PyObject *arg, int dir, int stackl
     PyTaskletObject *source = ts->st.current;
     PyTaskletObject *target = self->head;
     int cando = dir > 0 ? self->balance < 0 : self->balance > 0;
-    int interthread = cando ? target->cstate->tstate != ts : 0;
+    int interthread = cando ? target->tstate != ts : 0;
     PyObject *tmpval, *retval;
     int fail;
 
@@ -496,7 +496,7 @@ generic_channel_cando(PyThreadState *ts, PyObject **result, PyChannelObject *sel
     /* swap data and perform necessary scheduling */
 
     switchto = target = slp_channel_remove(self, NULL, NULL, &next);
-    interthread = target->cstate->tstate != ts;
+    interthread = target->tstate != ts;
     /* exchange data */
     TASKLET_SWAPVAL(source, target);
 

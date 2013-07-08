@@ -1965,10 +1965,6 @@
 					>
 				</File>
 				<File
-					RelativePath="..\Stackless\core\slp_transfer.c"
-					>
-				</File>
-				<File
 					RelativePath="..\Stackless\core\stackless_impl.h"
 					>
 				</File>

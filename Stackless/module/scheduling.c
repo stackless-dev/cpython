@@ -1072,7 +1072,9 @@ initialize_main_and_current(void)
                 &PyTasklet_Type, noargs, NULL);
     Py_DECREF(noargs);
     if (task == NULL) return -1;
-    assert(task->cstate != NULL);
+    task->cstate = 0;
+    task->tstate = ts;
+    task->nesting_level = 0;
     ts->st.main = task;
     Py_INCREF(task);
     slp_current_insert(task);
