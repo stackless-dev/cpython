@@ -88,6 +88,7 @@ int slp_stub_run(tealet_t *stub, tealet_run_t run, void **parg)
 {
     int result;
     void *myarg;
+    
     /* we cannot pass arguments to a different tealet on the stack */
     struct slp_stub_arg *psarg = (struct slp_stub_arg*)tealet_malloc(stub, sizeof(struct slp_stub_arg));
     if (!psarg)
@@ -108,6 +109,17 @@ int slp_stub_run(tealet_t *stub, tealet_run_t run, void **parg)
     return 0;
 }
 
+static int
+slp_tealet_error(int err)
+{
+    assert(err);
+    if (err == TEALET_ERR_MEM)
+        PyErr_NoMemory();
+    assert(err == TEALET_ERR_DEFUNCT);
+    PyErr_SetString(PyExc_RuntimeError, "Tealet corrupt");
+    return -1;
+}
+
 /* the current mechanism is based on the generic callable stubs
  * above.  This can be simplified, TODO
  */
@@ -121,43 +133,56 @@ make_initial_stub(void)
             (tealet_free_t)&PyMem_Free,
             0};
         ts->st.tealet_main = tealet_initialize(&ta);
-        if (!ts->st.tealet_main) {
-            PyErr_NoMemory();
-            return -1;
-        }
+        if (!ts->st.tealet_main)
+            goto err;
+
     }
     ts->st.initial_stub = slp_stub_new(ts->st.tealet_main);
-    if (!ts->st.initial_stub) {
-        PyErr_NoMemory();
-        return -1;
-    }
+    if (!ts->st.initial_stub)
+        goto err;
     return 0;
+err:
+    PyErr_NoMemory();
+    return -1;
 }
 
-static tealet_t *stub_func(tealet_t *me, void *arg)
+/* The function that runs tasklet loop in a tealet */
+static tealet_t *tasklet_stub_func(tealet_t *me, void *arg)
 {
     PyThreadState *ts = PyThreadState_GET();
     PyFrameObject *f = ts->frame;
     ts->frame = NULL;
+    ts->st.nesting_level = 0;
     slp_run_tasklet(f);
     /* We should never return.  The switch back is performed
-     * lower on the stack, in tasklet_end
+     * lower on the stack, in tasklet_endv
      */
     assert(0);
     return NULL;
 }
 
-static int
-run_initial_stub()
+/* Running a function in the top level stub.  If NULL is provided,
+ * use the tasklet evaluation loop
+ */
+
+/* Running the top level stub */
+int
+slp_run_initial_stub(tealet_run_t func, void *arg)
 {
     PyThreadState *ts = PyThreadState_GET();
-    tealet_t *stub = tealet_duplicate(ts->st.initial_stub);
-    if (stub) {
-        if (! slp_stub_run(ts->st.initial_stub, &stub_func, NULL))
-            return 0;
+    tealet_t *stub;
+    int result;
+    if (func == NULL)
+        func = &tasklet_stub_func;
+    stub = tealet_duplicate(ts->st.initial_stub);
+    if (!stub) {
+        PyErr_NoMemory();
+        return -1;
     }
-    PyErr_NoMemory();
-    return -1;
+    result = slp_stub_run(stub, func, arg);
+    if (result)
+        return slp_tealet_error(result);
+    return 0;
 }
 
 
@@ -201,8 +226,10 @@ slp_eval_frame(PyFrameObject *f)
 
 void slp_kill_tasks_with_stacks(PyThreadState *target_ts)
 {
-#if 0 /* todo, change wrt tasklet_chain
     PyThreadState *ts = PyThreadState_GET();
+
+
+#if 0 /* todo, change wrt tasklet_chain
     int count = 0;
 
     /* a loop to kill tasklets on the local thread */

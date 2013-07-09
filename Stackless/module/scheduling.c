@@ -331,22 +331,38 @@ slp_schedule_hook_func *_slp_schedule_fasthook;
 PyObject *_slp_schedule_hook;
 
 static int
-slp_transfer(tealet_t **cstprev, tealet_t *cst, PyTaskletObject *prev)
+slp_transfer(PyThreadState *ts, tealet_t *cst, PyTaskletObject *prev)
 {
     int result;
     int nesting_level;
-    assert(cstprev && *cstprev == NULL);
+    assert(prev->cstate == NULL);
+    
     nesting_level = prev->tstate->st.nesting_level;
     prev->nesting_level = nesting_level;
     /* mark the old tasklet as having cstate */
-    *cstprev = tealet_current(cst);
+    prev->cstate = tealet_current(ts->st.tealet_main);
 
-    result = tealet_switch(cst, NULL);
+    if (cst) {
+        /* make sure we are not trying to jump between threads */
+        assert(TEALET_MAIN(cst) == ts->st.tealet_main);
+        result = tealet_switch(cst, NULL);
+    } else {
+        assert(TEALET_MAIN(ts->st.initial_stub) == ts->st.tealet_main);
+        result = slp_run_initial_stub(NULL, NULL);
+    }
+
     /* we are back, or failed, no cstate in tasklet */
-    *cstprev = NULL;
+    prev->cstate = NULL;
     prev->tstate->st.nesting_level = nesting_level;
-    if (!result)
+    if (!result) {
+        if (ts->st.del_post_switch) {
+            PyObject *tmp;
+            TASKLET_CLAIMVAL(ts->st.current, &tmp);
+            Py_CLEAR(ts->st.del_post_switch);
+            TASKLET_SETVAL_OWN(ts->st.current, tmp);
+        }
         return 0;
+    }
     if (result == TEALET_ERR_MEM)
         PyErr_NoMemory();
     else
@@ -368,10 +384,8 @@ slp_transfer_return(tealet_t *cst)
 }
 
 static int
-transfer_with_exc(tealet_t **cstprev, tealet_t *cst, PyTaskletObject *prev)
+transfer_with_exc(PyThreadState *ts, tealet_t *cst, PyTaskletObject *prev)
 {
-    PyThreadState *ts = PyThreadState_GET();
-
     int tracing = ts->tracing;
     int use_tracing = ts->use_tracing;
 
@@ -394,7 +408,7 @@ transfer_with_exc(tealet_t **cstprev, tealet_t *cst, PyTaskletObject *prev)
     Py_XINCREF(c_profileobj);
     Py_XINCREF(c_traceobj);
 
-    ret = slp_transfer(cstprev, cst, prev);
+    ret = slp_transfer(ts, cst, prev);
 
     ts->tracing = tracing;
     ts->use_tracing = use_tracing;
@@ -892,10 +906,8 @@ static int
 slp_schedule_task_prepared(PyThreadState *ts, PyObject **result, PyTaskletObject *prev, PyTaskletObject *next, int stackless,
                   int *did_switch)
 {
-    tealet_t **cstprev;
-
     PyObject *retval;
-    int (*transfer)(tealet_t **, tealet_t *, PyTaskletObject *);
+    int (*transfer)(PyThreadState *, tealet_t *, PyTaskletObject *);
 
     /* remove the no-soft-irq flag from the runflags */
     int no_soft_irq = ts->st.runflags & PY_WATCHDOG_NO_SOFT_IRQ;
@@ -972,7 +984,6 @@ slp_schedule_task_prepared(PyThreadState *ts, PyObject **result, PyTaskletObject
     if (did_switch)
         *did_switch = 1;
 
-    assert(next->cstate != NULL);
     if (next->cstate) {
         /* create a helper frame to restore the target stack */
         ts->frame = (PyFrameObject *)
@@ -1008,8 +1019,7 @@ hard_switching:
     STACKLESS_ASSERT();
 
     /* note: nesting_level is handled in slp_transfer */
-    cstprev = &prev->cstate;
-
+    
     ts->st.current = next;
 
     if (ts->exc_type == Py_None) {
@@ -1026,7 +1036,7 @@ hard_switching:
     else
         transfer = slp_transfer;
 
-    if (transfer(cstprev, next->cstate, prev) >= 0) {
+    if (transfer(ts, next->cstate, prev) >= 0) {
         --ts->st.nesting_level;
         TASKLET_CLAIMVAL(prev, &retval);
         if (PyBomb_Check(retval))

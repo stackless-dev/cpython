@@ -311,7 +311,6 @@ tasklet_reduce(PyTaskletObject * t)
         f = f->f_back;
     }
     if (PyList_Reverse(lis)) goto err_exit;
-    assert(t->cstate != NULL);
     tup = Py_BuildValue("(O()(" TASKLET_TUPLEFMT "))",
                         t->ob_type,
                         t->flags,
@@ -1125,7 +1124,6 @@ tasklet_get_recursion_depth(PyTaskletObject *task)
 {
     PyThreadState *ts;
 
-    assert(task->cstate != NULL);
     ts = task->tstate;
     return PyInt_FromLong(ts->st.current == task ? ts->recursion_depth
                                                  : task->recursion_depth);
@@ -1136,7 +1134,6 @@ PyTasklet_GetRecursionDepth(PyTaskletObject *task)
 {
     PyThreadState *ts;
 
-    assert(task->cstate != NULL);
     ts = task->tstate;
     return ts->st.current == task ? ts->recursion_depth
                                   : task->recursion_depth;
@@ -1148,7 +1145,6 @@ tasklet_get_nesting_level(PyTaskletObject *task)
 {
     PyThreadState *ts;
 
-    assert(task->cstate != NULL);
     ts = task->tstate;
     return PyInt_FromLong(
         ts->st.current == task ? ts->st.nesting_level
@@ -1160,7 +1156,6 @@ PyTasklet_GetNestingLevel(PyTaskletObject *task)
 {
     PyThreadState *ts;
 
-    assert(task->cstate != NULL);
     ts = task->tstate;
     return ts->st.current == task ? ts->st.nesting_level
                                   : task->nesting_level;
@@ -1213,7 +1208,6 @@ tasklet_restorable(PyTaskletObject *task)
 {
     PyThreadState *ts;
 
-    assert(task->cstate != NULL);
     ts = task->tstate;
     return PyBool_FromLong(
         0 == (ts->st.current == task ? ts->st.nesting_level
@@ -1225,7 +1219,6 @@ PyTasklet_Restorable(PyTaskletObject *task)
 {
     PyThreadState *ts;
 
-    assert(task->cstate != NULL);
     ts = task->tstate;
     return 0 == (ts->st.current == task ? ts->st.nesting_level
                                         : task->nesting_level);
