@@ -153,6 +153,7 @@ static tealet_t *tasklet_stub_func(tealet_t *me, void *arg)
     PyFrameObject *f = ts->frame;
     ts->frame = NULL;
     ts->st.nesting_level = 0;
+    Py_CLEAR(ts->st.del_post_switch);
     slp_run_tasklet(f);
     /* We should never return.  The switch back is performed
      * lower on the stack, in tasklet_endv
