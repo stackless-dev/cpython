@@ -725,13 +725,19 @@ PyStackless_CallMethod_Main(PyObject *o, char *name, char *format, ...)
     va_list va;
     PyObject *args, *func = NULL, *retval;
 
-    if (o == NULL || name == NULL)
+    if (o == NULL)
         return slp_null_error();
 
-    func = PyObject_GetAttrString(o, name);
-    if (func == NULL) {
-        PyErr_SetString(PyExc_AttributeError, name);
-        return NULL;
+    if (name != NULL) {
+        func = PyObject_GetAttrString(o, name);
+        if (func == NULL) {
+            PyErr_SetString(PyExc_AttributeError, name);
+            return NULL;
+        }
+    } else {
+        /* direct call to object */
+        func = o;
+        Py_INCREF(func);
     }
 
     if (!PyCallable_Check(func))

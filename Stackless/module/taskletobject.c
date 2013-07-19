@@ -191,7 +191,7 @@ PyTasklet_New_M(PyTypeObject *type, PyObject *func)
 
     if (func == NULL) fmt = NULL;
     return (PyTaskletObject *) PyStackless_CallMethod_Main(
-        (PyObject*)type, "__call__", fmt, func);
+        (PyObject*)type, NULL, fmt, func);
 }
 
 PyTaskletObject *
