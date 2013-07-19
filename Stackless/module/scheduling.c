@@ -344,10 +344,10 @@ slp_transfer(PyThreadState *ts, tealet_t *cst, PyTaskletObject *prev)
 
     if (cst) {
         /* make sure we are not trying to jump between threads */
-        assert(TEALET_MAIN(cst) == ts->st.tealet_main);
+        assert(TEALET_RELATED(ts->st.tealet_main, cst));
         result = tealet_switch(cst, NULL);
     } else {
-        assert(TEALET_MAIN(ts->st.initial_stub) == ts->st.tealet_main);
+        assert(TEALET_RELATED(ts->st.tealet_main, ts->st.initial_stub));
         result = slp_run_tasklet_stub(ts);
     }
 

@@ -187,4 +187,7 @@ int tealet_get_count(tealet_t *t);
 #define TEALET_IS_MAIN(t)  ((t) == TEALET_MAIN(t))
 #define TEALET_CURRENT_IS_MAIN(t) (tealet_current(t) == TEALET_MAIN(t))
 
+/* see if two tealets share the same MAIN, and can therefore be switched between */
+#define TEALET_RELATED(t1, t2) (TEALET_MAIN(t1) == TEALET_MAIN(t2))
+
 #endif /* _TEALET_H_ */
