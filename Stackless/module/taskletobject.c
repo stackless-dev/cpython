@@ -184,24 +184,12 @@ tasklet_dealloc(PyTaskletObject *t)
 }
 
 
-static PyTaskletObject *
-PyTasklet_New_M(PyTypeObject *type, PyObject *func)
-{
-    char *fmt = "(O)";
-
-    if (func == NULL) fmt = NULL;
-    return (PyTaskletObject *) PyStackless_CallMethod_Main(
-        (PyObject*)type, NULL, fmt, func);
-}
-
 PyTaskletObject *
 PyTasklet_New(PyTypeObject *type, PyObject *func)
 {
     PyThreadState *ts = PyThreadState_GET();
     PyTaskletObject *t;
 
-    /* TODO: initial stub is not needed anymore */
-    if (ts->st.initial_stub == NULL) return PyTasklet_New_M(type, func);
     if (func != NULL && !PyCallable_Check(func))
         TYPE_ERROR("tasklet function must be a callable", NULL);
     if (type == NULL) type = &PyTasklet_Type;
