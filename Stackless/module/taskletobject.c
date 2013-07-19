@@ -94,7 +94,7 @@ tasklet_traverse(PyTaskletObject *t, visitproc visit, void *arg)
         Py_VISIT(f);
     }
     Py_VISIT(t->tempval);
-    Py_VISIT(t->cstate);
+    //Py_VISIT(t->cstate);
     return 0;
 }
 
@@ -215,9 +215,8 @@ PyTasklet_New(PyTypeObject *type, PyObject *func)
         if (func == NULL)
             func = Py_None;
         Py_INCREF(func);
-        t->tempval = func;
+        t->tempval = func; 
         t->tsk_weakreflist = NULL;
-        Py_INCREF(ts->st.initial_stub);
         t->cstate = 0;
         t->tstate = ts;
         t->nesting_level = 0;
