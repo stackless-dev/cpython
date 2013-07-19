@@ -124,9 +124,8 @@ slp_tealet_error(int err)
  * above.  This can be simplified, TODO
  */
 static int
-make_initial_stub(void)
+make_initial_stub(PyThreadState *ts)
 {
-    PyThreadState *ts = PyThreadState_GET();
     if (ts->st.tealet_main == NULL) {
         tealet_alloc_t ta = {
             (tealet_malloc_t)&PyMem_Malloc,
@@ -146,18 +145,29 @@ err:
     return -1;
 }
 
+static void
+destroy_initial_stub(PyThreadState *ts)
+{
+    tealet_delete(ts->st.initial_stub);
+    ts->st.initial_stub = NULL;
+}
+
 /* The function that runs tasklet loop in a tealet */
 static tealet_t *tasklet_stub_func(tealet_t *me, void *arg)
 {
     PyThreadState *ts = PyThreadState_GET();
     PyFrameObject *f = ts->frame;
+    PyObject *result;
     ts->frame = NULL;
     ts->st.nesting_level = 0;
     Py_CLEAR(ts->st.del_post_switch);
-    slp_run_tasklet(f);
-    /* We should never return.  The switch back is performed
-     * lower on the stack, in tasklet_endv
+    result = slp_run_tasklet(f);
+    
+    /* this tealet is returning, which means that main is returning. Switch back
+     * to the main tealet.  The result is passed to the target
      */
+    tealet_exit(ts->st.tealet_main, (void*)result, TEALET_EXIT_DEFAULT);
+    /* this should never fail */
     assert(0);
     return NULL;
 }
@@ -166,15 +176,12 @@ static tealet_t *tasklet_stub_func(tealet_t *me, void *arg)
  * use the tasklet evaluation loop
  */
 
-/* Running the top level stub */
+/* Running a function in the top level stub */
 int
-slp_run_initial_stub(tealet_run_t func, void *arg)
+slp_run_initial_stub(PyThreadState *ts, tealet_run_t func, void **arg)
 {
-    PyThreadState *ts = PyThreadState_GET();
     tealet_t *stub;
     int result;
-    if (func == NULL)
-        func = &tasklet_stub_func;
     stub = tealet_duplicate(ts->st.initial_stub);
     if (!stub) {
         PyErr_NoMemory();
@@ -186,6 +193,28 @@ slp_run_initial_stub(tealet_run_t func, void *arg)
     return 0;
 }
 
+/* run the top level loop from the main tasklet.  This invocation expects\
+ * a return value
+ */
+static PyObject *
+slp_run_main_stub(PyThreadState *ts)
+{
+    void *arg;
+    /* switch into a stub duplicate.  Run evaluation loop.  Then switch back */
+    int result = slp_run_initial_stub(ts, &tasklet_stub_func, &arg);
+    if (result)
+        return NULL;
+    return (PyObject*)arg;
+}
+
+/* call the top level loop as a means of startin a new such loop, hardswitching out
+ * of a tasklet.  This invocation does not expect a return value
+ */
+int
+slp_run_tasklet_stub(PyThreadState *ts)
+{
+    return slp_run_initial_stub(ts, &tasklet_stub_func, NULL);
+}
 
 PyObject *
 slp_eval_frame(PyFrameObject *f)
@@ -194,33 +223,25 @@ slp_eval_frame(PyFrameObject *f)
     PyFrameObject *fprev = f->f_back;
 
     if (fprev == NULL && ts->st.main == NULL) {
-        int returning;
-        /* this is the initial frame, so mark the stack base */
-
-        /*
-         * careful, this caused me a major headache.
-         * it is *not* sufficient to just check for fprev == NULL.
-         * Reason: (observed with wxPython):
-         * A toplevel frame is run as a tasklet. When its frame
-         * is deallocated (in tasklet_end), a Python object
-         * with a __del__ method is destroyed. This __del__
-         * will run as a toplevel frame, with f_back == NULL!
+        /* this is the initial frame.  From here we must
+         * run the evaluation loop on a separate tealet, so that
+         * all such tealets are equivalent and can jump back to main
+         * when they exit.
          */
-
-        returning = make_initial_stub();
-        if (returning < 0)
-            return NULL;
-        /* returning will be 1 if we "switched back" to this stub, and 0
-         * if this is the original call that just created the stub.
-         * If the stub is being reused, the argument, i.e. the frame,
-         * is in ts->frame
-         */
-        if (returning == 1) {
-            f = ts->frame;
-            ts->frame = NULL;
+        PyObject *result;
+        if (!ts->st.initial_stub) {
+            if (make_initial_stub(ts))
+                return NULL;
         }
-        return slp_run_tasklet(f);
+        ts->frame = f;
+        result = slp_run_main_stub(ts);
+        /* TODO: We could leave the stub around in the tstate and save
+         * ourselves the effort of recreating it all the time
+         */
+        destroy_initial_stub(ts);
+        return result;
     }
+
     Py_INCREF(Py_None);
     return slp_frame_dispatch(f, fprev, 0, Py_None);
 }
@@ -332,6 +353,9 @@ void PyStackless_kill_tasks_with_stacks(int allthreads)
     PyThreadState *ts = PyThreadState_Get();
 
     if (ts->st.main == NULL) {
+        /* TODO: Must destroy main and current afterwards, if required.
+         * also, only do this is there is any work to be done.
+         */
         if (initialize_main_and_current()) {
             PyObject *s = PyString_FromString("tasklet cleanup");
             PyErr_WriteUnraisable(s);

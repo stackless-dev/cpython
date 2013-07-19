@@ -200,7 +200,7 @@ PyTasklet_New(PyTypeObject *type, PyObject *func)
     PyThreadState *ts = PyThreadState_GET();
     PyTaskletObject *t;
 
-    /* we always need a cstate, so be sure to initialize */
+    /* TODO: initial stub is not needed anymore */
     if (ts->st.initial_stub == NULL) return PyTasklet_New_M(type, func);
     if (func != NULL && !PyCallable_Check(func))
         TYPE_ERROR("tasklet function must be a callable", NULL);

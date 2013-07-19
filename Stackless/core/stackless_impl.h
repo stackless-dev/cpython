@@ -71,8 +71,10 @@ PyAPI_FUNC(void) PyStackless_Fini(void);
 
 PyAPI_FUNC(void) PyStackless_kill_tasks_with_stacks(int allthreads);
 
-/* Runnin a new tealet */
-PyAPI_FUNC(int) slp_run_initial_stub(tealet_run_t func, void *arg);
+/* Running a new tealet */
+PyAPI_FUNC(int) slp_run_initial_stub(PyThreadState *ts, tealet_run_t func, void **arg);
+/* Running the evaluation loop in a new tealet */
+PyAPI_FUNC(int) slp_run_tasklet_stub(PyThreadState *ts);
 
 /* the special version of eval_frame */
 PyAPI_FUNC(PyObject *) slp_eval_frame(struct _frame *f);

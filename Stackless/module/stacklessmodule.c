@@ -589,13 +589,14 @@ PyObject *
 test_outside(PyObject *self)
 {
     PyThreadState *ts = PyThreadState_GET();
-    PyTaskletObject *stmain = ts->st.main;
+    PyTaskletObject *stcurrent, *stmain = ts->st.main;
     tealet_t *cst = ts->st.initial_stub;
     PyFrameObject *f = ts->frame;
     int recursion_depth = ts->recursion_depth;
     int nesting_level = ts->st.nesting_level;
     PyObject *ret = Py_None;
     int jump = ts->st.serial_last_jump;
+    tealet_t *old_main = ts->st.tealet_main;
 
     Py_INCREF(ret);
     ts->st.main = NULL;
@@ -603,7 +604,12 @@ test_outside(PyObject *self)
     ts->st.nesting_level = 0;
     ts->frame = NULL;
     ts->recursion_depth = 0;
+    stcurrent = ts->st.current;
     slp_current_remove();
+    /* must reset the "main" tealet to be this one, so that a final
+     * switch back lands us here, rather than in the "real" main tealet.
+     */
+    ts->st.tealet_main = tealet_current(old_main);
     while (ts->st.runcount > 0) {
         Py_DECREF(ret);
         ret = PyStackless_Schedule(Py_None, 0);
@@ -615,8 +621,9 @@ test_outside(PyObject *self)
     // TODO: destroy initial stub
     //Py_XDECREF(ts->st.initial_stub);
     ts->st.initial_stub = cst;
+    ts->st.tealet_main = old_main;
     ts->frame = f;
-    slp_current_insert(stmain);
+    slp_current_insert(stcurrent);
     ts->recursion_depth = recursion_depth;
     ts->st.nesting_level = nesting_level;
     ts->st.serial_last_jump = jump;

@@ -348,7 +348,7 @@ slp_transfer(PyThreadState *ts, tealet_t *cst, PyTaskletObject *prev)
         result = tealet_switch(cst, NULL);
     } else {
         assert(TEALET_MAIN(ts->st.initial_stub) == ts->st.tealet_main);
-        result = slp_run_initial_stub(NULL, NULL);
+        result = slp_run_tasklet_stub(ts);
     }
 
     /* we are back, or failed, no cstate in tasklet */
@@ -1210,17 +1210,6 @@ tasklet_end(PyObject *retval)
      * by schedule_task_destruct(), or cleared there
      */
     TASKLET_SETVAL(task, retval);
-
-    if (ismain) {
-        /*
-         * Because of soft switching, we may find ourself in the top level of a stack that was created
-         * using another stub (another entry point into stackless).  If so, we need a final return to
-         * the original stub if necessary. (Meanwhile, task->cstate may be an old nesting state and not
-         * the original stub, so we take the stub from the tstate)
-         */
-        if (tealet_current(ts->st.tealet_main) != ts->st.tealet_main)
-            slp_transfer_return(ts->st.tealet_main);
-    }
 
     /* remove from runnables */
     slp_current_remove();
