@@ -155,9 +155,18 @@ slp_run_initial_stub(PyThreadState *ts, tealet_run_t func, void **arg)
 PyObject *
 slp_run_stub_from_main(PyThreadState *ts)
 {
+    int result;
     void *arg;
-    /* switch into a stub duplicate.  Run evaluation loop.  Then switch back */
-    int result = slp_run_initial_stub(ts, &tasklet_stub_func, &arg);
+    tealet_t *old_main;
+
+    /* switch into a stub duplicate.  Run evaluation loop.  Then switch back.
+     * Set the "main" to be us, so that a switch out of the tasklet_stub_func
+     * lands us here
+     */
+    old_main = ts->st.tealet_main;
+    ts->st.tealet_main = tealet_current(old_main);
+    result = slp_run_initial_stub(ts, &tasklet_stub_func, &arg);
+    ts->st.tealet_main = old_main;
     if (result)
         return NULL;
     return (PyObject*)arg;
