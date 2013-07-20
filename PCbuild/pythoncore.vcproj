@@ -1977,6 +1977,14 @@
 					>
 				</File>
 				<File
+					RelativePath="..\Stackless\core\stackless_tealet.c"
+					>
+				</File>
+				<File
+					RelativePath="..\Stackless\core\stackless_tealet.h"
+					>
+				</File>
+				<File
 					RelativePath="..\Stackless\core\stackless_tstate.h"
 					>
 				</File>

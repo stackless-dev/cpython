@@ -2,6 +2,7 @@
 
 #ifdef STACKLESS
 #include "core/stackless_impl.h"
+#include "core/stackless_tealet.h"
 
 #ifdef WITH_THREAD
 #include "pythread.h"
@@ -329,102 +330,6 @@ PyTypeObject PyBomb_Type = {
 
 slp_schedule_hook_func *_slp_schedule_fasthook;
 PyObject *_slp_schedule_hook;
-
-static int
-slp_transfer(PyThreadState *ts, tealet_t *cst, PyTaskletObject *prev)
-{
-    int result;
-    int nesting_level;
-    assert(prev->cstate == NULL);
-    
-    nesting_level = prev->tstate->st.nesting_level;
-    prev->nesting_level = nesting_level;
-    /* mark the old tasklet as having cstate */
-    prev->cstate = tealet_current(ts->st.tealet_main);
-
-    if (cst) {
-        /* make sure we are not trying to jump between threads */
-        assert(TEALET_RELATED(ts->st.tealet_main, cst));
-        result = tealet_switch(cst, NULL);
-    } else {
-        assert(TEALET_RELATED(ts->st.tealet_main, ts->st.initial_stub));
-        result = slp_run_tasklet_stub(ts);
-    }
-
-    /* we are back, or failed, no cstate in tasklet */
-    prev->cstate = NULL;
-    prev->tstate->st.nesting_level = nesting_level;
-    if (!result) {
-        if (ts->st.del_post_switch) {
-            PyObject *tmp;
-            TASKLET_CLAIMVAL(ts->st.current, &tmp);
-            Py_CLEAR(ts->st.del_post_switch);
-            TASKLET_SETVAL_OWN(ts->st.current, tmp);
-        }
-        return 0;
-    }
-    if (result == TEALET_ERR_MEM)
-        PyErr_NoMemory();
-    else
-        PyErr_SetString(PyExc_RuntimeError, "Invalid tasklet");
-    return -1;
-}
-
-static int
-slp_transfer_return(tealet_t *cst)
-{
-    int result = tealet_exit(cst, NULL, TEALET_EXIT_DEFAULT);
-    if (result) {
-        /* emergency switch back to main tealet */
-        PyThreadState *ts = PyThreadState_GET();
-        PyErr_SetString(PyExc_RuntimeError, "Invalid tealet");
-        tealet_exit(ts->st.tealet_main, NULL, TEALET_EXIT_DEFAULT);
-    }
-    return 0;
-}
-
-static int
-transfer_with_exc(PyThreadState *ts, tealet_t *cst, PyTaskletObject *prev)
-{
-    int tracing = ts->tracing;
-    int use_tracing = ts->use_tracing;
-
-    Py_tracefunc c_profilefunc = ts->c_profilefunc;
-    Py_tracefunc c_tracefunc = ts->c_tracefunc;
-    PyObject *c_profileobj = ts->c_profileobj;
-    PyObject *c_traceobj = ts->c_traceobj;
-
-    PyObject *exc_type = ts->exc_type;
-    PyObject *exc_value = ts->exc_value;
-    PyObject *exc_traceback = ts->exc_traceback;
-    int ret;
-
-    ts->exc_type = ts->exc_value = ts->exc_traceback = NULL;
-    ts->c_profilefunc = ts->c_tracefunc = NULL;
-    ts->c_profileobj = ts->c_traceobj = NULL;
-    ts->use_tracing = ts->tracing = 0;
-
-    /* note that trace/profile are set without ref */
-    Py_XINCREF(c_profileobj);
-    Py_XINCREF(c_traceobj);
-
-    ret = slp_transfer(ts, cst, prev);
-
-    ts->tracing = tracing;
-    ts->use_tracing = use_tracing;
-
-    ts->c_profilefunc = c_profilefunc;
-    ts->c_tracefunc = c_tracefunc;
-    ts->c_profileobj = c_profileobj;
-    ts->c_traceobj = c_traceobj;
-    Py_XDECREF(c_profileobj);
-    Py_XDECREF(c_traceobj);
-
-    ts->exc_type = exc_type;
-    ts->exc_value = exc_value;
-    ts->exc_traceback = exc_traceback;
-    return ret;
-}
 
 /* scheduler monitoring */
 
@@ -1032,7 +937,7 @@ hard_switching:
 
     ++ts->st.nesting_level;
     if (ts->exc_type != NULL || ts->use_tracing || ts->tracing)
-        transfer = transfer_with_exc;
+        transfer = slp_transfer_with_exc;
     else
         transfer = slp_transfer;
 

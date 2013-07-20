@@ -17,8 +17,6 @@ extern "C" {
 #include "core/stackless_structs.h"
 #include "pickling/prickelpit.h"
 
-#include <tealet/tealet.h>
-
 #undef STACKLESS_SPY
 /*
  * if a platform wants to support self-inspection via _peek,
@@ -47,15 +45,6 @@ PyAPI_FUNC(PyCStackObject *) slp_cstack_new(PyCStackObject **cst,
 PyAPI_FUNC(size_t) slp_cstack_save(PyCStackObject *cstprev);
 PyAPI_FUNC(void) slp_cstack_restore(PyCStackObject *cst);
 
-PyAPI_FUNC(int) slp_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
-                             PyTaskletObject *prev);
-
-#ifdef Py_DEBUG
-PyAPI_FUNC(int) slp_transfer_return(PyCStackObject *cst);
-#else
-#define slp_transfer_return(cst) \
-                slp_transfer(NULL, (cst), NULL)
-#endif
 #endif
 
 PyAPI_FUNC(int) _PyStackless_InitTypes(void);
@@ -70,11 +59,6 @@ PyAPI_FUNC(void) slp_cframe_fini(void);
 PyAPI_FUNC(void) PyStackless_Fini(void);
 
 PyAPI_FUNC(void) PyStackless_kill_tasks_with_stacks(int allthreads);
-
-/* Running a new tealet */
-PyAPI_FUNC(int) slp_run_initial_stub(PyThreadState *ts, tealet_run_t func, void **arg);
-/* Running the evaluation loop in a new tealet */
-PyAPI_FUNC(int) slp_run_tasklet_stub(PyThreadState *ts);
 
 /* the special version of eval_frame */
 PyAPI_FUNC(PyObject *) slp_eval_frame(struct _frame *f);

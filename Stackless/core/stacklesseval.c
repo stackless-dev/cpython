@@ -11,6 +11,8 @@
 /* platform specific constants */
 #include "platf/slp_platformselect.h"
 
+#include "stackless_tealet.h"
+
 /* Stackless extension for ceval.c */
 
 /******************************************************
@@ -52,169 +54,7 @@ PyTaskletObject *slp_tasklet_chain = NULL;
 
 
 
-/****************************************************************
- *Implement copyable stubs by using a trampoline
- */
-struct slp_stub_arg
-{
-    tealet_t *current;
-    tealet_run_t run;
-    void *runarg;
-};
 
-static tealet_t *slp_stub_main(tealet_t *current, void *arg)
-{
-    void *myarg = 0;
-    /* the caller is in arg, return right back to him */
-    tealet_switch((tealet_t*)arg, &myarg);
-    /* now we are back, myarg should contain the arg to the run function.
-     * We were possibly duplicated, so can't trust the original function args.
-     */
-    {
-        struct slp_stub_arg sarg = *(struct slp_stub_arg*)myarg;
-        tealet_free(sarg.current, myarg);
-        return (sarg.run)(sarg.current, sarg.runarg);
-    }
-}
-
-/* create a stub and return it */
-tealet_t *slp_stub_new(tealet_t *t) {
-    void *arg = (void*)tealet_current(t);
-    return tealet_new(t, slp_stub_main, &arg, 0);
-}
-
-/* run a stub */
-int slp_stub_run(tealet_t *stub, tealet_run_t run, void **parg)
-{
-    int result;
-    void *myarg;
-    
-    /* we cannot pass arguments to a different tealet on the stack */
-    struct slp_stub_arg *psarg = (struct slp_stub_arg*)tealet_malloc(stub, sizeof(struct slp_stub_arg));
-    if (!psarg)
-        return TEALET_ERR_MEM;
-    psarg->current = stub;
-    psarg->run = run;
-    psarg->runarg = parg ? *parg : NULL;
-    myarg = (void*)psarg;
-    result = tealet_switch(stub, &myarg);
-    if (result) {
-        /* failure */
-        tealet_free(stub, psarg);
-        return result;
-    }
-    /* pass back the arg value from the switch */
-    if (parg)
-        *parg = myarg;
-    return 0;
-}
-
-static int
-slp_tealet_error(int err)
-{
-    assert(err);
-    if (err == TEALET_ERR_MEM)
-        PyErr_NoMemory();
-    assert(err == TEALET_ERR_DEFUNCT);
-    PyErr_SetString(PyExc_RuntimeError, "Tealet corrupt");
-    return -1;
-}
-
-/* the current mechanism is based on the generic callable stubs
- * above.  This can be simplified, TODO
- */
-static int
-make_initial_stub(PyThreadState *ts)
-{
-    if (ts->st.tealet_main == NULL) {
-        tealet_alloc_t ta = {
-            (tealet_malloc_t)&PyMem_Malloc,
-            (tealet_free_t)&PyMem_Free,
-            0};
-        ts->st.tealet_main = tealet_initialize(&ta, 0);
-        if (!ts->st.tealet_main)
-            goto err;
-
-    }
-    ts->st.initial_stub = slp_stub_new(ts->st.tealet_main);
-    if (!ts->st.initial_stub)
-        goto err;
-    return 0;
-err:
-    PyErr_NoMemory();
-    return -1;
-}
-
-static void
-destroy_initial_stub(PyThreadState *ts)
-{
-    tealet_delete(ts->st.initial_stub);
-    ts->st.initial_stub = NULL;
-}
-
-/* The function that runs tasklet loop in a tealet */
-static tealet_t *tasklet_stub_func(tealet_t *me, void *arg)
-{
-    PyThreadState *ts = PyThreadState_GET();
-    PyFrameObject *f = ts->frame;
-    PyObject *result;
-    ts->frame = NULL;
-    ts->st.nesting_level = 0;
-    Py_CLEAR(ts->st.del_post_switch);
-    result = slp_run_tasklet(f);
-    
-    /* this tealet is returning, which means that main is returning. Switch back
-     * to the main tealet.  The result is passed to the target
-     */
-    tealet_exit(ts->st.tealet_main, (void*)result, TEALET_EXIT_DEFAULT);
-    /* this should never fail */
-    assert(0);
-    return NULL;
-}
-
-/* Running a function in the top level stub.  If NULL is provided,
- * use the tasklet evaluation loop
- */
-
-/* Running a function in the top level stub */
-int
-slp_run_initial_stub(PyThreadState *ts, tealet_run_t func, void **arg)
-{
-    tealet_t *stub;
-    int result;
-    stub = tealet_duplicate(ts->st.initial_stub, 0);
-    if (!stub) {
-        PyErr_NoMemory();
-        return -1;
-    }
-    result = slp_stub_run(stub, func, arg);
-    if (result)
-        return slp_tealet_error(result);
-    return 0;
-}
-
-/* run the top level loop from the main tasklet.  This invocation expects\
- * a return value
- */
-static PyObject *
-slp_run_main_stub(PyThreadState *ts)
-{
-    void *arg;
-    /* switch into a stub duplicate.  Run evaluation loop.  Then switch back */
-    int result = slp_run_initial_stub(ts, &tasklet_stub_func, &arg);
-    if (result)
-        return NULL;
-    return (PyObject*)arg;
-}
-
-/* call the top level loop as a means of startin a new such loop, hardswitching out
- * of a tasklet.  This invocation does not expect a return value
- */
-int
-slp_run_tasklet_stub(PyThreadState *ts)
-{
-    return slp_run_initial_stub(ts, &tasklet_stub_func, NULL);
-}
 
 PyObject *
 slp_eval_frame(PyFrameObject *f)
@@ -230,15 +70,15 @@ slp_eval_frame(PyFrameObject *f)
          */
         PyObject *result;
         if (!ts->st.initial_stub) {
-            if (make_initial_stub(ts))
+            if (slp_make_initial_stub(ts))
                 return NULL;
         }
         ts->frame = f;
-        result = slp_run_main_stub(ts);
+        result = slp_run_stub_from_main(ts);
         /* TODO: We could leave the stub around in the tstate and save
          * ourselves the effort of recreating it all the time
          */
-        destroy_initial_stub(ts);
+        slp_destroy_initial_stub(ts);
         return result;
     }
 

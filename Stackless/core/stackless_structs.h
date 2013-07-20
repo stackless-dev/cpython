@@ -6,9 +6,10 @@ extern "C" {
 #endif
 
 /* platform specific constants (mainly SEH stuff to store )*/
+/* TODO: remove vestiges of old switching */
 #include "platf/slp_platformselect.h"
 
-#include <tealet/tealet.h>
+#include "stackless_tealet.h"
 
 
 
