@@ -80,7 +80,7 @@ static tealet_t *slp_stub_main(tealet_t *current, void *arg)
 /* create a stub and return it */
 tealet_t *slp_stub_new(tealet_t *t) {
     void *arg = (void*)tealet_current(t);
-    return tealet_new(t, slp_stub_main, &arg);
+    return tealet_new(t, slp_stub_main, &arg, 0);
 }
 
 /* run a stub */
@@ -131,7 +131,7 @@ make_initial_stub(PyThreadState *ts)
             (tealet_malloc_t)&PyMem_Malloc,
             (tealet_free_t)&PyMem_Free,
             0};
-        ts->st.tealet_main = tealet_initialize(&ta);
+        ts->st.tealet_main = tealet_initialize(&ta, 0);
         if (!ts->st.tealet_main)
             goto err;
 
@@ -182,7 +182,7 @@ slp_run_initial_stub(PyThreadState *ts, tealet_run_t func, void **arg)
 {
     tealet_t *stub;
     int result;
-    stub = tealet_duplicate(ts->st.initial_stub);
+    stub = tealet_duplicate(ts->st.initial_stub, 0);
     if (!stub) {
         PyErr_NoMemory();
         return -1;

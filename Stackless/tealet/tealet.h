@@ -40,10 +40,13 @@ typedef struct tealet_alloc_t {
 }
 
 
-/* The user-visible tealet structure */
+/* The user-visible tealet structure.  If an "extrasize" is provided when
+ * the tealet is created, "extra" points to a block of that size, otherwise
+ * it is initialized to NULL
+ */
 typedef struct tealet_t {
   struct tealet_t *main;   /* pointer to the main tealet */
-  void *data;              /* general-purpose, store whatever you want here */
+  void *extra;
   /* private fields follow */
 } tealet_t;
 
@@ -72,7 +75,7 @@ typedef tealet_t *(*tealet_run_t)(tealet_t *current, void *arg);
  * different main tealet.
  */
 TEALET_API
-tealet_t *tealet_initialize(tealet_alloc_t *alloc);
+tealet_t *tealet_initialize(tealet_alloc_t *alloc, size_t extrasize);
 
 /* Tear down the main tealet.  Call e.g. after a thread finishes (including
  * all its tealets).
@@ -100,9 +103,11 @@ void tealet_free(tealet_t *tealet, void *p);
  * causing this return.
  * 'arg' can be NULL, in which case NULL is passed to run and no result
  * argument is passed.
+ * If 'extrasize' is non-zero, extra data will be allocated and the tealet's
+ * 'extra' member points to it, otherwise it is set to NULL
  */
 TEALET_API
-tealet_t *tealet_new(tealet_t *tealet, tealet_run_t run, void **parg);
+tealet_t *tealet_new(tealet_t *tealet, tealet_run_t run, void **parg, size_t extrasize);
 
 /* Switch to another tealet.  Execution continues there.  The tealet
  * passed in must not have been freed yet and must descend from
@@ -145,7 +150,7 @@ int tealet_exit(tealet_t *target, void *arg, int flags);
  * mechanism to provide the copy with fresh data.
  */
 TEALET_API
-tealet_t *tealet_duplicate(tealet_t *tealet);
+tealet_t *tealet_duplicate(tealet_t *tealet, size_t extrasize);
 
 /* Deallocate a tealet.  Use this to delete a tealet that has exited
  * with tealet_exit() with 'TEALET_EXIT_NODELETE', or defunct tealets.
@@ -189,5 +194,8 @@ int tealet_get_count(tealet_t *t);
 
 /* see if two tealets share the same MAIN, and can therefore be switched between */
 #define TEALET_RELATED(t1, t2) (TEALET_MAIN(t1) == TEALET_MAIN(t2))
+
+/* convenience access to a typecast extra pointer */
+#define TEALET_EXTRA(t, tp) ((tp*)((t)->extra))
 
 #endif /* _TEALET_H_ */
