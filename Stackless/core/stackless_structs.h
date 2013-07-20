@@ -64,7 +64,7 @@ extern "C" {
 
  ***************************************************************************/
 
-typedef struct _tasklet_flags {
+typedef struct PyTaskletObject_flags {
     int blocked: 2;
     unsigned int atomic: 1;
     unsigned int ignore_nesting: 1;
@@ -75,17 +75,17 @@ typedef struct _tasklet_flags {
 } PyTaskletFlagStruc;
 
 
-typedef struct _tasklet {
+typedef struct PyTaskletObject {
     PyObject_HEAD
-    struct _tasklet *next;
-    struct _tasklet *prev;
+    struct PyTaskletObject *next;
+    struct PyTaskletObject *prev;
     union {
         struct _frame *frame;
         struct _cframe *cframe;
     } f;
     PyObject *tempval;
     /* bits stuff */
-    struct _tasklet_flags flags;
+    struct PyTaskletObject_flags flags;
     int recursion_depth;
     int nesting_level;
     PyThreadState *tstate;
@@ -106,7 +106,7 @@ typedef struct _cstack {
 #else
     long serial;
 #endif
-    struct _tasklet *task;
+    struct PyTaskletObject *task;
     int nesting_level;
     PyThreadState *tstate;
 #ifdef _SEH32
@@ -159,8 +159,8 @@ typedef struct _channel_flags {
 typedef struct _channel {
     PyObject_HEAD
     /* make sure that these fit tasklet's next/prev */
-    struct _tasklet *head;
-    struct _tasklet *tail;
+    struct PyTaskletObject *head;
+    struct PyTaskletObject *tail;
     int balance;
     struct _channel_flags flags;
     PyObject *chan_weakreflist;

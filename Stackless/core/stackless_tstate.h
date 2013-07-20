@@ -18,9 +18,9 @@ typedef struct _sts {
 #endif
     struct tealet_t *tealet_main;
     /* main tasklet */
-    struct _tasklet *main;
+    struct PyTaskletObject *main;
     /* runnable tasklets */
-    struct _tasklet *current;
+    struct PyTaskletObject *current;
     int runcount;
 
     /* scheduling */
