@@ -7,9 +7,6 @@
 #include "pickling/prickelpit.h"
 #include "module/channelobject.h"
 
-/* platform specific constants */
-#include "platf/slp_platformselect.h"
-
 /******************************************************
 
   type template and support for pickle helper types

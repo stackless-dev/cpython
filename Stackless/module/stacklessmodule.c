@@ -6,7 +6,6 @@
 #include "core/stackless_impl.h"
 
 #define IMPLEMENT_STACKLESSMODULE
-#include "platf/slp_platformselect.h"
 #include "core/cframeobject.h"
 #include "taskletobject.h"
 #include "channelobject.h"
@@ -543,6 +542,9 @@ This can be used to measure the execution time of 1.000.000 switches.");
 
 #define STACK_MAX_USEFUL 64000
 #define STACK_MAX_USESTR "64000"
+#ifdef MS_WINDOWS
+#define alloca _alloca
+#endif
 
 static
 PyObject *

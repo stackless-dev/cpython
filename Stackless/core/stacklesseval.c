@@ -8,9 +8,6 @@
 #include "stackless_impl.h"
 #include "pickling/prickelpit.h"
 
-/* platform specific constants */
-#include "platf/slp_platformselect.h"
-
 #include "stackless_tealet.h"
 
 /* Stackless extension for ceval.c */

@@ -2,7 +2,6 @@
 #include "cStringIO.h"
 #include "structmember.h"
 #include "core/stackless_impl.h"
-#include "platf/slp_platformselect.h"
 
 PyDoc_STRVAR(cPickle_module_documentation,
 "C implementation and optimization of the Python pickle module.");

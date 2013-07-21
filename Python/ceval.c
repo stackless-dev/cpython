@@ -17,7 +17,6 @@
 #include "opcode.h"
 #include "structmember.h"
 #include "core/stackless_impl.h"
-#include "platf/slp_platformselect.h" /* for stack saving */
 
 #include <ctype.h>
 

@@ -4,7 +4,6 @@
 #include "compile.h"
 
 #include "core/stackless_impl.h"
-#include "platf/slp_platformselect.h"
 
 /* safe pickling */
 
