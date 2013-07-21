@@ -1,22 +1,8 @@
 /*** addition to tstate ***/
 
 typedef struct _sts {
-    /* the blueprint for new stacks */
-    struct tealet_t *initial_stub;
-    /* "serial" is incremented each time we create a new stub.
-     * (enter "stackless" from the outside)
-     * and "serial_last_jump" indicates to which stub the current
-     * stack belongs.  This is used to find out if a stack switch
-     * is required when the main tasklet exits
-     */
-#ifdef have_long_long
-    long_long serial;
-    long_long serial_last_jump;
-#else
-    long serial;
-    long serial_last_jump;
-#endif
-    struct tealet_t *tealet_main;
+    struct tealet_t *initial_stub;  /* stub for creating new tealets */
+    struct tealet_t *tealet_main;   /* the current "main" tealet */
     /* main tasklet */
     struct PyTaskletObject *main;
     /* runnable tasklets */
@@ -49,9 +35,7 @@ typedef struct _sts {
 /* these macros go into pystate.c */
 #define __STACKLESS_PYSTATE_NEW \
     tstate->st.initial_stub = NULL; \
-    tstate->st.serial = 0; \
-    tstate->st.serial_last_jump = 0; \
-    tstate->st.tealet_main = 0; \
+    tstate->st.tealet_main = NULL; \
     tstate->st.ticker = 0; \
     tstate->st.interval = 0; \
     tstate->st.interrupt = NULL; \

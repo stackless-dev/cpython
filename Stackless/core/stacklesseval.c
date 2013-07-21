@@ -89,8 +89,6 @@ slp_eval_frame(PyFrameObject *f)
 void slp_kill_tasks_with_stacks(PyThreadState *target_ts)
 {
     PyThreadState *ts = PyThreadState_GET();
-
-
     int count = 0;
 
     /* a loop to kill tasklets on the local thread */

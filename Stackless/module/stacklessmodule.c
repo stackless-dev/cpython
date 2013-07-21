@@ -595,8 +595,7 @@ test_outside(PyObject *self)
     int recursion_depth = ts->recursion_depth;
     int nesting_level = ts->st.nesting_level;
     PyObject *ret = Py_None;
-    int jump = ts->st.serial_last_jump;
-    
+
     Py_INCREF(ret);
     ts->st.main = NULL;
     ts->st.initial_stub = NULL;
@@ -620,7 +619,6 @@ test_outside(PyObject *self)
     slp_current_insert(stcurrent);
     ts->recursion_depth = recursion_depth;
     ts->st.nesting_level = nesting_level;
-    ts->st.serial_last_jump = jump;
     return ret;
 }
 

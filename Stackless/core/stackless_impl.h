@@ -38,15 +38,6 @@ PyAPI_DATA(int) slp_in_psyco;
 PyAPI_DATA(int) slp_try_stackless;
 PyAPI_DATA(PyTaskletObject *) slp_tasklet_chain;
 
-#if 0
-PyAPI_FUNC(PyCStackObject *) slp_cstack_new(PyCStackObject **cst,
-                                            intptr_t *stackref,
-                                            PyTaskletObject *task);
-PyAPI_FUNC(size_t) slp_cstack_save(PyCStackObject *cstprev);
-PyAPI_FUNC(void) slp_cstack_restore(PyCStackObject *cst);
-
-#endif
-
 PyAPI_FUNC(int) _PyStackless_InitTypes(void);
 PyAPI_FUNC(void) _PyStackless_Init(void);
 

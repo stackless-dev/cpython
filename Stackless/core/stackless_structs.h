@@ -5,13 +5,7 @@
 extern "C" {
 #endif
 
-/* platform specific constants (mainly SEH stuff to store )*/
-/* TODO: remove vestiges of old switching */
-#include "platf/slp_platformselect.h"
-
 #include "stackless_tealet.h"
-
-
 
 /*** important structures: tasklet ***/
 
@@ -94,28 +88,6 @@ typedef struct PyTaskletObject {
     PyObject *def_globals;
     PyObject *tsk_weakreflist;
 } PyTaskletObject;
-
-
-/*** important structures: cstack ***/
-
-typedef struct _cstack {
-    PyObject_VAR_HEAD
-    struct _cstack *next;
-    struct _cstack *prev;
-#ifdef have_long_long
-    long_long serial;
-#else
-    long serial;
-#endif
-    struct PyTaskletObject *task;
-    int nesting_level;
-    PyThreadState *tstate;
-#ifdef _SEH32
-    DWORD exception_list; /* SEH handler on Win32 */
-#endif
-    tealet_t *tealet;
-} PyCStackObject;
-
 
 /*** important structures: bomb ***/
 
@@ -207,9 +179,6 @@ typedef struct _slpmodule {
 
 PyAPI_DATA(PyTypeObject) PyCFrame_Type;
 #define PyCFrame_Check(op) ((op)->ob_type == &PyCFrame_Type)
-
-PyAPI_DATA(PyTypeObject) PyCStack_Type;
-#define PyCStack_Check(op) ((op)->ob_type == &PyCStack_Type)
 
 PyAPI_DATA(PyTypeObject) PyBomb_Type;
 #define PyBomb_Check(op) ((op)->ob_type == &PyBomb_Type)

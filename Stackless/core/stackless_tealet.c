@@ -217,7 +217,7 @@ slp_transfer(PyThreadState *ts, tealet_t *cst, PyTaskletObject *prev)
 {
     int result;
     int nesting_level;
-    tealet_t *current, *current2;
+    tealet_t *current;
 
     assert(prev->cstate == NULL);
     nesting_level = prev->tstate->st.nesting_level;
@@ -238,7 +238,6 @@ slp_transfer(PyThreadState *ts, tealet_t *cst, PyTaskletObject *prev)
     }
 
     /* we are back, or failed, no cstate in tasklet */
-    current2 = tealet_current(ts->st.tealet_main);
     slp_tealet_unlink(current);
     prev->cstate = NULL;
     prev->tstate->st.nesting_level = nesting_level;
