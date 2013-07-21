@@ -703,6 +703,7 @@ tealet_t *tealet_duplicate(tealet_t *tealet, size_t extrasize)
     tealet_sub_t *g_tealet = (tealet_sub_t *)tealet;
     tealet_main_t *g_main = TEALET_GET_MAIN(g_tealet);
     tealet_sub_t *g_copy;
+    /* can't dup the current or the main tealet */
     assert(g_tealet != g_main->g_current && g_tealet != (tealet_sub_t*)g_main);
     g_copy = tealet_alloc(g_main, NULL, extrasize);
     if (g_copy == NULL)
@@ -710,8 +711,11 @@ tealet_t *tealet_duplicate(tealet_t *tealet, size_t extrasize)
 #ifndef NDEBUG
     g_main->g_tealets++;
 #endif
-    *g_copy = *g_tealet;
-    g_copy->stack = tealet_stack_dup(g_copy->stack);
+    /* copy the relevant bits.  extra data is not copied since we don't
+     * know how large it was in the source
+     */
+    g_copy->stack_far = g_tealet->stack_far;
+    g_copy->stack = tealet_stack_dup(g_tealet->stack);
     return (tealet_t*)g_copy;
 }
 
