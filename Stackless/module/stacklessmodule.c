@@ -614,8 +614,7 @@ test_outside(PyObject *self)
         }
     }
     ts->st.main = stmain;
-    // TODO: destroy initial stub
-    //Py_XDECREF(ts->st.initial_stub);
+    slp_destroy_initial_stub(ts);
     ts->st.initial_stub = cst;
     ts->frame = f;
     slp_current_insert(stcurrent);

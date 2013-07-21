@@ -146,7 +146,8 @@ void slp_tealet_cleanup(PyThreadState *ts)
 void
 slp_destroy_initial_stub(PyThreadState *ts)
 {
-    tealet_delete(ts->st.initial_stub);
+    if (ts->st.initial_stub)
+        tealet_delete(ts->st.initial_stub);
     ts->st.initial_stub = NULL;
 }
 
