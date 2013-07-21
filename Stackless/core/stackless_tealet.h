@@ -21,6 +21,7 @@ void slp_destroy_initial_stub(PyThreadState *ts);
 int slp_run_initial_stub(PyThreadState *ts, tealet_run_t func, void **arg);
 PyObject * slp_run_stub_from_main(PyThreadState *ts);
 int slp_run_stub_from_worker(PyThreadState *ts);
+void slp_tealet_cleanup(PyThreadState *ts);
 
 /* hard switching of tasklets */
 int slp_transfer(PyThreadState *ts, tealet_t *cst, struct PyTaskletObject *prev);

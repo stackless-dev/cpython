@@ -57,14 +57,14 @@ typedef struct _sts {
 
 struct _ts; /* Forward */
 
-/* TODO, make this also call tealet_finalize */
 void slp_kill_tasks_with_stacks(struct _ts *tstate);
+void slp_tealet_cleanup(struct _ts *tstate);
 
 #define __STACKLESS_PYSTATE_CLEAR \
     slp_kill_tasks_with_stacks(tstate); \
-    Py_CLEAR(tstate->st.initial_stub); \
     Py_CLEAR(tstate->st.del_post_switch); \
-    Py_CLEAR(tstate->st.interrupted);
+    Py_CLEAR(tstate->st.interrupted); \
+    slp_tealet_cleanup(tstate);
 
 #ifdef WITH_THREAD
 
