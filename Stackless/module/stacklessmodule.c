@@ -1155,21 +1155,21 @@ static PyObject *
 slpmodule_getuncollectables(PySlpModuleObject *mod, void *context)
 {
     PyObject *lis = PyList_New(0);
-#if 0 /* todo: finish this */
-    PyCStackObject *cst = slp_cstack_chain;
-
+    PyTealet_data *data = slp_tealet_list;
+    
     if (lis == NULL)
         return NULL;
-    do {
-        if (cst->task != NULL) {
-            if (PyList_Append(lis, (PyObject *) cst->task)) {
-                Py_DECREF(lis);
-                return NULL;
+    if (data) {
+        do {
+            if (data->tasklet) {
+                if (PyList_Append(lis, (PyObject*)data->tasklet)) {
+                    Py_DECREF(lis);
+                    return NULL;
+                }
             }
-        }
-        cst = cst->next;
-    } while (cst != slp_cstack_chain);
-#endif
+            data = data->next;
+        } while (data != slp_tealet_list);
+    }
     return lis;
 }
 

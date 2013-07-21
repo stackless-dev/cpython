@@ -475,6 +475,44 @@ class TestErrorHandler(StacklessTestCase):
             s.run()
         self.assertTrue(self.handled_tasklet is s)
 
+class TestUncollectables(StacklessTestCase):
+    def _testNone(self):
+        self.assertEqual(stackless.uncollectables, [])
+
+    def testOne(self):
+        before = set(stackless.uncollectables)
+        c = stackless.channel()
+        def func1():
+            stackless.test_cstate(func2) # force hard switch
+        def func2():
+            c.receive()
+        t = stackless.tasklet(func1)()
+        stackless.run()
+        after = set(stackless.uncollectables)
+        self.assertEqual(after-before, set([t]))
+        c.send(None)
+        stackless.run()
+        after = set(stackless.uncollectables)
+        self.assertEqual(after, before)
+
+    def testTwo(self):
+        before = set(stackless.uncollectables)
+        c = stackless.channel()
+        def func1():
+            stackless.test_cstate(func2) # force hard switch
+        def func2():
+            c.receive()
+        t1 = stackless.tasklet(func1)()
+        t2 = stackless.tasklet(func1)()
+        stackless.run()
+        after = set(stackless.uncollectables)
+        self.assertEqual(after - before, set([t1, t2]))
+        c.send(None)
+        c.send(None)
+        stackless.run()
+        after = set(stackless.uncollectables)
+        self.assertEqual(after, before)
+
 
 #///////////////////////////////////////////////////////////////////////////////
 

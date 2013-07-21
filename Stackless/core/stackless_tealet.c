@@ -5,6 +5,35 @@
 #include "frameobject.h"
 #include "stackless_impl.h"
 
+PyTealet_data *slp_tealet_list = NULL;
+
+static void
+slp_tealet_link(tealet_t *t, PyTaskletObject *tasklet)
+{
+    PyTealet_data *td = TEALET_EXTRA(t, PyTealet_data);
+    if (slp_tealet_list) {
+        td->next = slp_tealet_list;
+        td->prev = td->next->prev;
+        td->next->prev = td;
+        td->prev->next = td;
+    } else
+        td->next = td->prev = td;
+    slp_tealet_list = td;
+    td->tasklet = tasklet;
+}
+
+static void
+slp_tealet_unlink(tealet_t *t)
+{
+    PyTealet_data *td = TEALET_EXTRA(t, PyTealet_data);
+    if (td->next != td) {
+        slp_tealet_list = td->next;
+        td->next->prev = td->prev;
+        td->prev->next = td->next;
+    } else
+        slp_tealet_list = NULL;
+}
+
 /****************************************************************
  *Implement copyable tealet stubs by using a trampoline
  */
@@ -31,9 +60,9 @@ static tealet_t *slp_stub_main(tealet_t *current, void *arg)
 }
 
 /* create a stub and return it */
-tealet_t *slp_stub_new(tealet_t *t) {
+tealet_t *slp_stub_new(tealet_t *t, size_t extrasize) {
     void *arg = (void*)tealet_current(t);
-    return tealet_new(t, slp_stub_main, &arg, 0);
+    return tealet_new(t, slp_stub_main, &arg, extrasize);
 }
 
 /* run a stub */
@@ -87,12 +116,12 @@ slp_make_initial_stub(PyThreadState *ts)
             (tealet_malloc_t)&PyMem_Malloc,
             (tealet_free_t)&PyMem_Free,
             0};
-        ts->st.tealet_main = tealet_initialize(&ta, 0);
+        ts->st.tealet_main = tealet_initialize(&ta, sizeof(PyTealet_data));
         if (!ts->st.tealet_main)
             goto err;
 
     }
-    ts->st.initial_stub = slp_stub_new(ts->st.tealet_main);
+    ts->st.initial_stub = slp_stub_new(ts->st.tealet_main, sizeof(PyTealet_data));
     if (!ts->st.initial_stub)
         goto err;
     return 0;
@@ -138,7 +167,7 @@ slp_run_initial_stub(PyThreadState *ts, tealet_run_t func, void **arg)
 {
     tealet_t *stub;
     int result;
-    stub = tealet_duplicate(ts->st.initial_stub, 0);
+    stub = tealet_duplicate(ts->st.initial_stub, sizeof(PyTealet_data));
     if (!stub) {
         PyErr_NoMemory();
         return -1;
@@ -188,12 +217,16 @@ slp_transfer(PyThreadState *ts, tealet_t *cst, PyTaskletObject *prev)
 {
     int result;
     int nesting_level;
+    tealet_t *current, *current2;
+
     assert(prev->cstate == NULL);
-    
     nesting_level = prev->tstate->st.nesting_level;
     prev->nesting_level = nesting_level;
-    /* mark the old tasklet as having cstate */
-    prev->cstate = tealet_current(ts->st.tealet_main);
+
+    /* mark the old tasklet as having cstate, and link it in */
+    current = tealet_current(ts->st.tealet_main);
+    prev->cstate = current;
+    slp_tealet_link(current, prev);
 
     if (cst) {
         /* make sure we are not trying to jump between threads */
@@ -205,6 +238,8 @@ slp_transfer(PyThreadState *ts, tealet_t *cst, PyTaskletObject *prev)
     }
 
     /* we are back, or failed, no cstate in tasklet */
+    current2 = tealet_current(ts->st.tealet_main);
+    slp_tealet_unlink(current);
     prev->cstate = NULL;
     prev->tstate->st.nesting_level = nesting_level;
     if (!result) {
