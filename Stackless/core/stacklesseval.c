@@ -91,38 +91,34 @@ void slp_kill_tasks_with_stacks(PyThreadState *target_ts)
     PyThreadState *ts = PyThreadState_GET();
 
 
-#if 0 /* todo, change wrt tasklet_chain
     int count = 0;
 
     /* a loop to kill tasklets on the local thread */
     while (1) {
-        PyCStackObject *csfirst = slp_cstack_chain, *cs;
+        PyTealet_data *tdfirst = slp_tealet_list, *td;
         PyTaskletObject *t, *task;
         PyTaskletObject **chain;
 
-        if (csfirst == NULL)
+        if (tdfirst == NULL)
             break;
-        for (cs = csfirst; ; cs = cs->next) {
-            if (count && cs == csfirst) {
+        for (td = tdfirst; ; td = td->next) {
+            if (count && td == tdfirst) {
                 /* nothing found */
                 return;
             }
             ++count;
-            if (cs->task == NULL)
+            if (td->tasklet == NULL)
                 continue;
             /* can't kill tasklets from other threads here */
-            if (cs->tstate != ts)
-                continue;
-            /* were we asked to kill tasklet on our thread? */
-            if (target_ts != NULL && cs->tstate != target_ts)
+            if (td->tasklet->tstate != ts)
                 continue;
             /* Not killable, another thread's frameless main? */
-            if (slp_get_frame(cs->task) == NULL)
+            if (slp_get_frame(td->tasklet) == NULL)
                 continue;
             break;
         }
         count = 0;
-        t = cs->task;
+        t = td->tasklet;
         Py_INCREF(t); /* cs->task is a borrowed ref */
 
         /* We need to ensure that the tasklet 't' is in the scheduler
@@ -135,7 +131,7 @@ void slp_kill_tasks_with_stacks(PyThreadState *target_ts)
          * killed, they will be implicitly placed before this one,
          * leaving it to run next.
          */
-        if (!t->flags.blocked && t != cs->tstate->st.current) {
+        if (!t->flags.blocked && t != t->tstate->st.current) {
             PyTaskletObject *tmp;
             /* unlink from runnable queue if it wasn't previously remove()'d */
             if (t->next && t->prev) {
@@ -145,7 +141,7 @@ void slp_kill_tasks_with_stacks(PyThreadState *target_ts)
             } else
                 Py_INCREF(t); /* a new reference for the runnable queue */
             /* insert into the 'current' chain without modifying 'current' */
-            tmp = cs->tstate->st.current;
+            tmp = t->tstate->st.current;
             chain = &tmp;
             task = t;
             SLP_CHAIN_INSERT(PyTaskletObject, chain, task, next, prev);
@@ -154,10 +150,6 @@ void slp_kill_tasks_with_stacks(PyThreadState *target_ts)
         PyTasklet_Kill(t);
         PyErr_Clear();
 
-        if (t->cstate != NULL) {
-            /* ensure a valid tstate */
-            t->cstate->tstate = slp_initial_tstate;
-        }
         Py_DECREF(t);
     }
 
@@ -167,25 +159,30 @@ void slp_kill_tasks_with_stacks(PyThreadState *target_ts)
      * exit this function
      */
     {
-        PyCStackObject *csfirst = slp_cstack_chain, *cs;
+        PyTealet_data *tdfirst = slp_tealet_list, *td;
         PyTaskletObject *t;
         
-        if (csfirst == NULL)
+        if (tdfirst == NULL)
             return;
         count = 0;
-        for (cs = csfirst; ; cs = cs->next) {
-            if (count && cs == csfirst) {
+        for (td = tdfirst; ; td = td->next) {
+            if (count && td == tdfirst) {
                 return;
             }
+            if (td->tasklet == NULL)
+                continue;
+            t = td->tasklet;
+            if (t->tstate == ts)
+                continue; /* ignore this thread's tasklets */
+            if (target_ts && t->tstate != target_ts)
+                continue; /* want a specific thread */
             count++;
-            t = cs->task;
             Py_INCREF(t); /* cs->task is a borrowed ref */
             PyTasklet_Kill(t);
             PyErr_Clear();
             Py_DECREF(t);
         }
     }
-#endif
 }
 
 void PyStackless_kill_tasks_with_stacks(int allthreads)
