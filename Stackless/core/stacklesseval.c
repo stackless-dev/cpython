@@ -133,6 +133,7 @@ void slp_kill_tasks_with_stacks(PyThreadState *target_ts)
                 task = t;
                 chain = &task;
                 SLP_CHAIN_REMOVE(PyTaskletObject, chain, task, next, prev);
+                ts->st.runcount--;
             } else
                 Py_INCREF(t); /* a new reference for the runnable queue */
             /* insert into the 'current' chain without modifying 'current' */
@@ -140,6 +141,7 @@ void slp_kill_tasks_with_stacks(PyThreadState *target_ts)
             chain = &tmp;
             task = t;
             SLP_CHAIN_INSERT(PyTaskletObject, chain, task, next, prev);
+            ts->st.runcount++;
         }
 
         PyTasklet_Kill(t);
@@ -183,19 +185,28 @@ void slp_kill_tasks_with_stacks(PyThreadState *target_ts)
 void PyStackless_kill_tasks_with_stacks(int allthreads)
 {
     PyThreadState *ts = PyThreadState_Get();
+    int init = 0;
+    if (slp_tealet_list == NULL)
+        return;
 
     if (ts->st.main == NULL) {
-        /* TODO: Must destroy main and current afterwards, if required.
-         * also, only do this is there is any work to be done.
-         */
         if (initialize_main_and_current()) {
             PyObject *s = PyString_FromString("tasklet cleanup");
             PyErr_WriteUnraisable(s);
             Py_XDECREF(s);
             return;
         }
+        init = 1;
     }
     slp_kill_tasks_with_stacks(allthreads ? NULL : ts);
+
+    if (init) {
+        PyTaskletObject *m = ts->st.main, *c;
+        ts->st.main = NULL;
+        c = slp_current_remove();
+        Py_XDECREF(m);
+        Py_XDECREF(c);
+    }
 }
 
 
