@@ -94,7 +94,6 @@ tasklet_traverse(PyTaskletObject *t, visitproc visit, void *arg)
         Py_VISIT(f);
     }
     Py_VISIT(t->tempval);
-    //Py_VISIT(t->cstate);
     return 0;
 }
 
@@ -1255,10 +1254,6 @@ tasklet_thread_id(PyTaskletObject *task)
 }
 
 static PyMemberDef tasklet_members[] = {
-    {"cstate", T_OBJECT, offsetof(PyTaskletObject, cstate), READONLY,
-     PyDoc_STR("the C stack object associated with the tasklet.\n\
-     Every tasklet has a cstate, even if it is a trivial one.\n\
-     Please see the cstate doc and the stackless documentation.")},
     {"tempval", T_OBJECT, offsetof(PyTaskletObject, tempval), 0},
     /* blocked, slicing_lock, atomic and such are treated by tp_getset */
     {0}
