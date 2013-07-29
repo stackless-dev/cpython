@@ -221,116 +221,59 @@ void PyStackless_kill_tasks_with_stacks(int allthreads)
 
 
 /* cstack spilling for recursive calls */
-#if 0
-/* re-enable stack spilling separately */
-
-static PyObject *
-eval_frame_callback(PyFrameObject *f, int exc, PyObject *retval)
+typedef struct eval_args
 {
-    PyThreadState *ts = PyThreadState_GET();
-    PyTaskletObject *cur = ts->st.current;
-    PyCStackObject *cst;
-    PyCFrameObject *cf = (PyCFrameObject *) f;
-    intptr_t *saved_base;
+    PyThreadState *ts;
+    tealet_t *return_to;
+    PyFrameObject *f;
+    int exc;
+    PyObject *retval;
+} eval_args;
 
-    //make sure we don't try softswitching out of this callstack
-    ts->st.nesting_level = cf->n + 1;
-    ts->frame = f->f_back;
-
-    //this tasklet now runs in this tstate.
-    cst = cur->cstate; //The calling cstate
-    cur->cstate = ts->st.initial_stub;
-    Py_INCREF(cur->cstate);
-
-    /* We must base our new stack from here, because otherwise we might find
-     * ourselves in an infinite loop of stack spilling.
-     */
-    saved_base = ts->st.cstack_root;
-    ts->st.cstack_root = STACK_REFPLUS + (intptr_t *) &f;
-
-    /* pull in the right retval and tempval from the arguments */
-    Py_DECREF(retval);
-    retval = cf->ob1;
-    cf->ob1 = NULL;
-    TASKLET_SETVAL_OWN(cur, cf->ob2);
-    cf->ob2 = NULL;
-
-    retval = PyEval_EvalFrameEx_slp(ts->frame, exc, retval);
-    ts->st.cstack_root = saved_base;
-
-    /* store retval back into the cstate object */
-    if (retval == NULL)
-        retval = slp_curexc_to_bomb();
-    if (retval == NULL)
-        goto fatal;
-    cf->ob1 = retval;
-
-    /* jump back */
-    Py_DECREF(cur->cstate);
-    cur->cstate = cst;
-    slp_transfer_return(cst);
-    /* should never come here */
-fatal:
-    Py_DECREF(cf); /* since the caller won't do it */
-    return NULL;
+static tealet_t *
+eval_frame_callback(tealet_t *current, void *arg)
+{
+    eval_args *args = (eval_args*)arg;
+    PyThreadState *ts = args->ts;
+    
+    /*make sure we don't try softswitching out of this callstack
+    /* TODO: find a way to keep this tasklet pickleable, but not softswitchable */
+    ts->st.nesting_level++;
+    
+    /* perform the call */
+    args->retval = PyEval_EvalFrameEx_slp(args->f, args->exc, args->retval);
+    ts->st.nesting_level--;
+    return args->return_to;
 }
 
 PyObject *
 slp_eval_frame_newstack(PyFrameObject *f, int exc, PyObject *retval)
 {
     PyThreadState *ts = PyThreadState_GET();
-    PyTaskletObject *cur = ts->st.current;
-    PyCFrameObject *cf = NULL;
-    PyCStackObject *cst;
-
-    if (cur == NULL || PyErr_Occurred()) {
-        /* Bypass this during early initialization or if we have a pending
-         * exception, such as the one set via gen_close().  Doing the stack
-         * magic here will clear that exception.
-         */
-        intptr_t *old = ts->st.cstack_root;
-        ts->st.cstack_root = STACK_REFPLUS + (intptr_t *) &f;
-        retval = PyEval_EvalFrameEx_slp(f,exc, retval);
-        ts->st.cstack_root = old;
-        return retval;
-    }
-    if (ts->st.cstack_root == NULL) {
-        /* this is a toplevel call.  Store the root of stack spilling */
-        ts->st.cstack_root = STACK_REFPLUS + (intptr_t *) &f;
-        retval = PyEval_EvalFrameEx_slp(f, exc, retval);
-        /* and reset it.  We may reenter stackless at a completely different
-         * depth later
-         */
-        return retval;
-    }
-
-    ts->frame = f;
-    cf = slp_cframe_new(eval_frame_callback, 1);
-    if (cf == NULL)
+    eval_args *args = PyMem_MALLOC(sizeof(eval_args));
+    int result;
+    void *argp;
+    if (!args) {
+        PyErr_NoMemory();
         return NULL;
-    cf->n = ts->st.nesting_level;
-    cf->ob1 = retval;
-    /* store the tmpval here so that it won't get clobbered
-     * by slp_run_tasklet()
-     */
-    TASKLET_CLAIMVAL(cur, &(cf->ob2));
-    ts->frame = (PyFrameObject *) cf;
-    cst = cur->cstate;
-    cur->cstate = NULL;
-    if (slp_transfer(&cur->cstate, NULL, cur) < 0)
-        goto finally; /* fatal */
-    Py_XDECREF(cur->cstate);
+    }
+    args->ts = ts;
+    args->return_to = tealet_current(ts->st.tealet_main);
+    args->f = f;
+    args->exc = exc;
+    args->retval = retval;
 
-    retval = cf->ob1;
-    cf->ob1 = NULL;
-    if (PyBomb_Check(retval))
-        retval = slp_bomb_explode(retval);
-finally:
-    Py_DECREF(cf);
-    cur->cstate = cst;
+    argp = (void*)args;
+    result = slp_run_initial_stub(ts, eval_frame_callback, &argp);
+    if (result) {
+        Py_XDECREF(retval);
+        PyMem_FREE(args);
+        return NULL;
+    }
+    retval = args->retval;
+    PyMem_FREE(args);
     return retval;
 }
-#endif
 
 /******************************************************
 

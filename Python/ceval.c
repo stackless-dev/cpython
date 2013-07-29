@@ -905,10 +905,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
         return NULL;
 
 #ifdef STACKLESS
-#if 0 /* TODO - re-enable stack spilling */
-    if (CSTACK_SAVE_NOW(tstate, f))
+    if (slp_cstack_save_now(tstate))
         return slp_eval_frame_newstack(f, throwflag, retval);
-#endif
 
     /* push frame */
     if (Py_EnterRecursiveCall("")) {
