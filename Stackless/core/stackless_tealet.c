@@ -115,7 +115,8 @@ slp_tealet_error(int err)
 }
 
 /* the current mechanism is based on the generic callable stubs
- * above.  This can be simplified, TODO
+ * above.  This is useful, because it allows us to call arbitrary
+ * callbacks, e.g. when doing stack spilling.
  */
 int
 slp_make_initial_stub(PyThreadState *ts)
