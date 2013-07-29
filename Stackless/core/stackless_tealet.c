@@ -60,10 +60,19 @@ static tealet_t *slp_stub_main(tealet_t *current, void *arg)
 }
 
 /* create a stub and return it */
-tealet_t *slp_stub_new(tealet_t *t, size_t extrasize) {
+tealet_t *slp_stub_new(tealet_t *t, size_t extrasize)
+{
     void *arg = (void*)tealet_current(t);
     return tealet_new(t, slp_stub_main, &arg, extrasize);
 }
+
+/* find the stack far point if a stub were created here */
+void * slp_stub_far(tealet_t *dummy1, size_t dummy2)
+{
+    void *arg = 0;
+    return tealet_new_far(dummy1, NULL, &arg, dummy2);
+}
+
 
 /* run a stub */
 int slp_stub_run(tealet_t *stub, tealet_run_t run, void **parg)
@@ -121,9 +130,35 @@ slp_make_initial_stub(PyThreadState *ts)
             goto err;
 
     }
-    ts->st.initial_stub = slp_stub_new(ts->st.tealet_main, sizeof(PyTealet_data));
-    if (!ts->st.initial_stub)
-        goto err;
+    if (ts->st.initial_stub) {
+        /* recreate stub, if it was deeper on the stack, otherwise, we just leave it */
+        /* note, this approach needs to be subject to tuning.  Maybe the absolute position
+         * of the stub makes no difference.  But for stack spilling, a "high" stub makes
+         * perfect sense.
+         */
+        void *a;
+        void *b;
+        a = tealet_get_far(ts->st.initial_stub);
+        b = slp_stub_far(ts->st.tealet_main, 0);
+        if (tealet_stack_diff(a, b) < 0) {
+            /* new stub will be higher up, recreate it */
+            tealet_delete(ts->st.initial_stub);
+            ts->st.initial_stub = NULL;
+        }
+    }
+
+    if (!ts->st.initial_stub) {
+        ts->st.initial_stub = slp_stub_new(ts->st.tealet_main, sizeof(PyTealet_data));
+        if (!ts->st.initial_stub)
+            goto err;
+#if 0 /* just to verify predicted pos */
+        {
+            void *c
+            c = slp_stub_far(ts->st.tealet_main, 0);
+            c = c;
+        }
+#endif
+    }
     return 0;
 err:
     PyErr_NoMemory();
@@ -344,7 +379,7 @@ int slp_cstack_save_now(PyThreadState *ts)
         return 0;
     assert(ts->st.initial_stub);
     a = tealet_get_far(ts->st.initial_stub);
-    b = tealet_new_far(NULL, NULL, NULL, 0);
+    b = slp_stub_far(NULL, 0);
     diff = tealet_stack_diff(a, b);
 #if 0 /* enable this for testing, a low threshold */
     return diff > 1000;

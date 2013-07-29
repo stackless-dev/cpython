@@ -66,26 +66,10 @@ slp_eval_frame(PyFrameObject *f)
          * when they exit.
          */
         PyObject *result;
-        if (!ts->st.initial_stub) {
-            if (slp_make_initial_stub(ts))
-                return NULL;
-        }
+        if (slp_make_initial_stub(ts))
+            return NULL;
         ts->frame = f;
         result = slp_run_stub_from_main(ts);
-#if 0
-        /* clean up initial stub and recreate it every time */
-        slp_destroy_initial_stub(ts);
-#else
-        /* experimental.
-         * no need to have new stubs, because of how tealets
-         * work.  This stub continues to be valid no matter from
-         * what level we enter.
-         * The only way this might cause problems is if the initial
-         * entry is unusually deep on the stack.  We could modify this by
-         * testing the stack position.
-         */
-        /* TODO: recreate the stub if we are in a "shallower" position */
-#endif
         return result;
     }
 
