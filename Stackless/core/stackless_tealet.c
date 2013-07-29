@@ -133,9 +133,7 @@ err:
 /* clean up tealet state for this thread */
 void slp_tealet_cleanup(PyThreadState *ts)
 {
-    if (ts->st.initial_stub)
-        tealet_delete(ts->st.initial_stub);
-    ts->st.initial_stub = NULL;
+    slp_destroy_initial_stub(ts);
     if (ts->st.tealet_main) {
         assert(TEALET_IS_MAIN(ts->st.tealet_main));
         tealet_finalize(ts->st.tealet_main);
