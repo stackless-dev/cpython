@@ -2537,10 +2537,9 @@ save(Picklerobject *self, PyObject *args, int pers_save)
     int res = -1;
     int tmp;
 
-    /* TODO: re-enable stack spilling */
-#if 0 && defined STACKLESS
+#if defined STACKLESS
     /* but we save the stack after a fixed watermark */
-    if (CSTACK_SAVE_NOW(PyThreadState_GET(), self)) {
+    if (slp_cstack_save_now(PyThreadState_GET())) {
         res = slp_safe_pickling((int(*)(PyObject *, PyObject *, int))&save,
                                 (PyObject *)self, args, pers_save);
         goto finally;

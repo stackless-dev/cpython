@@ -28,4 +28,7 @@ int slp_transfer(PyThreadState *ts, tealet_t *cst, struct PyTaskletObject *prev)
 int slp_transfer_with_exc(PyThreadState *ts, tealet_t *cst, struct PyTaskletObject *prev);
 int slp_transfer_return(tealet_t *cst);
 
+/* stack spilling */
+int slp_cstack_save_now(PyThreadState *ts);
+
 #endif

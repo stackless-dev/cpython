@@ -221,7 +221,6 @@ class TestPickledTasklets(StacklessTestCase):
     except AttributeError:
         have_fromkeys = False
 
-@unittest.skip("until safe pickling is done")
 class TestConcretePickledTasklets(TestPickledTasklets):
     def testClassPersistence(self):
         t1 = CustomTasklet(nothing)()

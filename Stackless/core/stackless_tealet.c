@@ -135,10 +135,15 @@ void slp_tealet_cleanup(PyThreadState *ts)
 {
     slp_destroy_initial_stub(ts);
     if (ts->st.tealet_main) {
-        assert(TEALET_IS_MAIN(ts->st.tealet_main));
-        tealet_finalize(ts->st.tealet_main);
+        /* we may be calling Py_Exit from a tasklet or otherwise
+         * from a sub-tealet.  Therefore we can't make sanity checks
+         * like testing that we are the main tealet.  Accept that we
+         * may leak suspended tealets in this case
+         */
+        if (TEALET_CURRENT_IS_MAIN(ts->st.tealet_main))
+            tealet_finalize(ts->st.tealet_main);
+        ts->st.tealet_main = NULL;
     }
-    ts->st.initial_stub = NULL;
 }
 
 void
@@ -326,4 +331,23 @@ slp_transfer_with_exc(PyThreadState *ts, tealet_t *cst, PyTaskletObject *prev)
     ts->exc_value = exc_value;
     ts->exc_traceback = exc_traceback;
     return ret;
+}
+
+#ifndef CSTACK_WATERMARK
+#define CSTACK_WATERMARK 16384
+#endif
+int slp_cstack_save_now(PyThreadState *ts)
+{
+    void *a, *b;
+    ptrdiff_t diff;
+    if (!ts->st.initial_stub)
+        return 0;
+    assert(ts->st.initial_stub);
+    a = tealet_get_far(ts->st.initial_stub);
+    b = tealet_new_far(NULL, NULL, NULL, 0);
+    diff = tealet_stack_diff(a, b);
+#if 0 /* enable this for testing, a low threshold */
+    return diff > 1000;
+#endif
+    return diff > CSTACK_WATERMARK;
 }
