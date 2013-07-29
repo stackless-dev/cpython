@@ -175,6 +175,32 @@ tealet_t *tealet_current(tealet_t *tealet);
 TEALET_API
 void **tealet_main_userpointer(tealet_t *tealet);
 
+/* functions for stack arithmetic.  Useful when deciding
+ * if you want to start a newa tealet, or when doing stack
+ * spilling
+ */
+
+/* subtract two stack positions, taking into account if the
+ * local stack grows up or down in memory.
+ * The result is positive if 'b' is 'deeper' on the stack
+ * than 'a'
+ */
+TEALET_API
+ptrdiff_t tealet_stack_diff(void *a, void *b);
+
+/* Get a tealet's "far" position on the stack.  This is an
+ * indicator of its creation position on the stack.  The main
+ * tealet extends until the beginning of stack
+ */
+TEALET_API
+void *tealet_get_far(tealet_t *_tealet);
+
+/* this is used to get the "far address _if_ a tealet were initialized here
+ * The arguments must match the real tealet_new() but are dummies.
+ */
+TEALET_API
+void *tealet_new_far(tealet_t *dummy1, tealet_run_t dummy2, void **dummy3, size_t dummy4);
+
 /* get a tealet's status */
 #define TEALET_STATUS_ACTIVE 0
 #define TEALET_STATUS_EXITED 1

@@ -759,3 +759,27 @@ int tealet_get_count(tealet_t *tealet)
     return TEALET_GET_MAIN(tealet)->g_tealets;
 }
 #endif
+
+ptrdiff_t tealet_stack_diff(void *a, void *b)
+{
+    return STACK_SUB((ptrdiff_t)a, (ptrdiff_t)(b));
+}
+
+void *tealet_get_far(tealet_t *_tealet)
+{
+    tealet_sub_t *tealet = (tealet_sub_t *)_tealet;
+    return tealet->stack_far;
+}
+
+void *tealet_new_far(tealet_t *d1, tealet_run_t d2, void **d3, size_t d4)
+{
+    tealet_sub_t *result;
+    void *r;
+    (void)d1;
+    (void)d2;
+    (void)d3;
+    (void)d4;
+    /* avoid compiler warnings about returning tmp addr */
+    r = (void*)&result;
+    return r;
+}
