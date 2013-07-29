@@ -51,7 +51,7 @@ For example::
 
     >>> # Find the ten most common words in Hamlet
     >>> import re
-    >>> words = re.findall('\w+', open('hamlet.txt').read().lower())
+    >>> words = re.findall(r'\w+', open('hamlet.txt').read().lower())
     >>> Counter(words).most_common(10)
     [('the', 1143), ('and', 966), ('to', 762), ('of', 669), ('i', 631),
      ('you', 554),  ('a', 546), ('my', 514), ('hamlet', 471), ('in', 451)]
@@ -628,9 +628,7 @@ Example:
            'Return a new OrderedDict which maps field names to their values'
            return OrderedDict(zip(self._fields, self))
    <BLANKLINE>
-      __dict__ = property(_asdict)
-   <BLANKLINE>
-      def _replace(_self, **kwds):
+       def _replace(_self, **kwds):
            'Return a new Point object replacing specified fields with new values'
            result = _self._make(map(kwds.pop, ('x', 'y'), _self))
            if kwds:
@@ -895,29 +893,35 @@ ABC                        Inherits from          Abstract Methods        Mixin 
 :class:`Sized`                                    ``__len__``
 :class:`Callable`                                 ``__call__``
 
-:class:`Sequence`          :class:`Sized`,        ``__getitem__``         ``__contains__``, ``__iter__``, ``__reversed__``,
-                           :class:`Iterable`,                             ``index``, and ``count``
+:class:`Sequence`          :class:`Sized`,        ``__getitem__``,        ``__contains__``, ``__iter__``, ``__reversed__``,
+                           :class:`Iterable`,     ``__len__``             ``index``, and ``count``
                            :class:`Container`
 
-:class:`MutableSequence`   :class:`Sequence`      ``__setitem__``,        Inherited :class:`Sequence` methods and
-                                                  ``__delitem__``,        ``append``, ``reverse``, ``extend``, ``pop``,
-                                                  ``insert``              ``remove``, and ``__iadd__``
+:class:`MutableSequence`   :class:`Sequence`      ``__getitem__``,        Inherited :class:`Sequence` methods and
+                                                  ``__setitem__``,        ``append``, ``reverse``, ``extend``, ``pop``,
+                                                  ``__delitem__``,        ``remove``, and ``__iadd__``
+                                                  ``__len__``,
+                                                  ``insert``
 
-:class:`Set`               :class:`Sized`,                                ``__le__``, ``__lt__``, ``__eq__``, ``__ne__``,
-                           :class:`Iterable`,                             ``__gt__``, ``__ge__``, ``__and__``, ``__or__``,
-                           :class:`Container`                             ``__sub__``, ``__xor__``, and ``isdisjoint``
+:class:`Set`               :class:`Sized`,        ``__contains__``,       ``__le__``, ``__lt__``, ``__eq__``, ``__ne__``,
+                           :class:`Iterable`,     ``__iter__``,           ``__gt__``, ``__ge__``, ``__and__``, ``__or__``,
+                           :class:`Container`     ``__len__``             ``__sub__``, ``__xor__``, and ``isdisjoint``
 
-:class:`MutableSet`        :class:`Set`           ``add``,                Inherited :class:`Set` methods and
-                                                  ``discard``             ``clear``, ``pop``, ``remove``, ``__ior__``,
-                                                                          ``__iand__``, ``__ixor__``, and ``__isub__``
+:class:`MutableSet`        :class:`Set`           ``__contains__``,       Inherited :class:`Set` methods and
+                                                  ``__iter__``,           ``clear``, ``pop``, ``remove``, ``__ior__``,
+                                                  ``__len__``,            ``__iand__``, ``__ixor__``, and ``__isub__``
+                                                  ``add``,
+                                                  ``discard``
 
-:class:`Mapping`           :class:`Sized`,        ``__getitem__``         ``__contains__``, ``keys``, ``items``, ``values``,
-                           :class:`Iterable`,                             ``get``, ``__eq__``, and ``__ne__``
-                           :class:`Container`
+:class:`Mapping`           :class:`Sized`,        ``__getitem__``,        ``__contains__``, ``keys``, ``items``, ``values``,
+                           :class:`Iterable`,     ``__iter__``,           ``get``, ``__eq__``, and ``__ne__``
+                           :class:`Container`     ``__len__``
 
-:class:`MutableMapping`    :class:`Mapping`       ``__setitem__``,        Inherited :class:`Mapping` methods and
-                                                  ``__delitem__``         ``pop``, ``popitem``, ``clear``, ``update``,
-                                                                          and ``setdefault``
+:class:`MutableMapping`    :class:`Mapping`       ``__getitem__``,        Inherited :class:`Mapping` methods and
+                                                  ``__setitem__``,        ``pop``, ``popitem``, ``clear``, ``update``,
+                                                  ``__delitem__``,        and ``setdefault``
+                                                  ``__iter__``,
+                                                  ``__len__``
 
 
 :class:`MappingView`       :class:`Sized`                                 ``__len__``

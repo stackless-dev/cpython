@@ -137,6 +137,64 @@ def cellpickling():
     schedule()
     return the_closure()
 
+
+class CtxManager(object):
+    def __init__(self, n, when, expect_type, suppress_exc):
+        self.n = n
+        assert when in ('enter', 'body', 'exit')
+        self.when = when
+        self.expect_type = expect_type
+        self.suppress_exc = suppress_exc
+
+    def __enter__(self):
+        self.ran_enter = True
+        if self.when == 'enter':
+            lst = rectest(self.n)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if not is_soft() and isinstance(exc_val, SystemExit):
+            return False
+        self.ran_exit = True
+        self.exc_type = exc_type
+        if self.when == 'exit':
+            lst = rectest(self.n)
+        return self.suppress_exc
+
+def ctxpickling(n, when, expect_type, suppress_exc):
+    ctxmgr = CtxManager(n, when, expect_type, suppress_exc)
+
+    ran_body = False
+    try:
+        with ctxmgr as c:
+            ran_body = True
+            if when == 'body':
+                rectest(n)
+            if expect_type:
+                raise expect_type("raised by ctxpickling")
+    except SystemExit:
+        raise
+    except:
+        exc_info = sys.exc_info()
+    else:
+        exc_info = (None, None, None)
+
+    if expect_type is not None:
+        assert ctxmgr.exc_type is expect_type, "incorrect ctxmgr.exc_type: expected %r got %r" % (expect_type, ctxmgr.exc_type)
+        if suppress_exc:
+            assert exc_info == (None, None, None), "Suppress didn't work"
+        else:
+            assert exc_info[0] is expect_type, "incorrect exc_type"
+    else:
+        assert ctxmgr.exc_type is None, "ctxmgr.exc_type is not None: %r" % (ctxmgr.exc_type,)
+        assert exc_info == (None, None, None), "unexpected exception: " + repr(exc_info[1])
+
+    assert ctxmgr.ran_enter is True, "__enter__ did not run"
+    assert ran_body is True, "with block did not run"
+    assert ctxmgr is c, "__enter__ returned wrong value"
+    assert ctxmgr.ran_exit is True, "__exit__ did not run"        
+    return "OK"
+
 def in_psyco():
     try:
         return __in_psyco__
@@ -287,6 +345,41 @@ class TestConcretePickledTasklets(TestPickledTasklets):
 
     def testCell(self):
         self.run_pickled(cellpickling)
+        
+    def testCtx_enter_0(self):
+        self.run_pickled(ctxpickling, 0, 'enter', None, False)
+    def testCtx_enter_1(self):
+        self.run_pickled(ctxpickling, 1, 'enter', None, False)
+    def testCtx_enter_2(self):
+        self.run_pickled(ctxpickling, 2, 'enter', RuntimeError, False)
+    def testCtx_enter_3(self):
+        self.run_pickled(ctxpickling, 1, 'enter', RuntimeError, True)
+    def testCtx_body_0(self):
+        self.run_pickled(ctxpickling, 0, 'body', None, False)
+    def testCtx_body_1(self):
+        self.run_pickled(ctxpickling, 1, 'body', None, False)
+    def testCtx_body_2(self):
+        self.run_pickled(ctxpickling, 2, 'body', RuntimeError, False)
+    def testCtx_body_3(self):
+        self.run_pickled(ctxpickling, 1, 'body', RuntimeError, True)
+    def testCtx_body_4(self):
+        self.run_pickled(ctxpickling, 2, 'body', RuntimeError, True)
+    def testCtx_body_5(self):
+        self.run_pickled(ctxpickling, 1, 'body', RuntimeError, False)
+    def testCtx_body_6(self):
+        self.run_pickled(ctxpickling, 0, 'body', RuntimeError, True)
+    def testCtx_body_7(self):
+        self.run_pickled(ctxpickling, 0, 'body', RuntimeError, False)
+    def testCtx_exit_0(self):
+        self.run_pickled(ctxpickling, 0, 'exit', None, False)
+    def testCtx_exit_1(self):
+        self.run_pickled(ctxpickling, 1, 'exit', None, False)
+    def testCtx_exit_2(self):
+        self.run_pickled(ctxpickling, 2, 'exit', RuntimeError, False)
+    def testCtx_exit_3(self):
+        self.run_pickled(ctxpickling, 0, 'exit', RuntimeError, True)
+    def testCtx_exit_4(self):
+        self.run_pickled(ctxpickling, 1, 'exit', RuntimeError, True)
 
     def testFakeModules(self):
         types.ModuleType('fakemodule!')

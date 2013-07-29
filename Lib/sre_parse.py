@@ -15,6 +15,7 @@
 import sys
 
 from sre_constants import *
+from _sre import MAXREPEAT
 
 SPECIAL_CHARS = ".\\[{()*+?^$|"
 REPEAT_CHARS = "*+?{"
@@ -498,10 +499,14 @@ def _parse(source, state):
                     continue
                 if lo:
                     min = int(lo)
+                    if min >= MAXREPEAT:
+                        raise OverflowError("the repetition number is too large")
                 if hi:
                     max = int(hi)
-                if max < min:
-                    raise error, "bad repeat interval"
+                    if max >= MAXREPEAT:
+                        raise OverflowError("the repetition number is too large")
+                    if max < min:
+                        raise error("bad repeat interval")
             else:
                 raise error, "not supported"
             # figure out which item to repeat
@@ -544,7 +549,8 @@ def _parse(source, state):
                         if not name:
                             raise error("missing group name")
                         if not isname(name):
-                            raise error, "bad character in group name"
+                            raise error("bad character in group name %r" %
+                                        name)
                     elif sourcematch("="):
                         # named backreference
                         name = ""
@@ -558,7 +564,8 @@ def _parse(source, state):
                         if not name:
                             raise error("missing group name")
                         if not isname(name):
-                            raise error, "bad character in group name"
+                            raise error("bad character in backref group name "
+                                        "%r" % name)
                         gid = state.groupdict.get(name)
                         if gid is None:
                             raise error, "unknown group name"

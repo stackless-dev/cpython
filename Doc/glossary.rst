@@ -77,6 +77,14 @@ Glossary
       Benevolent Dictator For Life, a.k.a. `Guido van Rossum
       <http://www.python.org/~guido/>`_, Python's creator.
 
+   bytes-like object
+      An object that supports the :ref:`buffer protocol <bufferobjects>`,
+      like :class:`str`, :class:`bytearray` or :class:`memoryview`.
+      Bytes-like objects can be used for various operations that expect
+      binary data, such as compression, saving to a binary file or sending
+      over a socket. Some operations need the binary data to be mutable,
+      in which case not all bytes-like objects can apply.
+
    bytecode
       Python source code is compiled into bytecode, the internal representation
       of a Python program in the CPython interpreter.  The bytecode is also
@@ -330,7 +338,8 @@ Glossary
       All of Python's immutable built-in objects are hashable, while no mutable
       containers (such as lists or dictionaries) are.  Objects which are
       instances of user-defined classes are hashable by default; they all
-      compare unequal, and their hash value is their :func:`id`.
+      compare unequal (except with themselves), and their hash value is their
+      :func:`id`.
 
    IDLE
       An Integrated Development Environment for Python.  IDLE is a basic editor

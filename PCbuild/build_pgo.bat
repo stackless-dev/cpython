@@ -13,7 +13,7 @@ set job1=..\tools\pybench\pybench.py -n 1 -C 1 --with-gc
 set path1=..\tools\pybench
 
 rem or the whole testsuite for more thorough testing
-set job2=..\lib\test\regrtest.py
+set job2=..\lib\test\regrtest.py -f pgo_test_list.txt
 set path2=..\lib
 
 set job=%job1%
@@ -21,7 +21,7 @@ set clrpath=%path1%
 
 :CheckOpts
 if "%1"=="-p" (set platf=%2) & shift & shift & goto CheckOpts
-if "%1"=="-2" (set job=%job2%) & (set clrpath=%path2%) & shift & goto CheckOpts
+if "%1"=="-2" (set job=%job2%) & (set clrpath=%path2%) & (set VCPROFILE_ALLOC_SCALE=2) & shift & goto CheckOpts
 
 set PGI=%platf%-pgi
 set PGO=%platf%-pgo

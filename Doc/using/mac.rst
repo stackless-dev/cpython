@@ -25,14 +25,14 @@ installers for the latest 2.3 release for Mac OS 9 and related documentation.
 Getting and Installing MacPython
 ================================
 
-Mac OS X 10.5 comes with Python 2.5.1 pre-installed by Apple.  If you wish, you
+Mac OS X 10.8 comes with Python 2.7 pre-installed by Apple.  If you wish, you
 are invited to install the most recent version of Python from the Python website
 (http://www.python.org).  A current "universal binary" build of Python, which
 runs natively on the Mac's new Intel and legacy PPC CPU's, is available there.
 
 What you get after installing is a number of things:
 
-* A :file:`MacPython 2.5` folder in your :file:`Applications` folder. In here
+* A :file:`MacPython 2.7` folder in your :file:`Applications` folder. In here
   you find IDLE, the development environment that is a standard part of official
   Python distributions; PythonLauncher, which handles double-clicking Python
   scripts from the Finder; and the "Build Applet" tool, which allows you to
@@ -100,7 +100,7 @@ aware of: programs that talk to the Aqua window manager (in other words,
 anything that has a GUI) need to be run in a special way. Use :program:`pythonw`
 instead of :program:`python` to start such scripts.
 
-With Python 2.5, you can use either :program:`python` or :program:`pythonw`.
+With Python 2.7, you can use either :program:`python` or :program:`pythonw`.
 
 
 Configuration
@@ -133,13 +133,11 @@ Installing Additional Python Packages
 
 There are several methods to install additional Python packages:
 
-* http://pythonmac.org/packages/ contains selected compiled packages for Python
-  2.5, 2.4, and 2.3.
-
 * Packages can be installed via the standard Python distutils mode (``python
   setup.py install``).
 
-* Many packages can also be installed via the :program:`setuptools` extension.
+* Many packages can also be installed via the :program:`setuptools` extension
+  or :program:`pip` wrapper, see http://www.pip-installer.org/.
 
 
 GUI Programming on the Mac
@@ -167,7 +165,7 @@ http://www.riverbankcomputing.co.uk/software/pyqt/intro.
 Distributing Python Applications on the Mac
 ===========================================
 
-The "Build Applet" tool that is placed in the MacPython 2.5 folder is fine for
+The "Build Applet" tool that is placed in the MacPython 2.7 folder is fine for
 packaging small Python scripts on your own machine to run as a standard Mac
 application. This tool, however, is not robust enough to distribute Python
 applications to other users.
@@ -175,20 +173,6 @@ applications to other users.
 The standard tool for deploying standalone Python applications on the Mac is
 :program:`py2app`. More information on installing and using py2app can be found
 at http://undefined.org/python/#py2app.
-
-
-Application Scripting
-=====================
-
-Python can also be used to script other Mac applications via Apple's Open
-Scripting Architecture (OSA); see http://appscript.sourceforge.net. Appscript is
-a high-level, user-friendly Apple event bridge that allows you to control
-scriptable Mac OS X applications using ordinary Python scripts. Appscript makes
-Python a serious alternative to Apple's own *AppleScript* language for
-automating your Mac. A related package, *PyOSA*, is an OSA language component
-for the Python scripting language, allowing Python code to be executed by any
-OSA-enabled application (Script Editor, Mail, iTunes, etc.). PyOSA makes Python
-a full peer to AppleScript.
 
 
 Other Resources

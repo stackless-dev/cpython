@@ -579,7 +579,6 @@ For an example of the usage of queues for interprocess communication see
       :exc:`Queue.Empty` exception (*timeout* is ignored in that case).
 
    .. method:: get_nowait()
-               get_no_wait()
 
       Equivalent to ``get(False)``.
 
@@ -1745,7 +1744,7 @@ authentication* using the :mod:`hmac` module.
    then a welcome message is sent to the other end of the connection.  Otherwise
    :exc:`AuthenticationError` is raised.
 
-.. function:: answerChallenge(connection, authkey)
+.. function:: answer_challenge(connection, authkey)
 
    Receive a message, calculate the digest of the message using *authkey* as the
    key, and then send the digest back.

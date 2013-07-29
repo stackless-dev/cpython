@@ -81,7 +81,6 @@ static int
 tasklet_traverse(PyTaskletObject *t, visitproc visit, void *arg)
 {
     PyFrameObject *f;
-    PyThreadState *ts = PyThreadState_GET();
 
     /* tasklets that need to be switched to for the kill, can't be collected.
      * Only trivial decrefs are allowed during GC collect

@@ -7,8 +7,22 @@ except ImportError:
     withThreads = False
 import sys
 import traceback
+import contextlib
 from support import StacklessTestCase
 
+@contextlib.contextmanager
+def block_trap(trap=True):
+    """
+    A context manager to temporarily set the block trap state of the
+    current tasklet.  Defaults to setting it to True
+    """
+    c = stackless.getcurrent()
+    old = c.block_trap
+    c.block_trap = trap
+    try:
+        yield
+    finally:
+        c.block_trap = old
 
 class TestChannels(StacklessTestCase):
     def testBlockingSend(self):
@@ -22,7 +36,7 @@ class TestChannels(StacklessTestCase):
         channel = stackless.channel()
         tasklet = stackless.tasklet(f)(channel)
         tasklet.run()
-        
+
         # The tasklet should be blocked.
         self.assertTrue(tasklet.blocked, "The tasklet should have been run and have blocked on the channel waiting for a corresponding receiver")
 
@@ -40,7 +54,7 @@ class TestChannels(StacklessTestCase):
         channel = stackless.channel()
         tasklet = stackless.tasklet(f)(channel)
         tasklet.run()
-        
+
         # The tasklet should be blocked.
         self.assertTrue(tasklet.blocked, "The tasklet should have been run and have blocked on the channel waiting for a corresponding sender")
 
@@ -52,7 +66,7 @@ class TestChannels(StacklessTestCase):
 
         originalValue = 1
         receivedValues = []
-    
+
         # Function to block when run in a tasklet.
         def f(testChannel):
             receivedValues.append(testChannel.receive())
@@ -71,13 +85,13 @@ class TestChannels(StacklessTestCase):
             channel.send(originalValue)
         finally:
             stackless.getcurrent().block_trap = oldBlockTrap
-        
+
         self.assertTrue(len(receivedValues) == 1 and receivedValues[0] == originalValue, "We sent a value, but it was not the one we received.  Completely unexpected.")
 
     def testNonBlockingReceive(self):
         ''' Test that when there is a waiting sender, we can receive without blocking with normal channel behaviour. '''
         originalValue = 1
-    
+
         # Function to block when run in a tasklet.
         def f(testChannel, valueToSend):
             testChannel.send(valueToSend)
@@ -98,19 +112,19 @@ class TestChannels(StacklessTestCase):
             stackless.getcurrent().block_trap = oldBlockTrap
 
         tasklet.kill()
-        
+
         self.assertEqual(value, originalValue, "We received a value, but it was not the one we sent.  Completely unexpected.")
 
     def testMainTaskletBlockingWithoutASender(self):
-        ''' Test that the last runnable tasklet cannot be blocked on a channel. '''    
+        ''' Test that the last runnable tasklet cannot be blocked on a channel. '''
         self.assertEqual(stackless.getruncount(), 1, "Leakage from other tests, with tasklets still in the scheduler.")
-        
+
         c = stackless.channel()
         self.assertRaises(RuntimeError, c.receive)
 
     @unittest.skipUnless(withThreads, "Compiled without threading")
     def testInterthreadCommunication(self):
-        ''' Test that tasklets in different threads sending over channels to each other work. '''    
+        ''' Test that tasklets in different threads sending over channels to each other work. '''
         self.assertEqual(stackless.getruncount(), 1, "Leakage from other tests, with tasklets still in the scheduler.")
 
         commandChannel = stackless.channel()
@@ -138,7 +152,7 @@ class TestChannels(StacklessTestCase):
         scheduler_run(slave_func)
 
     def testSendException(self):
-        
+
         # Function to send the exception
         def f(testChannel):
             testChannel.send_exception(ValueError, 1,2,3)
@@ -156,11 +170,11 @@ class TestChannels(StacklessTestCase):
             self.assertEqual(e.args, (1, 2, 3))
 
     def testSendThrow(self):
-        
+
         # subfunction in tasklet
         def bar():
             raise ValueError, (1,2,3)
-        
+
         # Function to send the exception
         def f(testChannel):
             try:
@@ -181,12 +195,40 @@ class TestChannels(StacklessTestCase):
         except ValueError:
             exc, val, tb = sys.exc_info()
             self.assertEqual(val.args, (1, 2, 3))
-            
+
             # Check that the traceback is correct
             l = traceback.extract_tb(tb)
             self.assertEqual(l[-1][2], "bar")
-            
-        
+
+    def testBlockTrapSend(self):
+        '''Test that block trapping works when receiving'''
+        channel = stackless.channel()
+        count = [0]
+        def f():
+            with block_trap():
+                self.assertRaises(RuntimeError, channel.send, None)
+            count[0] += 1
+
+        # Test on main tasklet and on worker
+        f()
+        stackless.tasklet(f)()
+        stackless.run()
+        self.assertEqual(count[0], 2)
+
+def testBlockTrapRecv(self):
+        '''Test that block trapping works when receiving'''
+        channel = stackless.channel()
+        count = [0]
+        def f():
+            with block_trap():
+                self.assertRaises(RuntimeError, channel.receive)
+            count[0] += 1
+
+        f()
+        stackless.tasklet(f)()
+        stackless.run()
+        self.assertEqual(count[0], 2)
+
 
 if __name__ == '__main__':
     import sys

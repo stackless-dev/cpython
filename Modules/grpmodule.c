@@ -3,15 +3,15 @@
 
 #include "Python.h"
 #include "structseq.h"
+#include "posixmodule.h"
 
-#include <sys/types.h>
 #include <grp.h>
 
 static PyStructSequence_Field struct_group_type_fields[] = {
    {"gr_name", "group name"},
    {"gr_passwd", "password"},
-   {"gr_gid", "group id"}, 
-   {"gr_mem", "group memebers"}, 
+   {"gr_gid", "group id"},
+   {"gr_mem", "group memebers"},
    {0}
 };
 
@@ -70,7 +70,7 @@ mkgrent(struct group *p)
 	    Py_INCREF(Py_None);
     }
 #endif
-    SET(setIndex++, PyInt_FromLong((long) p->gr_gid));
+    SET(setIndex++, _PyInt_FromGid(p->gr_gid));
     SET(setIndex++, w);
 #undef SET
 
@@ -86,17 +86,25 @@ static PyObject *
 grp_getgrgid(PyObject *self, PyObject *pyo_id)
 {
     PyObject *py_int_id;
-    unsigned int gid;
+    gid_t gid;
     struct group *p;
 
     py_int_id = PyNumber_Int(pyo_id);
     if (!py_int_id)
-	    return NULL;
-    gid = PyInt_AS_LONG(py_int_id);
+            return NULL;
+    if (!_Py_Gid_Converter(py_int_id, &gid)) {
+        Py_DECREF(py_int_id);
+        return NULL;
+    }
     Py_DECREF(py_int_id);
 
     if ((p = getgrgid(gid)) == NULL) {
-	PyErr_Format(PyExc_KeyError, "getgrgid(): gid not found: %d", gid);
+        if (gid < 0)
+            PyErr_Format(PyExc_KeyError,
+                         "getgrgid(): gid not found: %ld", (long)gid);
+        else
+            PyErr_Format(PyExc_KeyError,
+                         "getgrgid(): gid not found: %lu", (unsigned long)gid);
         return NULL;
     }
     return mkgrent(p);
@@ -113,7 +121,7 @@ grp_getgrnam(PyObject *self, PyObject *pyo_name)
     if (!py_str_name)
 	    return NULL;
     name = PyString_AS_STRING(py_str_name);
-    
+
     if ((p = getgrnam(name)) == NULL) {
 	PyErr_Format(PyExc_KeyError, "getgrnam(): name not found: %s", name);
 	Py_DECREF(py_str_name);

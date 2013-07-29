@@ -236,9 +236,9 @@ arguments: ``open(filename, mode)``.
 
 ::
 
-   >>> f = open('/tmp/workfile', 'w')
+   >>> f = open('workfile', 'w')
    >>> print f
-   <open file '/tmp/workfile', mode 'w' at 80a0960>
+   <open file 'workfile', mode 'w' at 80a0960>
 
 The first argument is a string containing the filename.  The second argument is
 another string containing a few characters describing the way in which the file
@@ -295,18 +295,8 @@ containing only a single newline.   ::
    >>> f.readline()
    ''
 
-``f.readlines()`` returns a list containing all the lines of data in the file.
-If given an optional parameter *sizehint*, it reads that many bytes from the
-file and enough more to complete a line, and returns the lines from that.  This
-is often used to allow efficient reading of a large file by lines, but without
-having to load the entire file in memory.  Only complete lines will be returned.
-::
-
-   >>> f.readlines()
-   ['This is the first line of the file.\n', 'Second line of the file\n']
-
-An alternative approach to reading lines is to loop over the file object. This is
-memory efficient, fast, and leads to simpler code::
+For reading lines from a file, you can loop over the file object. This is memory
+efficient, fast, and leads to simple code::
 
    >>> for line in f:
            print line,
@@ -314,9 +304,8 @@ memory efficient, fast, and leads to simpler code::
    This is the first line of the file.
    Second line of the file
 
-The alternative approach is simpler but does not provide as fine-grained
-control.  Since the two approaches manage line buffering differently, they
-should not be mixed.
+If you want to read all the lines of a file in a list you can also use
+``list(f)`` or ``f.readlines()``.
 
 ``f.write(string)`` writes the contents of *string* to the file, returning
 ``None``.   ::
@@ -339,7 +328,7 @@ of the file, 1 uses the current file position, and 2 uses the end of the file as
 the reference point.  *from_what* can be omitted and defaults to 0, using the
 beginning of the file as the reference point. ::
 
-   >>> f = open('/tmp/workfile', 'r+')
+   >>> f = open('workfile', 'r+')
    >>> f.write('0123456789abcdef')
    >>> f.seek(5)     # Go to the 6th byte in the file
    >>> f.read(1)
@@ -363,7 +352,7 @@ objects.  This has the advantage that the file is properly closed after its
 suite finishes, even if an exception is raised on the way.  It is also much
 shorter than writing equivalent :keyword:`try`\ -\ :keyword:`finally` blocks::
 
-    >>> with open('/tmp/workfile', 'r') as f:
+    >>> with open('workfile', 'r') as f:
     ...     read_data = f.read()
     >>> f.closed
     True

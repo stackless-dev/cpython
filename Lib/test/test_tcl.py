@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
 import unittest
+import sys
 import os
 from test import test_support
+from subprocess import Popen, PIPE
 
 # Skip this test if the _tkinter module wasn't built.
 _tkinter = test_support.import_module('_tkinter')
@@ -145,12 +147,42 @@ class TclTest(unittest.TestCase):
 
         with test_support.EnvironmentVarGuard() as env:
             env.unset("TCL_LIBRARY")
-            f = os.popen('%s -c "import Tkinter; print Tkinter"' % (unc_name,))
+            cmd = '%s -c "import Tkinter; print Tkinter"' % (unc_name,)
 
-        self.assertTrue('Tkinter.py' in f.read())
-        # exit code must be zero
-        self.assertEqual(f.close(), None)
+            p = Popen(cmd, stdout=PIPE, stderr=PIPE)
+            out_data, err_data = p.communicate()
 
+            msg = '\n\n'.join(['"Tkinter.py" not in output',
+                               'Command:', cmd,
+                               'stdout:', out_data,
+                               'stderr:', err_data])
+
+            self.assertIn('Tkinter.py', out_data, msg)
+
+            self.assertEqual(p.wait(), 0, 'Non-zero exit code')
+
+
+    def test_passing_values(self):
+        def passValue(value):
+            return self.interp.call('set', '_', value)
+        self.assertEqual(passValue(True), True)
+        self.assertEqual(passValue(False), False)
+        self.assertEqual(passValue('string'), 'string')
+        self.assertEqual(passValue('string\u20ac'), 'string\u20ac')
+        self.assertEqual(passValue(u'string'), u'string')
+        self.assertEqual(passValue(u'string\u20ac'), u'string\u20ac')
+        for i in (0, 1, -1, int(2**31-1), int(-2**31)):
+            self.assertEqual(passValue(i), i)
+        for f in (0.0, 1.0, -1.0, 1//3, 1/3.0,
+                  sys.float_info.min, sys.float_info.max,
+                  -sys.float_info.min, -sys.float_info.max):
+            self.assertEqual(passValue(f), f)
+        for f in float('nan'), float('inf'), -float('inf'):
+            if f != f: # NaN
+                self.assertNotEqual(passValue(f), f)
+            else:
+                self.assertEqual(passValue(f), f)
+        self.assertEqual(passValue((1, '2', (3.4,))), (1, '2', (3.4,)))
 
 
 def test_main():

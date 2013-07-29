@@ -1,3 +1,138 @@
+Stackless Python News
++++++++++++++++++++++
+
+This file documents changes to the Stackless extension of CPython.
+For other changes see Misc/NEWS.
+
+
+What's New in Stackless 2.7.6?
+==============================
+
+*Release date: XXXX-XX-XX*
+
+
+What's New in Stackless 2.7.5?
+==============================
+
+*Release date: 2013-05-17*
+
+No Stackless specific changes.
+
+
+What's New in Stackless 2.7.4?
+==============================
+
+*Release date: 2013-05-17*
+
+- Fix unlinking of tasks in kill_tasks_with_stacks. The earlier code
+  was a bit weird and would cause miscompilation on X64.
+
+- http://www.stackless.com/ticket/23: Fix compile error with STACKLESS_OFF
+  defined
+
+
+What's New in Stackless 2.7.4rc2?
+=================================
+
+*Release date: 2013-05-01*
+
+(A selection of user visible changes from mercurial commit log messages. Use 
+ "hg log -b 2.7-slp -r v2.7.4rc2-slp:v2.7.2-slp  -v -M" to get the complete log.) 
+
+- http://www.stackless.com/ticket/21: Fix crash on exit.
+
+- http://www.stackless.com/ticket/22: soft switching for context managers.
+
+- #17667: Fix Windows build using "build_pgo.bat -2".
+
+- http://www.stackless.com/ticket/18: unexpected increase of nesting level in
+  __call__.
+ 
+- http://www.stackless.com/ticket/20: fix infinite recursion in __call__
+
+- http://www.stackless.com/ticket/17: Fix a few clang warnings.
+
+- http://www.stackless.com/ticket/14: Prevent overly optimization with 
+  gcc 4.7.x.
+
+- Add the feature of a tasklet error handler, global to the module.
+
+- Add the tasklet.throw() method, which can raise an exception on a tasklet
+  with traceback, just like channel.send_throw.  It also has the facility to
+  either activate the target immediately (default) or just make it runnable.
+
+- Add the switch-trap flag. Add unittests for channel action and stackless.run
+  and stackless.schedule.
+
+- Fix tasklet.raise_exception.  It had invalid flags and didn't work.
+
+- Fix default argument handling of channel.send_throw
+
+
+What's New in Stackless 2.7.3?
+==============================
+
+*Release date: 2013-05-15*
+
+- Add channel.send_throw(exc[,val[,tb]]) to raise a new exception or propagate
+  an old one across a channel.
+
+- Make sure that the tasklet's "atomic" flag inhibits thread switching, so that
+  it can be used when synchronizing tasklets from different threads.
+
+
+What's New in Stackless 2.7.2?
+==============================
+
+*Release date: 2011-12-21*
+
+(A selection of SVN commit log messages)
+
+- Apply Anselm Kruis' patch to get amd64 linux building again without the 'bp'
+  register problem.
+           
+- When a tasklet is killed, remove it from being "active" in the cstate.  
+  Otherwise, kill_task_with_cstatcks will spin endlessly trying to kill it.
+  We have to fix kill_tasks_with_cstacks more properly later.
+
+- Integrate changes to tasklet GC as run by CCP for over a year.  Tasklets are
+  now properly garbage collected unless they have a C stack.  
+
+- Add a new api, PyStackless_GetCurrentId(), and stackless.getcurrentid(), to
+  help with bookkeeping that has to do with callstacks.
+
+- Fix errors where a PyCFrame could confuse code, both when pickling and when
+  emitting warnings.  Now use proper internal Stackless methods to get at the
+  frame.
+
+- Remove tasklet become and capture methods/support. This functionality is
+  considered in retrospect to be a mistake, and has been on track for removal
+  for several years.  Goodbye cool functionality!
+
+- A first draft of Stackless C API documentation. This has rewritten
+  descriptions for most of the functions, but some still have the API include
+  file comments.
+
+- Committing Jeff Senn's non-Windows compilation changes as mailed to the
+  Stackless mailing list 
+  (http://www.stackless.com/pipermail/stackless/2010-July/004766.html).
+
+- the _lsprof.c module is now stackless aware.  This allows the same
+  cProfile.Profile() instance to be used by multiple tasklets, for whole
+  program profiling. A patch with this new _lsprof.c has also been submitted
+  to bug.python.org. What remains now is the ability to set tracing/profiling
+  for all tasklets globally.
+
+20100101   Release of Stackless Python 2.7.1
+
+
+Here is a break. Nobody wrote a change log. If you are interested 
+in software archaeology look at http://svn.python.org/view/stackless.
+
+
+The very beginning of Stackless
+=============================== 
+
 20020524	ct	There appears to be a problem with stack switching
 			and tkinter. When I disable it, things work. This is
 			most probably a stack misuse with C locals used as
@@ -5,7 +140,7 @@
 			Should we possibly disable stack manips completely
 			by default and have the user switch it on?
 
-20020524	ct	There have been massive changes in thee meantime, and
+20020524	ct	There have been massive changes in the meantime, and
 			I've missed logging them in the changelog.
 			This will become better now.
 			The old ideas of reusing old stackless stuff are gone.
@@ -17,16 +152,16 @@
 200205		Got hired by IronPort for working on Stackless and
 			their application based upon it.
 
-20020122	ct	There are some influences of olde Stackless. Without repeating
+20020122	ct	There are some influences of old Stackless. Without repeating
 			the full mess, a number of ideas are very useful
 			Especially, the frame dispatcher idea will be revived.
 			It turns out to make sense:
 			Try to let the innermost interpreter resolve some recusrions.
-			Find an equivalent of olde Py_UnwindToken. Probably the 
+			Find an equivalent of old Py_UnwindToken. Probably the 
 			protocol of the new generators can be extended.
 			Now I *do* think to modify frames. They get an additional
 			field for their C stack part.
-			There will definately be a revival of f_execute.
+			There will definitely be a revival of f_execute.
 			This fits perfectly: For pure frames, this is eval_frame.
 			For frames which need to restore their stack, it will be a helper
 			function.

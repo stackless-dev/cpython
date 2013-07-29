@@ -511,6 +511,9 @@ reference count or by being garbage collected), the generator-iterator's
 :meth:`close` method will be called, allowing any pending :keyword:`finally`
 clauses to execute.
 
+For full details of :keyword:`yield` semantics, refer to the :ref:`yieldexpr`
+section.
+
 .. note::
 
    In Python 2.2, the :keyword:`yield` statement was only allowed when the
@@ -737,7 +740,7 @@ can be found but the path exists then a value of ``None`` is
 stored in :data:`sys.path_importer_cache` to signify that an implicit,
 file-based finder that handles modules stored as individual files should be
 used for that path. If the path does not exist then a finder which always
-returns `None`` is placed in the cache for the path.
+returns ``None`` is placed in the cache for the path.
 
 .. index::
     single: loader

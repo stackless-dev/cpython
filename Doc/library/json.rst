@@ -84,6 +84,7 @@ Extending :class:`JSONEncoder`::
     ...     def default(self, obj):
     ...         if isinstance(obj, complex):
     ...             return [obj.real, obj.imag]
+    ...         # Let the base class default method raise the TypeError
     ...         return json.JSONEncoder.default(self, obj)
     ...
     >>> dumps(2 + 1j, cls=ComplexEncoder)
@@ -103,7 +104,7 @@ Using json.tool from the shell to validate and pretty-print::
         "json": "obj"
     }
     $ echo '{1.2:3.4}' | python -mjson.tool
-    Expecting property name enclosed in double quotes: line 1 column 1 (char 1)
+    Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
 
 .. highlight:: python
 
@@ -124,7 +125,8 @@ Basic Usage
                    default=None, sort_keys=False, **kw)
 
    Serialize *obj* as a JSON formatted stream to *fp* (a ``.write()``-supporting
-   :term:`file-like object`).
+   :term:`file-like object`) using this :ref:`conversion table
+   <py-to-json-table>`.
 
    If *skipkeys* is ``True`` (default: ``False``), then dict keys that are not
    of a basic type (:class:`str`, :class:`unicode`, :class:`int`, :class:`long`,
@@ -187,9 +189,10 @@ Basic Usage
                     indent=None, separators=None, encoding="utf-8", \
                     default=None, sort_keys=False, **kw)
 
-   Serialize *obj* to a JSON formatted :class:`str`.  If *ensure_ascii* is
-   ``False``, the result may contain non-ASCII characters and the return value
-   may be a :class:`unicode` instance.
+   Serialize *obj* to a JSON formatted :class:`str` using this :ref:`conversion
+   table <py-to-json-table>`.  If *ensure_ascii* is ``False``, the result may
+   contain non-ASCII characters and the return value may be a :class:`unicode`
+   instance.
 
    The arguments have the same meaning as in :func:`dump`.
 
@@ -197,7 +200,7 @@ Basic Usage
 
       Keys in key/value pairs of JSON are always of the type :class:`str`. When
       a dictionary is converted into JSON, all the keys of the dictionary are
-      coerced to strings. As a result of this, if a dictionary is convered
+      coerced to strings. As a result of this, if a dictionary is converted
       into JSON and then back into a dictionary, the dictionary may not equal
       the original one. That is, ``loads(dumps(x)) != x`` if x has non-string
       keys.
@@ -205,7 +208,8 @@ Basic Usage
 .. function:: load(fp[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, object_pairs_hook[, **kw]]]]]]]])
 
    Deserialize *fp* (a ``.read()``-supporting :term:`file-like object`
-   containing a JSON document) to a Python object.
+   containing a JSON document) to a Python object using this :ref:`conversion
+   table <json-to-py-table>`.
 
    If the contents of *fp* are encoded with an ASCII based encoding other than
    UTF-8 (e.g. latin-1), then an appropriate *encoding* name must be specified.
@@ -256,7 +260,8 @@ Basic Usage
 .. function:: loads(s[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, object_pairs_hook[, **kw]]]]]]]])
 
    Deserialize *s* (a :class:`str` or :class:`unicode` instance containing a JSON
-   document) to a Python object.
+   document) to a Python object using this :ref:`conversion table
+   <json-to-py-table>`.
 
    If *s* is a :class:`str` instance and is encoded with an ASCII based encoding
    other than UTF-8 (e.g. latin-1), then an appropriate *encoding* name must be
@@ -274,6 +279,8 @@ Encoders and Decoders
    Simple JSON decoder.
 
    Performs the following translations in decoding by default:
+
+   .. _json-to-py-table:
 
    +---------------+-------------------+
    | JSON          | Python            |
@@ -362,6 +369,8 @@ Encoders and Decoders
    Extensible JSON encoder for Python data structures.
 
    Supports the following objects and types by default:
+
+   .. _py-to-json-table:
 
    +-------------------+---------------+
    | Python            | JSON          |
@@ -452,6 +461,7 @@ Encoders and Decoders
                 pass
             else:
                 return list(iterable)
+            # Let the base class default method raise the TypeError
             return JSONEncoder.default(self, o)
 
 

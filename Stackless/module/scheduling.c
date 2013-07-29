@@ -421,8 +421,8 @@ kill_wrap_bad_guy(PyTaskletObject *prev, PyTaskletObject *bad_guy)
 
 /* non-recursive scheduling */
 
-static PyObject *
-restore_exception(PyFrameObject *f, int exc, PyObject *retval)
+PyObject *
+slp_restore_exception(PyFrameObject *f, int exc, PyObject *retval)
 {
     PyThreadState *ts = PyThreadState_GET();
     PyCFrameObject *cf = (PyCFrameObject *) f;
@@ -848,7 +848,7 @@ slp_schedule_task_prepared(PyThreadState *ts, PyObject **result, PyTaskletObject
     if (ts->exc_type != NULL) {
         /* build a shadow frame if we are returning here*/
         if (ts->frame != NULL) {
-            PyCFrameObject *f = slp_cframe_new(restore_exception, 1);
+            PyCFrameObject *f = slp_cframe_new(slp_restore_exception, 1);
             if (f == NULL)
                 return -1;
             f->ob1 = ts->exc_type;

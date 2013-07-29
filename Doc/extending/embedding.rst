@@ -140,7 +140,9 @@ The code to run a function defined in a Python script is:
 This code loads a Python script using ``argv[1]``, and calls the function named
 in ``argv[2]``.  Its integer arguments are the other values of the ``argv``
 array.  If you compile and link this program (let's call the finished executable
-:program:`call`), and use it to execute a Python script, such as::
+:program:`call`), and use it to execute a Python script, such as:
+
+.. code-block:: python
 
    def multiply(a,b):
        print "Will compute", a, "times", b
@@ -229,7 +231,9 @@ following two statements directly after :c:func:`Py_Initialize`::
 
 These two lines initialize the ``numargs`` variable, and make the
 :func:`emb.numargs` function accessible to the embedded Python interpreter.
-With these extensions, the Python script can do things like ::
+With these extensions, the Python script can do things like
+
+.. code-block:: python
 
    import emb
    print "Number of arguments", emb.numargs()
@@ -273,7 +277,9 @@ the linker not to remove these symbols.
 Determining the right options to use for any given platform can be quite
 difficult, but fortunately the Python configuration already has those values.
 To retrieve them from an installed Python interpreter, start an interactive
-interpreter and have a short session like this::
+interpreter and have a short session like this
+
+.. code-block:: python
 
    >>> import distutils.sysconfig
    >>> distutils.sysconfig.get_config_var('LINKFORSHARED')

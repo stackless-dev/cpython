@@ -145,6 +145,8 @@ use cases, the underlying :class:`Popen` interface can be used directly.
 
    .. versionadded:: 2.7
 
+   ..
+
    .. warning::
 
       Invoking the system shell with ``shell=True`` can be a security hazard
@@ -225,7 +227,7 @@ default values. The arguments that are most commonly needed are:
 
    When *stdout* or *stderr* are pipes and *universal_newlines* is
    ``True`` then all line endings will be converted to ``'\n'`` as described
-   for the :term:`universal newlines` `'U'`` mode argument to :func:`open`.
+   for the :term:`universal newlines` ``'U'`` mode argument to :func:`open`.
 
    If *shell* is ``True``, the specified command will be executed through
    the shell.  This can be useful if you are using Python primarily for the

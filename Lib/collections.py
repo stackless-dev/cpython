@@ -66,7 +66,7 @@ class OrderedDict(dict):
         # Deleting an existing item uses self.__map to find the link which gets
         # removed by updating the links in the predecessor and successor nodes.
         dict_delitem(self, key)
-        link_prev, link_next, key = self.__map.pop(key)
+        link_prev, link_next, _ = self.__map.pop(key)
         link_prev[1] = link_next                        # update link_prev[NEXT]
         link_next[0] = link_prev                        # update link_next[PREV]
 
@@ -258,8 +258,6 @@ class {typename}(tuple):
     def _asdict(self):
         'Return a new OrderedDict which maps field names to their values'
         return OrderedDict(zip(self._fields, self))
-
-    __dict__ = property(_asdict)
 
     def _replace(_self, **kwds):
         'Return a new {typename} object replacing specified fields with new values'

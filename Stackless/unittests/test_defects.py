@@ -133,6 +133,29 @@ class Channel(StacklessTestCase):
         finally:
             stackless.enable_softswitch(old)
 
+class TestInfiniteRecursion(unittest.TestCase):
+    # test for http://www.stackless.com/ticket/20
+    def testDirectRecursion(self):
+        class A(object):
+            # define __call__ in case http://www.stackless.com/ticket/18 is not fixed
+            def __call__(self):
+                pass
+        A.__call__ = A()
+        a=A()
+        # might crash Python, if the recursion check does not kick in
+        self.assertRaises(RuntimeError, a)
+
+    def testIndirectDirectRecursion(self):
+        class A(object):
+            def __call__(self):
+                pass
+        class B(object):
+            def __call__(self):
+                pass
+        A.__call__ = B()
+        B.__call__ = A()
+        a=A()
+        self.assertRaises(RuntimeError, a)
 
 if __name__ == '__main__':
     import sys

@@ -453,12 +453,13 @@ The available presentation types for floating point and decimal values are:
    +=========+==========================================================+
    | ``'e'`` | Exponent notation. Prints the number in scientific       |
    |         | notation using the letter 'e' to indicate the exponent.  |
+   |         | The default precision is ``6``.                          |
    +---------+----------------------------------------------------------+
    | ``'E'`` | Exponent notation. Same as ``'e'`` except it uses an     |
    |         | upper case 'E' as the separator character.               |
    +---------+----------------------------------------------------------+
    | ``'f'`` | Fixed point. Displays the number as a fixed-point        |
-   |         | number.                                                  |
+   |         | number.  The default precision is ``6``.                 |
    +---------+----------------------------------------------------------+
    | ``'F'`` | Fixed point. Same as ``'f'``.                            |
    +---------+----------------------------------------------------------+
@@ -484,7 +485,7 @@ The available presentation types for floating point and decimal values are:
    |         | the precision.                                           |
    |         |                                                          |
    |         | A precision of ``0`` is treated as equivalent to a       |
-   |         | precision of ``1``.                                      |
+   |         | precision of ``1``.  The default precision is ``6``.     |
    +---------+----------------------------------------------------------+
    | ``'G'`` | General format. Same as ``'g'`` except switches to       |
    |         | ``'E'`` if the number gets too large. The                |
@@ -707,7 +708,7 @@ these rules.  The methods of :class:`Template` are:
       This is the object passed to the constructor's *template* argument.  In
       general, you shouldn't change it, but read-only access is not enforced.
 
-Here is an example of how to use a Template:
+Here is an example of how to use a Template::
 
    >>> from string import Template
    >>> s = Template('$who likes $what')
@@ -716,11 +717,11 @@ Here is an example of how to use a Template:
    >>> d = dict(who='tim')
    >>> Template('Give $who $100').substitute(d)
    Traceback (most recent call last):
-   [...]
+   ...
    ValueError: Invalid placeholder in string: line 1, col 11
    >>> Template('$who likes $what').substitute(d)
    Traceback (most recent call last):
-   [...]
+   ...
    KeyError: 'what'
    >>> Template('$who likes $what').safe_substitute(d)
    'tim likes $what'

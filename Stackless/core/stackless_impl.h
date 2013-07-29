@@ -69,13 +69,20 @@ PyAPI_FUNC(PyObject *) PyEval_EvalFrameEx_slp(struct _frame *, int, PyObject *);
 /* eval_frame with stack overflow, triggered there with a macro */
 PyAPI_FUNC(PyObject *) slp_eval_frame_newstack(struct _frame *f, int throwflag, PyObject *retval);
 
-/* the new eval_frame loop with or without value or resuming an iterator */
+/* the new eval_frame loop with or without value or resuming an iterator 
+   or setting up or cleaning up a with block */
 PyAPI_FUNC(PyObject *) PyEval_EvalFrame_value(struct _frame *f,  int throwflag,
                                               PyObject *retval);
 PyAPI_FUNC(PyObject *) PyEval_EvalFrame_noval(struct _frame *f,  int throwflag,
                                               PyObject *retval);
 PyAPI_FUNC(PyObject *) PyEval_EvalFrame_iter(struct _frame *f,  int throwflag,
                                              PyObject *retval);
+PyAPI_FUNC(PyObject *) PyEval_EvalFrame_setup_with(struct _frame *f,  int throwflag,
+                                             PyObject *retval);
+PyAPI_FUNC(PyObject *) PyEval_EvalFrame_with_cleanup(struct _frame *f,  int throwflag,
+                                             PyObject *retval);
+/* another eval_frame function from module/scheduling.c */
+PyAPI_FUNC(PyObject *) slp_restore_exception(PyFrameObject *f, int exc, PyObject *retval);
 
 /* rebirth of software stack avoidance */
 
@@ -125,7 +132,7 @@ PyAPI_DATA(PyTypeObject) PyMethodWrapper_Type;
      (PyObject *) Py_UnwindToken)
 
 #define STACKLESS_UNPACK(retval) \
-    (retval = Py_UnwindToken->tempval, retval)
+    ((void)(retval = Py_UnwindToken->tempval, retval))
 
 #endif
 
@@ -154,7 +161,7 @@ PyAPI_DATA(PyTypeObject) PyMethodWrapper_Type;
 #define STACKLESS_PROMOTE_WRAPPER(wp) \
     (slp_try_stackless = stackless & wp->descr->d_slpmask)
 
-#define STACKLESS_PROMOTE_ALL() (slp_try_stackless = stackless, NULL)
+#define STACKLESS_PROMOTE_ALL() ((void)(slp_try_stackless = stackless, NULL))
 
 #define STACKLESS_PROPOSE(func)                                     \
     {                                                               \

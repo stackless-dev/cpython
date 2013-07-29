@@ -264,6 +264,11 @@ class MyHandler(rpc.RPCHandler):
                 IOBinding.encoding)
         sys.stderr = PyShell.PseudoOutputFile(self.console, "stderr",
                 IOBinding.encoding)
+
+        # Keep a reference to stdin so that it won't try to exit IDLE if
+        # sys.stdin gets changed from within IDLE's shell. See issue17838.
+        self._keep_stdin = sys.stdin
+
         self.interp = self.get_remote_proxy("interp")
         rpc.RPCHandler.getresponse(self, myseq=None, wait=0.05)
 
@@ -301,11 +306,14 @@ class Executive(object):
                 exec code in self.locals
             finally:
                 interruptable = False
+        except SystemExit:
+            # Scripts that raise SystemExit should just
+            # return to the interactive prompt
+            pass
         except:
             self.usr_exc_info = sys.exc_info()
             if quitting:
                 exit()
-            # even print a user code SystemExit exception, continue
             print_exception()
             jit = self.rpchandler.console.getvar("<<toggle-jit-stack-viewer>>")
             if jit:

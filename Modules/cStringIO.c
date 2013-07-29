@@ -66,9 +66,7 @@ typedef struct { /* Subtype of IOobject */
   PyObject_HEAD
   char *buf;
   Py_ssize_t pos, string_size;
-  /* We store a reference to the object here in order to keep
-     the buffer alive during the lifetime of the Iobject. */
-  PyObject *pbuf;
+    Py_buffer pbuf;
 } Iobject;
 
 /* IOobject (common) methods */
@@ -170,10 +168,15 @@ IO_cread(PyObject *self, char **output, Py_ssize_t  n) {
         n = l;
         if (n < 0) n=0;
     }
+    if (n > INT_MAX) {
+        PyErr_SetString(PyExc_OverflowError,
+                        "length too large");
+        return -1;
+    }
 
     *output=((IOobject*)self)->buf + ((IOobject*)self)->pos;
     ((IOobject*)self)->pos += n;
-    return n;
+    return (int)n;
 }
 
 static PyObject *
@@ -192,26 +195,30 @@ PyDoc_STRVAR(IO_readline__doc__, "readline() -- Read one line");
 
 static int
 IO_creadline(PyObject *self, char **output) {
-    char *n, *s;
-    Py_ssize_t l;
+    char *n, *start, *end;
+    Py_ssize_t len;
 
     if (!IO__opencheck(IOOOBJECT(self))) return -1;
 
-    for (n = ((IOobject*)self)->buf + ((IOobject*)self)->pos,
-           s = ((IOobject*)self)->buf + ((IOobject*)self)->string_size;
-         n < s && *n != '\n'; n++);
+    n = start = ((IOobject*)self)->buf + ((IOobject*)self)->pos;
+    end = ((IOobject*)self)->buf + ((IOobject*)self)->string_size;
+    while (n < end && *n != '\n')
+        n++;
 
-    if (n < s) n++;
+    if (n < end) n++;
 
-    *output=((IOobject*)self)->buf + ((IOobject*)self)->pos;
-    l = n - ((IOobject*)self)->buf - ((IOobject*)self)->pos;
+    len = n - start;
+    if (len > INT_MAX)
+        len = INT_MAX;
 
-    assert(IOOOBJECT(self)->pos <= PY_SSIZE_T_MAX - l);
+    *output=start;
+
+    assert(IOOOBJECT(self)->pos <= PY_SSIZE_T_MAX - len);
     assert(IOOOBJECT(self)->pos >= 0);
     assert(IOOOBJECT(self)->string_size >= 0);
 
-    ((IOobject*)self)->pos += l;
-    return (int)l;
+    ((IOobject*)self)->pos += len;
+    return (int)len;
 }
 
 static PyObject *
@@ -239,9 +246,9 @@ IO_readlines(IOobject *self, PyObject *args) {
     int n;
     char *output;
     PyObject *result, *line;
-    int hint = 0, length = 0;
+    Py_ssize_t hint = 0, length = 0;
 
-    if (!PyArg_ParseTuple(args, "|i:readlines", &hint)) return NULL;
+    if (!PyArg_ParseTuple(args, "|n:readlines", &hint)) return NULL;
 
     result = PyList_New(0);
     if (!result)
@@ -377,31 +384,41 @@ PyDoc_STRVAR(O_write__doc__,
 
 
 static int
-O_cwrite(PyObject *self, const char *c, Py_ssize_t  l) {
-    Py_ssize_t newl;
+O_cwrite(PyObject *self, const char *c, Py_ssize_t  len) {
+    Py_ssize_t newpos;
     Oobject *oself;
     char *newbuf;
 
     if (!IO__opencheck(IOOOBJECT(self))) return -1;
     oself = (Oobject *)self;
 
-    newl = oself->pos+l;
-    if (newl >= oself->buf_size) {
-        oself->buf_size *= 2;
-        if (oself->buf_size <= newl) {
-            assert(newl + 1 < INT_MAX);
-            oself->buf_size = (int)(newl+1);
+    if (len > INT_MAX) {
+        PyErr_SetString(PyExc_OverflowError,
+                        "length too large");
+        return -1;
+    }
+    assert(len >= 0);
+    if (oself->pos >= PY_SSIZE_T_MAX - len) {
+        PyErr_SetString(PyExc_OverflowError,
+                        "new position too large");
+        return -1;
+    }
+    newpos = oself->pos + len;
+    if (newpos >= oself->buf_size) {
+        size_t newsize = oself->buf_size;
+        newsize *= 2;
+        if (newsize <= (size_t)newpos || newsize > PY_SSIZE_T_MAX) {
+            assert(newpos < PY_SSIZE_T_MAX - 1);
+            newsize = newpos + 1;
         }
-        newbuf = (char*)realloc(oself->buf, oself->buf_size);
+        newbuf = (char*)realloc(oself->buf, newsize);
         if (!newbuf) {
             PyErr_SetString(PyExc_MemoryError,"out of memory");
-            free(oself->buf);
-            oself->buf = 0;
-            oself->buf_size = oself->pos = 0;
             return -1;
-          }
+        }
+        oself->buf_size = (Py_ssize_t)newsize;
         oself->buf = newbuf;
-      }
+    }
 
     if (oself->string_size < oself->pos) {
         /* In case of overseek, pad with null bytes the buffer region between
@@ -416,26 +433,27 @@ O_cwrite(PyObject *self, const char *c, Py_ssize_t  l) {
                (oself->pos - oself->string_size) * sizeof(char));
     }
 
-    memcpy(oself->buf+oself->pos,c,l);
+    memcpy(oself->buf + oself->pos, c, len);
 
-    assert(oself->pos + l < INT_MAX);
-    oself->pos += (int)l;
+    oself->pos = newpos;
 
     if (oself->string_size < oself->pos) {
         oself->string_size = oself->pos;
     }
 
-    return (int)l;
+    return (int)len;
 }
 
 static PyObject *
 O_write(Oobject *self, PyObject *args) {
-    char *c;
-    int l;
+    Py_buffer buf;
+    int result;
 
-    if (!PyArg_ParseTuple(args, "t#:write", &c, &l)) return NULL;
+    if (!PyArg_ParseTuple(args, "s*:write", &buf)) return NULL;
 
-    if (O_cwrite((PyObject*)self,c,l) < 0) return NULL;
+    result = O_cwrite((PyObject*)self, buf.buf, buf.len);
+    PyBuffer_Release(&buf);
+    if (result < 0) return NULL;
 
     Py_INCREF(Py_None);
     return Py_None;
@@ -588,7 +606,7 @@ newOobject(int  size) {
 
 static PyObject *
 I_close(Iobject *self, PyObject *unused) {
-    Py_CLEAR(self->pbuf);
+    PyBuffer_Release(&self->pbuf);
     self->buf = NULL;
 
     self->pos = self->string_size = 0;
@@ -617,7 +635,7 @@ static struct PyMethodDef I_methods[] = {
 
 static void
 I_dealloc(Iobject *self) {
-  Py_XDECREF(self->pbuf);
+  PyBuffer_Release(&self->pbuf);
   PyObject_Del(self);
 }
 
@@ -662,25 +680,26 @@ static PyTypeObject Itype = {
 static PyObject *
 newIobject(PyObject *s) {
   Iobject *self;
-  char *buf;
-  Py_ssize_t size;
+  Py_buffer buf;
+  PyObject *args;
+  int result;
 
-  if (PyUnicode_Check(s)) {
-    if (PyObject_AsCharBuffer(s, (const char **)&buf, &size) != 0)
+  args = Py_BuildValue("(O)", s);
+  if (args == NULL)
       return NULL;
-  }
-  else if (PyObject_AsReadBuffer(s, (const void **)&buf, &size)) {
-    PyErr_Format(PyExc_TypeError, "expected read buffer, %.200s found",
-                 s->ob_type->tp_name);
-    return NULL;
-  }
+  result = PyArg_ParseTuple(args, "s*:StringIO", &buf);
+  Py_DECREF(args);
+  if (!result)
+      return NULL;
 
   self = PyObject_New(Iobject, &Itype);
-  if (!self) return NULL;
-  Py_INCREF(s);
-  self->buf=buf;
-  self->string_size=size;
-  self->pbuf=s;
+  if (!self) {
+      PyBuffer_Release(&buf);
+      return NULL;
+  }
+  self->buf=buf.buf;
+  self->string_size=buf.len;
+  self->pbuf=buf;
   self->pos=0;
 
   return (PyObject*)self;

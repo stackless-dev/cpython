@@ -189,7 +189,7 @@ under the distribution root; if you're excessively concerned with speed, or want
 to keep the source tree pristine, you can change the build directory with the
 :option:`--build-base` option. For example::
 
-   python setup.py build --build-base=/tmp/pybuild/foo-1.0
+   python setup.py build --build-base=/path/to/pybuild/foo-1.0
 
 (Or you could do this permanently with a directive in your system or personal
 Distutils configuration file; see section :ref:`inst-config-files`.)  Normally, this
@@ -234,6 +234,8 @@ location for third-party Python modules.  This location varies by platform and
 by how you built/installed Python itself.  On Unix (and Mac OS X, which is also
 Unix-based), it also depends on whether the module distribution being installed
 is pure Python or contains extensions ("non-pure"):
+
+.. tabularcolumns:: |l|l|l|l|
 
 +-----------------+-----------------------------------------------------+--------------------------------------------------+-------+
 | Platform        | Standard installation location                      | Default value                                    | Notes |

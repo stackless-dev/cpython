@@ -473,14 +473,11 @@ generic_channel_action(PyChannelObject *self, PyObject *arg, int dir, int stackl
 
     if (fail) {
         TASKLET_SETVAL_OWN(source, tmpval);
+		return NULL;
     }
-    else
-    {
-        Py_DECREF(tmpval);
-        if (interthread) {
+    Py_DECREF(tmpval);
+        if (interthread)
             NOTIFY_CHANNEL(self, source, dir, cando, NULL);
-        }
-    }
     return retval;
 }
 

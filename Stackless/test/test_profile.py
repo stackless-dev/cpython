@@ -7,7 +7,7 @@
 from stackless import *
 
 import sys
-sys.setrecursionlimit(sys.maxint)
+sys.setrecursionlimit(min(sys.maxint, 2**31-1))
 
 counts = [0, 0]
 def func1(n):

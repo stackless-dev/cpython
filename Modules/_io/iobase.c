@@ -74,7 +74,7 @@ iobase_unsupported(const char *message)
 PyDoc_STRVAR(iobase_seek_doc,
     "Change stream position.\n"
     "\n"
-    "Change the stream position to byte offset offset. offset is\n"
+    "Change the stream position to the given byte offset. The offset is\n"
     "interpreted relative to the position indicated by whence.  Values\n"
     "for whence are:\n"
     "\n"
@@ -660,7 +660,10 @@ iobase_writelines(PyObject *self, PyObject *args)
                 break; /* Stop Iteration */
         }
 
-        res = PyObject_CallMethodObjArgs(self, _PyIO_str_write, line, NULL);
+        res = NULL;
+        do {
+            res = PyObject_CallMethodObjArgs(self, _PyIO_str_write, line, NULL);
+        } while (res == NULL && _PyIO_trap_eintr());
         Py_DECREF(line);
         if (res == NULL) {
             Py_DECREF(iter);

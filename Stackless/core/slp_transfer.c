@@ -156,41 +156,4 @@ slp_transfer_return(PyCStackObject *cst)
 }
 #endif
 
-/* experimental feature:
-   Doing a real stack switch.
-   I still have no exact clue how to fit this
-   into the rest of the system...
- */
-
-#define SLP_STACK_BEGIN(stackref, stsizediff) \
-    int stsizeb; \
-    \
-    stackref += STACK_MAGIC; \
-    if (_cstprev != NULL) { \
-        if (slp_cstack_new(_cstprev, (intptr_t*)stackref, _prev) == NULL) \
-            return -1; \
-        stsizeb = slp_cstack_save(*_cstprev); \
-    } \
-    else \
-        stsizeb = (_cst->startaddr - stackref) * sizeof(int*); \
-    if (_cst == NULL) return 0; \
-    stsizediff = stsizeb - (_cst->ob_size * sizeof(int*));
-
-#define SLP_STACK_END() \
-    if (_cst != NULL) { \
-        slp_cstack_restore(_cst); \
-    }
-
-#if 0
-/* disabled by now. Also need support for x64 asm file... */
-#include "platf/slp_switch_stack.h"
-
-int
-slp_transfer_stack(PyCStackObject **cstprev, PyCStackObject *cst)
-{
-    /* this is defunct, no idea how it must be */
-    return slp_switch_stack();
-}
-#endif
-
 #endif

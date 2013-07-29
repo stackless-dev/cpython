@@ -16,6 +16,14 @@ The :class:`Element` type is a flexible container object, designed to store
 hierarchical data structures in memory.  The type can be described as a cross
 between a list and a dictionary.
 
+
+.. warning::
+
+   The :mod:`xml.etree.ElementTree` module is not secure against
+   maliciously constructed data.  If you need to parse untrusted or
+   unauthenticated data see :ref:`xml-vulnerabilities`.
+
+
 Each element has a number of properties associated with it:
 
 * a tag which is a string identifying what kind of data this element represents
@@ -303,6 +311,8 @@ module.  We'll be using the ``countrydata`` XML document from the
 
 Supported XPath syntax
 ^^^^^^^^^^^^^^^^^^^^^^
+
+.. tabularcolumns:: |l|L|
 
 +-----------------------+------------------------------------------------------+
 | Syntax                | Meaning                                              |
@@ -711,26 +721,17 @@ ElementTree Objects
 
    .. method:: find(match)
 
-      Finds the first toplevel element matching *match*.  *match* may be a tag
-      name or path.  Same as getroot().find(match).  Returns the first matching
-      element, or ``None`` if no element was found.
+      Same as :meth:`Element.find`, starting at the root of the tree.
 
 
    .. method:: findall(match)
 
-      Finds all matching subelements, by tag name or path.  Same as
-      getroot().findall(match).  *match* may be a tag name or path.  Returns a
-      list containing all matching elements, in document order.
+      Same as :meth:`Element.findall`, starting at the root of the tree.
 
 
    .. method:: findtext(match, default=None)
 
-      Finds the element text for the first toplevel element with given tag.
-      Same as getroot().findtext(match).  *match* may be a tag name or path.
-      *default* is the value to return if the element was not found.  Returns
-      the text content of the first matching element, or the default value no
-      element was found.  Note that if the element is found, but has no text
-      content, this method returns an empty string.
+      Same as :meth:`Element.findtext`, starting at the root of the tree.
 
 
    .. method:: getiterator(tag=None)

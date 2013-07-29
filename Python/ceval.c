@@ -1003,6 +1003,42 @@ PyEval_EvalFrame_iter(PyFrameObject *f, int throwflag, PyObject *retval)
 }
 
 PyObject *
+PyEval_EvalFrame_setup_with(PyFrameObject *f, int throwflag, PyObject *retval)
+{
+    PyObject *r;
+    /*
+     * this function is identical to PyEval_EvalFrame_value.
+     * it serves as a marker whether we are inside of a
+     * SETUP_WITH operation.
+     * NOTE / XXX: see above.
+     */
+    Py_XINCREF(f);	    /* fool the link optimizer */
+    Py_XINCREF(retval); /* fool the link optimizer */
+    r = PyEval_EvalFrame_value(f, throwflag, retval);
+    Py_XDECREF(retval);
+    Py_XDECREF(f);
+    return r;
+}
+
+PyObject *
+PyEval_EvalFrame_with_cleanup(PyFrameObject *f, int throwflag, PyObject *retval)
+{
+    PyObject *r;
+    /*
+     * this function is identical to PyEval_EvalFrame_value.
+     * it serves as a marker whether we are inside of a
+     * WITH_CLEANUP operation.
+     * NOTE / XXX: see above.
+     */
+    Py_XINCREF(f);      /* fool the link optimizer */
+    Py_XINCREF(f);	    /* fool the link optimizer */
+    r = PyEval_EvalFrame_value(f, throwflag, retval);
+    Py_XDECREF(f);
+    Py_XDECREF(f);
+    return r;
+}
+
+PyObject *
 PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 {
     /* unfortunately we repeat all the variables here... */
@@ -1127,11 +1163,70 @@ PyEval_EvalFrame_value(PyFrameObject *f, int throwflag, PyObject *retval)
                 JUMPBY(oparg);
             }
         }
+        else if (f->f_execute == PyEval_EvalFrame_setup_with) {
+            /* finalise the SETUP_WITH operation */
+            opcode = NEXTOP();
+            oparg = NEXTARG();
+            if (opcode == EXTENDED_ARG) {
+                opcode = NEXTOP();
+                oparg = oparg<<16 | NEXTARG();
+            }
+            assert(opcode == SETUP_WITH);
+
+            if (retval) {
+                /* Setup a finally block (SETUP_WITH as a block is
+                   equivalent to SETUP_FINALLY except it normalizes
+                   the exception) before pushing the result of
+                   __enter__ on the stack. */
+                PyFrame_BlockSetup(f, SETUP_WITH, INSTR_OFFSET() + oparg,
+                                   STACK_LEVEL());
+
+                PUSH(retval);
+            }
+        }
+        else if (f->f_execute == PyEval_EvalFrame_with_cleanup) {
+            /* finalise the WITH_CLEANUP operation */
+
+            if (retval) {
+                u = TOP();
+                if (u != Py_None)
+                    err = PyObject_IsTrue(retval);
+                else
+                    err = 0;
+                Py_DECREF(retval);
+
+                if (err >= 0) {
+                    if (err > 0) {
+                        err = 0;
+                        /* There was an exception and a true return */
+                        v = SECOND();
+                        w = THIRD();
+                        STACKADJ(-2);
+                        Py_INCREF(Py_None);
+                        SET_TOP(Py_None);
+                        Py_DECREF(u);
+                        Py_DECREF(v);
+                        Py_DECREF(w);
+                    } else {
+                        /* The stack was rearranged to remove EXIT
+                           above. Let END_FINALLY do its thing */
+                    }
+                }
+                /* XXX: The main loop contains a PREDICT(END_FINALLY).
+                 * I wonder, if we must use it here?
+                 * If so, then set f_execute too.
+                 */
+                /*f->f_execute = PyEval_EvalFrame_value;
+                PREDICT(END_FINALLY); */
+            }
+        }
         else {
             /* don't push it, frame ignores value */
+            assert (f->f_execute == PyEval_EvalFrame_noval);
             Py_XDECREF(retval);
         }
         f->f_execute = PyEval_EvalFrame_value;
+
     }
 
     /* always check for an error flag */
@@ -2777,8 +2872,16 @@ stackless_iter_return:
                 x = NULL;
                 break;
             }
+            STACKLESS_PROPOSE_ALL();
             x = PyObject_CallFunctionObjArgs(u, NULL);
+            STACKLESS_ASSERT();
             Py_DECREF(u);
+#ifdef STACKLESS
+            if (STACKLESS_UNWINDING(x)) {
+                goto stackless_setup_with;
+            }
+stackless_setup_with_return:
+#endif
             if (!x)
                 break;
             /* Setup a finally block (SETUP_WITH as a block is
@@ -2849,9 +2952,17 @@ stackless_iter_return:
                 SET_THIRD(w);
             }
             /* XXX Not the fastest way to call it... */
+            STACKLESS_PROPOSE_ALL();
             x = PyObject_CallFunctionObjArgs(exit_func, u, v, w,
                                              NULL);
+            STACKLESS_ASSERT();
             Py_DECREF(exit_func);
+#ifdef STACKLESS
+            if (STACKLESS_UNWINDING(x)) {
+                goto stackless_with_cleanup;
+            }
+stackless_with_cleanup_return:
+#endif
             if (x == NULL)
                 break; /* Go to error exit */
 
@@ -3249,9 +3360,18 @@ exit_eval_frame:
     Py_DECREF(f);
     return retval;
 
+stackless_setup_with:
+    f->f_execute = PyEval_EvalFrame_setup_with;
+    goto stackless_call_with_opcode;
+
+stackless_with_cleanup:
+    f->f_execute = PyEval_EvalFrame_with_cleanup;
+    goto stackless_call;
+
 stackless_iter:
     /* restore this opcode and enable frame to handle it */
     f->f_execute = PyEval_EvalFrame_iter;
+stackless_call_with_opcode:
     next_instr -= (oparg >> 16) ? 6 : 3;
 
 stackless_call:
@@ -3269,8 +3389,10 @@ stackless_call:
     STACKLESS_UNPACK(retval);
     retval = tstate->frame->f_execute(tstate->frame, 0, retval);
     if (tstate->frame != f) {
-        assert(f->f_execute == PyEval_EvalFrame_value || f->f_execute == PyEval_EvalFrame_noval);
-        f->f_execute = PyEval_EvalFrame_value;
+        assert(f->f_execute == PyEval_EvalFrame_value || f->f_execute == PyEval_EvalFrame_noval ||
+            f->f_execute == PyEval_EvalFrame_setup_with || f->f_execute == PyEval_EvalFrame_with_cleanup);
+        if (f->f_execute == PyEval_EvalFrame_noval)
+            f->f_execute = PyEval_EvalFrame_value;
         return retval;
     }
     if (STACKLESS_UNWINDING(retval))
@@ -3281,7 +3403,16 @@ stackless_call:
     if (f->f_execute == PyEval_EvalFrame_iter) {
         next_instr += (oparg >> 16) ? 6 : 3;
         f->f_execute = PyEval_EvalFrame_value;
-            goto stackless_iter_return;
+        goto stackless_iter_return;
+    }
+    else if (f->f_execute == PyEval_EvalFrame_setup_with) {
+        next_instr += (oparg >> 16) ? 6 : 3;
+        f->f_execute = PyEval_EvalFrame_value;
+        goto stackless_setup_with_return;
+    }
+    else if (f->f_execute == PyEval_EvalFrame_with_cleanup) {
+        f->f_execute = PyEval_EvalFrame_value;
+        goto stackless_with_cleanup_return;
     }
 
     goto stackless_call_return;

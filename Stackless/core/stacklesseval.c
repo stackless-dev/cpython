@@ -85,8 +85,7 @@ void slp_kill_tasks_with_stacks(PyThreadState *target_ts)
     /* a loop to kill tasklets on the local thread */
     while (1) {
         PyTealet_data *tdfirst = slp_tealet_list, *td;
-        PyTaskletObject *t, *task;
-        PyTaskletObject **chain;
+        PyTaskletObject *t;
 
         if (tdfirst == NULL)
             break;
@@ -122,19 +121,20 @@ void slp_kill_tasks_with_stacks(PyThreadState *target_ts)
          */
         if (!t->flags.blocked && t != t->tstate->st.current) {
             PyTaskletObject *tmp;
+            PyTaskletObject **chain;
             /* unlink from runnable queue if it wasn't previously remove()'d */
-            if (t->next && t->prev) {
-                task = t;
-                chain = &task;
-                SLP_CHAIN_REMOVE(PyTaskletObject, chain, task, next, prev);
-                ts->st.runcount--;
+            if (t->next) {
+                assert(t->prev);
+                chain = &t;
+                SLP_CHAIN_REMOVE(PyTaskletObject, chain, tmp, next, prev);
+                t = tmp;
+                ts.st.runcount--;
             } else
                 Py_INCREF(t); /* a new reference for the runnable queue */
             /* insert into the 'current' chain without modifying 'current' */
             tmp = t->tstate->st.current;
             chain = &tmp;
-            task = t;
-            SLP_CHAIN_INSERT(PyTaskletObject, chain, task, next, prev);
+            SLP_CHAIN_INSERT(PyTaskletObject, chain, t, next, prev);
             ts->st.runcount++;
         }
 

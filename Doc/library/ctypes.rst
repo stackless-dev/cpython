@@ -568,8 +568,8 @@ Here is a simple example of a POINT structure, which contains two integers named
    ValueError: too many initializers
    >>>
 
-You can, however, build much more complicated structures. Structures can itself
-contain other structures by using a structure as a field type.
+You can, however, build much more complicated structures.  A structure can
+itself contain other structures by using a structure as a field type.
 
 Here is a RECT structure which contains two POINTs named *upperleft* and
 *lowerright*::
@@ -601,6 +601,13 @@ for debugging because they can provide useful information::
 
 
 .. _ctypes-structureunion-alignment-byte-order:
+
+.. warning::
+
+   :mod:`ctypes` does not support passing unions or structures with bit-fields
+   to functions by value.  While this may work on 32-bit x86, it's not
+   guaranteed by the library to work in the general case.  Unions and
+   structures with bit-fields should always be passed to functions by pointer.
 
 Structure/union alignment and byte order
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -815,6 +822,11 @@ pointer types.  So, for ``POINTER(c_int)``, ctypes accepts an array of c_int::
    2
    3
    >>>
+
+In addition, if a function argument is explicitly declared to be a pointer type
+(such as ``POINTER(c_int)``) in :attr:`argtypes`, an object of the pointed
+type (``c_int`` in this case) can be passed to the function.  ctypes will apply
+the required :func:`byref` conversion in this case automatically.
 
 To set a POINTER type field to ``NULL``, you can assign ``None``::
 

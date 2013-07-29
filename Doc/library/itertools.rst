@@ -732,9 +732,9 @@ which incur interpreter overhead.
        next(b, None)
        return izip(a, b)
 
-   def grouper(n, iterable, fillvalue=None):
+   def grouper(iterable, n, fillvalue=None):
        "Collect data into fixed-length chunks or blocks"
-       # grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx
+       # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
        args = [iter(iterable)] * n
        return izip_longest(fillvalue=fillvalue, *args)
 
@@ -827,6 +827,18 @@ which incur interpreter overhead.
        n = len(pool)
        indices = sorted(random.randrange(n) for i in xrange(r))
        return tuple(pool[i] for i in indices)
+
+   def tee_lookahead(t, i):
+       """Inspect the i-th upcomping value from a tee object
+          while leaving the tee object at its current position.
+
+          Raise an IndexError if the underlying iterator doesn't
+          have enough values.
+
+       """
+       for value in islice(t.__copy__(), i, None):
+           return value
+       raise IndexError(i)
 
 Note, many of the above recipes can be optimized by replacing global lookups
 with local variables defined as default values.  For example, the

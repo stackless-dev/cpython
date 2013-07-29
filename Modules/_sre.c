@@ -524,7 +524,7 @@ SRE_COUNT(SRE_STATE* state, SRE_CODE* pattern, Py_ssize_t maxcount)
     Py_ssize_t i;
 
     /* adjust end */
-    if (maxcount < end - ptr && maxcount != 65535)
+    if (maxcount < end - ptr && maxcount != SRE_MAXREPEAT)
         end = ptr + maxcount;
 
     switch (pattern[0]) {
@@ -686,7 +686,7 @@ do { \
     alloc_pos = state->data_stack_base; \
     TRACE(("allocating %s in %d (%d)\n", \
            SFY(type), alloc_pos, sizeof(type))); \
-    if (state->data_stack_size < alloc_pos+sizeof(type)) { \
+    if (sizeof(type) > state->data_stack_size - alloc_pos) { \
         int j = data_stack_grow(state, sizeof(type)); \
         if (j < 0) return j; \
         if (ctx_pos != -1) \
@@ -706,7 +706,7 @@ do { \
 do { \
     TRACE(("copy data in %p to %d (%d)\n", \
            data, state->data_stack_base, size)); \
-    if (state->data_stack_size < state->data_stack_base+size) { \
+    if (size > state->data_stack_size - state->data_stack_base) { \
         int j = data_stack_grow(state, size); \
         if (j < 0) return j; \
         if (ctx_pos != -1) \
@@ -1028,7 +1028,7 @@ entrance:
             TRACE(("|%p|%p|REPEAT_ONE %d %d\n", ctx->pattern, ctx->ptr,
                    ctx->pattern[1], ctx->pattern[2]));
 
-            if (ctx->ptr + ctx->pattern[1] > end)
+            if (ctx->pattern[1] > end - ctx->ptr)
                 RETURN_FAILURE; /* cannot match */
 
             state->ptr = ctx->ptr;
@@ -1111,7 +1111,7 @@ entrance:
             TRACE(("|%p|%p|MIN_REPEAT_ONE %d %d\n", ctx->pattern, ctx->ptr,
                    ctx->pattern[1], ctx->pattern[2]));
 
-            if (ctx->ptr + ctx->pattern[1] > end)
+            if (ctx->pattern[1] > end - ctx->ptr)
                 RETURN_FAILURE; /* cannot match */
 
             state->ptr = ctx->ptr;
@@ -1139,7 +1139,7 @@ entrance:
             } else {
                 /* general case */
                 LASTMARK_SAVE();
-                while ((Py_ssize_t)ctx->pattern[2] == 65535
+                while ((Py_ssize_t)ctx->pattern[2] == SRE_MAXREPEAT
                        || ctx->count <= (Py_ssize_t)ctx->pattern[2]) {
                     state->ptr = ctx->ptr;
                     DO_JUMP(JUMP_MIN_REPEAT_ONE,jump_min_repeat_one,
@@ -1225,7 +1225,7 @@ entrance:
             }
 
             if ((ctx->count < ctx->u.rep->pattern[2] ||
-                ctx->u.rep->pattern[2] == 65535) &&
+                ctx->u.rep->pattern[2] == SRE_MAXREPEAT) &&
                 state->ptr != ctx->u.rep->last_ptr) {
                 /* we may have enough matches, but if we can
                    match another item, do so */
@@ -1302,13 +1302,18 @@ entrance:
 
             LASTMARK_RESTORE();
 
-            if (ctx->count >= ctx->u.rep->pattern[2]
-                && ctx->u.rep->pattern[2] != 65535)
+            if ((ctx->count >= ctx->u.rep->pattern[2]
+                && ctx->u.rep->pattern[2] != SRE_MAXREPEAT) ||
+                state->ptr == ctx->u.rep->last_ptr)
                 RETURN_FAILURE;
 
             ctx->u.rep->count = ctx->count;
+            /* zero-width match protection */
+            DATA_PUSH(&ctx->u.rep->last_ptr);
+            ctx->u.rep->last_ptr = state->ptr;
             DO_JUMP(JUMP_MIN_UNTIL_3,jump_min_until_3,
                     ctx->u.rep->pattern+3);
+            DATA_POP(&ctx->u.rep->last_ptr);
             if (ret) {
                 RETURN_ON_ERROR(ret);
                 RETURN_SUCCESS;
@@ -2779,7 +2784,7 @@ _compile(PyObject* self_, PyObject* args)
         skip = *code;                                   \
         VTRACE(("%lu (skip to %p)\n",                   \
                (unsigned long)skip, code+skip));        \
-        if (code+skip-adj < code || code+skip-adj > end)\
+        if (skip-adj > end-code)                        \
             FAIL;                                       \
         code++;                                         \
     } while (0)
@@ -2812,7 +2817,7 @@ _validate_charset(SRE_CODE *code, SRE_CODE *end)
 
         case SRE_OP_CHARSET:
             offset = 32/sizeof(SRE_CODE); /* 32-byte bitmap */
-            if (code+offset < code || code+offset > end)
+            if (offset > end-code)
                 FAIL;
             code += offset;
             break;
@@ -2820,7 +2825,7 @@ _validate_charset(SRE_CODE *code, SRE_CODE *end)
         case SRE_OP_BIGCHARSET:
             GET_ARG; /* Number of blocks */
             offset = 256/sizeof(SRE_CODE); /* 256-byte table */
-            if (code+offset < code || code+offset > end)
+            if (offset > end-code)
                 FAIL;
             /* Make sure that each byte points to a valid block */
             for (i = 0; i < 256; i++) {
@@ -2829,7 +2834,7 @@ _validate_charset(SRE_CODE *code, SRE_CODE *end)
             }
             code += offset;
             offset = arg * 32/sizeof(SRE_CODE); /* 32-byte bitmap times arg */
-            if (code+offset < code || code+offset > end)
+            if (offset > end-code)
                 FAIL;
             code += offset;
             break;
@@ -2980,11 +2985,11 @@ _validate_inner(SRE_CODE *code, SRE_CODE *end, Py_ssize_t groups)
                     GET_ARG; prefix_len = arg;
                     GET_ARG; /* prefix skip */
                     /* Here comes the prefix string */
-                    if (code+prefix_len < code || code+prefix_len > newcode)
+                    if (prefix_len > newcode-code)
                         FAIL;
                     code += prefix_len;
                     /* And here comes the overlap table */
-                    if (code+prefix_len < code || code+prefix_len > newcode)
+                    if (prefix_len > newcode-code)
                         FAIL;
                     /* Each overlap value should be < prefix_len */
                     for (i = 0; i < prefix_len; i++) {
@@ -3042,7 +3047,7 @@ _validate_inner(SRE_CODE *code, SRE_CODE *end, Py_ssize_t groups)
                 GET_ARG; max = arg;
                 if (min > max)
                     FAIL;
-                if (max > 65535)
+                if (max > SRE_MAXREPEAT)
                     FAIL;
                 if (!_validate_inner(code, code+skip-4, groups))
                     FAIL;
@@ -3061,7 +3066,7 @@ _validate_inner(SRE_CODE *code, SRE_CODE *end, Py_ssize_t groups)
                 GET_ARG; max = arg;
                 if (min > max)
                     FAIL;
-                if (max > 65535)
+                if (max > SRE_MAXREPEAT)
                     FAIL;
                 if (!_validate_inner(code, code+skip-3, groups))
                     FAIL;
@@ -3113,7 +3118,7 @@ _validate_inner(SRE_CODE *code, SRE_CODE *end, Py_ssize_t groups)
                to allow arbitrary jumps anywhere in the code; so we just look
                for a JUMP opcode preceding our skip target.
             */
-            if (skip >= 3 && code+skip-3 >= code &&
+            if (skip >= 3 && skip-3 < end-code &&
                 code[skip-3] == SRE_OP_JUMP)
             {
                 VTRACE(("both then and else parts present\n"));
@@ -3935,6 +3940,12 @@ PyMODINIT_FUNC init_sre(void)
     x = PyInt_FromLong(sizeof(SRE_CODE));
     if (x) {
         PyDict_SetItemString(d, "CODESIZE", x);
+        Py_DECREF(x);
+    }
+
+    x = PyLong_FromUnsignedLong(SRE_MAXREPEAT);
+    if (x) {
+        PyDict_SetItemString(d, "MAXREPEAT", x);
         Py_DECREF(x);
     }
 

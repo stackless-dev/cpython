@@ -11,7 +11,7 @@ recommended command-line parsing module in the Python standard library.
 
 .. note::
 
-   There's two other modules that fulfill the same task, namely
+   There are two other modules that fulfill the same task, namely
    :mod:`getopt` (an equivalent for :c:func:`getopt` from the C
    language) and the deprecated :mod:`optparse`.
    Note also that :mod:`argparse` is based on :mod:`optparse`,
@@ -668,8 +668,8 @@ Conflicting options
 So far, we have been working with two methods of an
 :class:`argparse.ArgumentParser` instance. Let's introduce a third one,
 :meth:`add_mutually_exclusive_group`. It allows for us to specify options that
-conflict with each other. Let's also change the rest of the program make the
-new functionality makes more sense:
+conflict with each other. Let's also change the rest of the program so that
+the new functionality makes more sense:
 we'll introduce the ``--quiet`` option,
 which will be the opposite of the ``--verbose`` one::
 

@@ -517,9 +517,6 @@ static PyTypeObject PyClassMethodDescr_Type = {
 
 STACKLESS_DECLARE_METHOD(&PyClassMethodDescr_Type, tp_call)
 
-#ifndef STACKLESS
-static
-#endif
 PyTypeObject PyMemberDescr_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
     "member_descriptor",
@@ -557,9 +554,6 @@ PyTypeObject PyMemberDescr_Type = {
     (descrsetfunc)member_set,                   /* tp_descr_set */
 };
 
-#ifndef STACKLESS
-static
-#endif
 PyTypeObject PyGetSetDescr_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
     "getset_descriptor",

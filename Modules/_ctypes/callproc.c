@@ -25,8 +25,8 @@
 
   2. After several checks, _build_callargs() is called which returns another
   tuple 'callargs'.  This may be the same tuple as 'inargs', a slice of
-  'inargs', or a completely fresh tuple, depending on several things (is is a
-  COM method, are 'paramflags' available).
+  'inargs', or a completely fresh tuple, depending on several things (is it a
+  COM method?, are 'paramflags' available?).
 
   3. _build_callargs also calculates bitarrays containing indexes into
   the callargs tuple, specifying how to build the return value(s) of
@@ -401,6 +401,11 @@ static DWORD HandleException(EXCEPTION_POINTERS *ptrs,
 {
     *pdw = ptrs->ExceptionRecord->ExceptionCode;
     *record = *ptrs->ExceptionRecord;
+    /* We don't want to catch breakpoint exceptions, they are used to attach
+     * a debugger to the process.
+     */
+    if (*pdw == EXCEPTION_BREAKPOINT)
+        return EXCEPTION_CONTINUE_SEARCH;
     return EXCEPTION_EXECUTE_HANDLER;
 }
 #endif

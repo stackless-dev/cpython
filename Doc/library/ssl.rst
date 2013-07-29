@@ -298,21 +298,37 @@ Functions, Constants, and Exceptions
 SSLSocket Objects
 -----------------
 
-.. method:: SSLSocket.read([nbytes=1024])
+SSL sockets provide the following methods of :ref:`socket-objects`:
 
-   Reads up to ``nbytes`` bytes from the SSL-encrypted channel and returns them.
+- :meth:`~socket.socket.accept()`
+- :meth:`~socket.socket.bind()`
+- :meth:`~socket.socket.close()`
+- :meth:`~socket.socket.connect()`
+- :meth:`~socket.socket.fileno()`
+- :meth:`~socket.socket.getpeername()`, :meth:`~socket.socket.getsockname()`
+- :meth:`~socket.socket.getsockopt()`, :meth:`~socket.socket.setsockopt()`
+- :meth:`~socket.socket.gettimeout()`, :meth:`~socket.socket.settimeout()`,
+  :meth:`~socket.socket.setblocking()`
+- :meth:`~socket.socket.listen()`
+- :meth:`~socket.socket.makefile()`
+- :meth:`~socket.socket.recv()`, :meth:`~socket.socket.recv_into()`
+  (but passing a non-zero ``flags`` argument is not allowed)
+- :meth:`~socket.socket.send()`, :meth:`~socket.socket.sendall()` (with
+  the same limitation)
+- :meth:`~socket.socket.shutdown()`
 
-.. method:: SSLSocket.write(data)
+However, since the SSL (and TLS) protocol has its own framing atop
+of TCP, the SSL sockets abstraction can, in certain respects, diverge from
+the specification of normal, OS-level sockets.
 
-   Writes the ``data`` to the other side of the connection, using the SSL
-   channel to encrypt.  Returns the number of bytes written.
+SSL sockets also have the following additional methods and attributes:
 
 .. method:: SSLSocket.getpeercert(binary_form=False)
 
    If there is no certificate for the peer on the other end of the connection,
    returns ``None``.
 
-   If the parameter ``binary_form`` is :const:`False`, and a certificate was
+   If the ``binary_form`` parameter is :const:`False`, and a certificate was
    received from the peer, this method returns a :class:`dict` instance.  If the
    certificate was not validated, the dict is empty.  If the certificate was
    validated, it returns a dict with the keys ``subject`` (the principal for
@@ -338,10 +354,16 @@ SSLSocket Objects
    If the ``binary_form`` parameter is :const:`True`, and a certificate was
    provided, this method returns the DER-encoded form of the entire certificate
    as a sequence of bytes, or :const:`None` if the peer did not provide a
-   certificate.  This return value is independent of validation; if validation
-   was required (:const:`CERT_OPTIONAL` or :const:`CERT_REQUIRED`), it will have
-   been validated, but if :const:`CERT_NONE` was used to establish the
-   connection, the certificate, if present, will not have been validated.
+   certificate.  Whether the peer provides a certificate depends on the SSL
+   socket's role:
+
+   * for a client SSL socket, the server will always provide a certificate,
+     regardless of whether validation was required;
+
+   * for a server SSL socket, the client will only provide a certificate
+     when requested by the server; therefore :meth:`getpeercert` will return
+     :const:`None` if you used :const:`CERT_NONE` (rather than
+     :const:`CERT_OPTIONAL` or :const:`CERT_REQUIRED`).
 
 .. method:: SSLSocket.cipher()
 

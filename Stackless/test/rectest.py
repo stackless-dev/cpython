@@ -11,5 +11,5 @@ def f(x):
 ##sys.enable_stackless(1)
 ##print "slicing interval =", sys.getslicinginterval()
 
-sys.setrecursionlimit(sys.maxint)
+sys.setrecursionlimit(min(sys.maxint, 2**31-1))
 f(100000)

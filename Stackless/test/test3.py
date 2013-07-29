@@ -1,9 +1,7 @@
 import stackless, random
-
-
+from timeit import default_timer as timer
 
 wait = stackless.schedule
-
 
 class InterruptTasklet(Exception):
     pass
@@ -50,7 +48,8 @@ s = ActiveSprite()
 schedule(s.cyclic, "123")
 
 
-while 1:
+tim = timer()
+while timer() - tim < 5:
     normal_frame()
     if random.random() < 0.3:
         schedule(s.cyclic, "ghijk")

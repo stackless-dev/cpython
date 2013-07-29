@@ -19,7 +19,7 @@ available.  They are listed here in alphabetical order.
 :func:`bytearray`    :func:`float`      :func:`list`        :func:`raw_input`  :func:`unichr`
 :func:`callable`     :func:`format`     :func:`locals`      :func:`reduce`     :func:`unicode`
 :func:`chr`          |func-frozenset|_  :func:`long`        :func:`reload`     :func:`vars`
-:func:`classmethod`  :func:`getattr`    :func:`map`         :func:`repr`       :func:`xrange`
+:func:`classmethod`  :func:`getattr`    :func:`map`         |func-repr|_       :func:`xrange`
 :func:`cmp`          :func:`globals`    :func:`max`         :func:`reversed`   :func:`zip`
 :func:`compile`      :func:`hasattr`    |func-memoryview|_  :func:`round`      :func:`__import__`
 :func:`complex`      :func:`hash`       :func:`min`         |func-set|_        :func:`apply`
@@ -34,6 +34,7 @@ available.  They are listed here in alphabetical order.
 .. |func-dict| replace:: ``dict()``
 .. |func-frozenset| replace:: ``frozenset()``
 .. |func-memoryview| replace:: ``memoryview()``
+.. |func-repr| replace:: ``repr()``
 .. |func-set| replace:: ``set()``
 
 
@@ -162,9 +163,10 @@ available.  They are listed here in alphabetical order.
    instance method receives the instance. To declare a class method, use this
    idiom::
 
-      class C:
+      class C(object):
           @classmethod
-          def f(cls, arg1, arg2, ...): ...
+          def f(cls, arg1, arg2, ...):
+              ...
 
    The ``@classmethod`` form is a function :term:`decorator` -- see the description
    of function definitions in :ref:`function` for details.
@@ -872,9 +874,9 @@ available.  They are listed here in alphabetical order.
 
    The optional *buffering* argument specifies the file's desired buffer size: 0
    means unbuffered, 1 means line buffered, any other positive value means use a
-   buffer of (approximately) that size.  A negative *buffering* means to use the
-   system default, which is usually line buffered for tty devices and fully
-   buffered for other files.  If omitted, the system default is used. [#]_
+   buffer of (approximately) that size (in bytes).  A negative *buffering* means
+   to use the system default, which is usually line buffered for tty devices and
+   fully buffered for other files.  If omitted, the system default is used. [#]_
 
    Modes ``'r+'``, ``'w+'`` and ``'a+'`` open the file for updating (note that
    ``'w+'`` truncates the file).  Append ``'b'`` to the mode to open the file in
@@ -1178,6 +1180,7 @@ available.  They are listed here in alphabetical order.
    continue to use the old class definition.  The same is true for derived classes.
 
 
+.. _func-repr:
 .. function:: repr(object)
 
    Return a string containing a printable representation of an object.  This is
@@ -1303,9 +1306,10 @@ available.  They are listed here in alphabetical order.
    A static method does not receive an implicit first argument. To declare a static
    method, use this idiom::
 
-      class C:
+      class C(object):
           @staticmethod
-          def f(arg1, arg2, ...): ...
+          def f(arg1, arg2, ...):
+              ...
 
    The ``@staticmethod`` form is a function :term:`decorator` -- see the
    description of function definitions in :ref:`function` for details.

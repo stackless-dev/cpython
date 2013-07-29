@@ -598,7 +598,8 @@ Notes:
     It is recommended that versions take the form *major.minor[.patch[.sub]]*.
 
 (3)
-    Either the author or the maintainer must be identified.
+    Either the author or the maintainer must be identified. If maintainer is
+    provided, distutils lists it as the author in :file:`PKG-INFO`.
 
 (4)
     These fields should not be used if your package is to be compatible with Python
@@ -606,8 +607,9 @@ Notes:
     <http://pypi.python.org/pypi>`_.
 
 (5)
-    The ``long_description`` field is used by PyPI when you are registering a
-    package, to build its home page.
+    The ``long_description`` field is used by PyPI when you are
+    :ref:`registering <package-register>` a package, to
+    :ref:`build its home page <package-display>`.
 
 (6)
     The ``license`` field is a text indicating the license covering the

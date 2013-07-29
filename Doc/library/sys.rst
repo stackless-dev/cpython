@@ -302,6 +302,8 @@ always available.
    5.2.4.2.2 of the 1999 ISO/IEC C standard [C99]_, 'Characteristics of
    floating types', for details.
 
+   .. tabularcolumns:: |l|l|L|
+
    +---------------------+----------------+--------------------------------------------------+
    | attribute           | float.h macro  | explanation                                      |
    +=====================+================+==================================================+
@@ -599,6 +601,8 @@ always available.
    A struct sequence that holds information about Python's
    internal representation of integers.  The attributes are read only.
 
+   .. tabularcolumns:: |l|L|
+
    +-------------------------+----------------------------------------------+
    | Attribute               | Explanation                                  |
    +=========================+==============================================+
@@ -774,7 +778,7 @@ always available.
    independent Python files are installed; by default, this is the string
    ``'/usr/local'``.  This can be set at build time with the ``--prefix``
    argument to the :program:`configure` script.  The main collection of Python
-   library modules is installed in the directory :file:`{prefix}/lib/python{X.Y}``
+   library modules is installed in the directory :file:`{prefix}/lib/python{X.Y}`
    while the platform independent header files (all except :file:`pyconfig.h`) are
    stored in :file:`{prefix}/include/python{X.Y}`, where *X.Y* is the version
    number of Python, for example ``2.7``.

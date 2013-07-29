@@ -2110,6 +2110,38 @@ class _TestLogging(BaseTestCase):
 #         assert self.__handled
 
 #
+# Check that Process.join() retries if os.waitpid() fails with EINTR
+#
+
+class _TestPollEintr(BaseTestCase):
+
+    ALLOWED_TYPES = ('processes',)
+
+    @classmethod
+    def _killer(cls, pid):
+        time.sleep(0.5)
+        os.kill(pid, signal.SIGUSR1)
+
+    @unittest.skipUnless(hasattr(signal, 'SIGUSR1'), 'requires SIGUSR1')
+    def test_poll_eintr(self):
+        got_signal = [False]
+        def record(*args):
+            got_signal[0] = True
+        pid = os.getpid()
+        oldhandler = signal.signal(signal.SIGUSR1, record)
+        try:
+            killer = self.Process(target=self._killer, args=(pid,))
+            killer.start()
+            p = self.Process(target=time.sleep, args=(1,))
+            p.start()
+            p.join()
+            self.assertTrue(got_signal[0])
+            self.assertEqual(p.exitcode, 0)
+            killer.join()
+        finally:
+            signal.signal(signal.SIGUSR1, oldhandler)
+
+#
 # Test to verify handle verification, see issue 3321
 #
 
@@ -2373,11 +2405,73 @@ class TestNoForkBomb(unittest.TestCase):
             self.assertEqual('', err.decode('ascii'))
 
 #
+# Issue 12098: check sys.flags of child matches that for parent
+#
+
+class TestFlags(unittest.TestCase):
+    @classmethod
+    def run_in_grandchild(cls, conn):
+        conn.send(tuple(sys.flags))
+
+    @classmethod
+    def run_in_child(cls):
+        import json
+        r, w = multiprocessing.Pipe(duplex=False)
+        p = multiprocessing.Process(target=cls.run_in_grandchild, args=(w,))
+        p.start()
+        grandchild_flags = r.recv()
+        p.join()
+        r.close()
+        w.close()
+        flags = (tuple(sys.flags), grandchild_flags)
+        print(json.dumps(flags))
+
+    def test_flags(self):
+        import json, subprocess
+        # start child process using unusual flags
+        prog = ('from test.test_multiprocessing import TestFlags; ' +
+                'TestFlags.run_in_child()')
+        data = subprocess.check_output(
+            [sys.executable, '-E', '-B', '-O', '-c', prog])
+        child_flags, grandchild_flags = json.loads(data.decode('ascii'))
+        self.assertEqual(child_flags, grandchild_flags)
+
+#
+# Issue #17555: ForkAwareThreadLock
+#
+
+class TestForkAwareThreadLock(unittest.TestCase):
+    # We recurisvely start processes.  Issue #17555 meant that the
+    # after fork registry would get duplicate entries for the same
+    # lock.  The size of the registry at generation n was ~2**n.
+
+    @classmethod
+    def child(cls, n, conn):
+        if n > 1:
+            p = multiprocessing.Process(target=cls.child, args=(n-1, conn))
+            p.start()
+            p.join()
+        else:
+            conn.send(len(util._afterfork_registry))
+        conn.close()
+
+    def test_lock(self):
+        r, w = multiprocessing.Pipe(False)
+        l = util.ForkAwareThreadLock()
+        old_size = len(util._afterfork_registry)
+        p = multiprocessing.Process(target=self.child, args=(5, w))
+        p.start()
+        new_size = r.recv()
+        p.join()
+        self.assertLessEqual(new_size, old_size)
+
+#
 #
 #
 
 testcases_other = [OtherTest, TestInvalidHandle, TestInitializers,
-                   TestStdinBadfiledescriptor, TestTimeouts, TestNoForkBomb]
+                   TestStdinBadfiledescriptor, TestTimeouts, TestNoForkBomb,
+                   TestFlags, TestForkAwareThreadLock]
 
 #
 #

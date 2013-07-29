@@ -692,6 +692,133 @@ test_cstate(PyObject *f, PyObject *callable)
 }
 
 
+PyDoc_STRVAR(test_nostacklesscalltype__doc__,
+"A callable extension type that does not support stackless calls\n"
+"It calls arg[0](*arg[1:], **kw).\n"
+"There are two special keyword arguments\n"
+"  post_callback: callback(result, stackless, slp_try_stackless, **kw) that runs after arg[0].\n"
+"  set_try_stackless: integer value, assigned to set spl_try_stackless."
+);
+
+typedef struct {
+    PyObject_HEAD
+} test_nostacklesscallObject;
+
+static
+PyObject *
+test_nostacklesscall_call(PyObject *f, PyObject *arg, PyObject *kw)
+{
+    PyObject * result;
+    PyObject * callback1;
+    PyObject * callback2 = NULL;
+    PyObject * rest;
+    int stackless = slp_try_stackless;
+
+    callback1 = PyTuple_GetItem(arg, 0);
+    if (callback1 == NULL)
+        return NULL;
+    Py_INCREF(callback1);
+
+    rest = PyTuple_GetSlice(arg, 1, PyTuple_GET_SIZE(arg));
+    if (rest == NULL) {
+        Py_DECREF(callback1);
+        return NULL;
+    }
+
+    if (kw && PyDict_Check(kw)) {
+        PyObject * setTryStackless;
+
+        setTryStackless = PyDict_GetItemString(kw, "set_try_stackless");
+        if (setTryStackless) {
+            long l;
+            Py_INCREF(setTryStackless);
+            PyDict_DelItemString(kw, "set_try_stackless");
+            l = PyInt_AsLong(setTryStackless);
+            Py_DECREF(setTryStackless);
+            if (-1 != l)
+                slp_try_stackless = l;
+            else
+                return NULL;
+        }
+
+        callback2 = PyDict_GetItemString(kw, "post_callback");
+        if (callback2) {
+            Py_INCREF(callback2);
+            PyDict_DelItemString(kw, "post_callback");
+        }
+    }
+
+    if (callback1 == Py_None) {
+        result = rest;
+        Py_INCREF(result);
+    }
+    else
+        result = PyObject_Call(callback1, rest, kw);
+
+    Py_DECREF(callback1);
+    Py_DECREF(rest);
+
+    if (NULL == callback2)
+        return result;
+
+    if (NULL == result) {
+        Py_DECREF(callback2);
+        return NULL;
+    }
+
+    rest = Py_BuildValue("Oii", result, stackless, slp_try_stackless);
+    Py_DECREF(result);
+    if (rest == NULL) {
+        Py_DECREF(callback2);
+        return NULL;
+    }
+
+    slp_try_stackless = 0;
+    result = PyObject_Call(callback2, rest, kw);
+    Py_DECREF(callback2);
+    Py_DECREF(rest);
+
+    return result;
+}
+
+static test_nostacklesscallObject *test_nostacklesscall = NULL;
+
+static int init_test_nostacklesscalltype(void)
+{
+    static PyTypeObject test_nostacklesscallType = {
+            PyObject_HEAD_INIT(NULL)
+            0,                         /*ob_size*/
+            "stackless.test_nostacklesscall_type",   /*tp_name*/
+            sizeof(test_nostacklesscallObject), /*tp_basicsize*/
+            0,                         /*tp_itemsize*/
+            0,                         /*tp_dealloc*/
+            0,                         /*tp_print*/
+            0,                         /*tp_getattr*/
+            0,                         /*tp_setattr*/
+            0,                         /*tp_compare*/
+            0,                         /*tp_repr*/
+            0,                         /*tp_as_number*/
+            0,                         /*tp_as_sequence*/
+            0,                         /*tp_as_mapping*/
+            0,                         /*tp_hash */
+            test_nostacklesscall_call, /*tp_call*/
+            0,                         /*tp_str*/
+            0,                         /*tp_getattro*/
+            0,                         /*tp_setattro*/
+            0,                         /*tp_as_buffer*/
+            Py_TPFLAGS_DEFAULT & ~(Py_TPFLAGS_HAVE_STACKLESS_EXTENSION | Py_TPFLAGS_HAVE_STACKLESS_CALL) ,        /*tp_flags*/
+            test_nostacklesscalltype__doc__, /* tp_doc */
+    };
+
+    test_nostacklesscallType.tp_new = PyType_GenericNew;
+    if (PyType_Ready(&test_nostacklesscallType) < 0)
+        return -1;
+    test_nostacklesscall = PyObject_New(test_nostacklesscallObject, &test_nostacklesscallType);
+    if (NULL == test_nostacklesscall)
+        return -1;
+    return 0;
+}
+
 /******************************************************
 
   The Stackless External Interface
@@ -1352,6 +1479,7 @@ _PyStackless_Init(void)
         goto error;
 
     if (init_prickelpit()) goto error;
+    if (init_test_nostacklesscalltype()) goto error;
 
     dict = PyModule_GetDict(slp_module);
     if (dict == NULL)
@@ -1365,6 +1493,7 @@ _PyStackless_Init(void)
     INSERT("bomb",          &PyBomb_Type);
     INSERT("tasklet",   &PyTasklet_Type);
     INSERT("channel",   &PyChannel_Type);
+    INSERT("_test_nostacklesscall", test_nostacklesscall);
     INSERT("stackless", slp_module);
 
     m = (PySlpModuleObject *) slp_module;
