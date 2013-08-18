@@ -68,9 +68,7 @@ slp_eval_frame(PyFrameObject *f)
         PyObject *result;
         if (slp_make_initial_stub(ts))
             return NULL;
-        ts->frame = f;
-        result = slp_run_stub_from_main(ts);
-        return result;
+        return slp_run_tasklet(f);
     }
 
     Py_INCREF(Py_None);

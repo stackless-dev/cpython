@@ -838,6 +838,15 @@ slp_schedule_task_prepared(PyThreadState *ts, PyObject **result, PyTaskletObject
     if (!stackless || ts->st.nesting_level != 0)
         goto hard_switching;
 
+    /* We never soft switch out of the main tasklet.  Otherwise, we might end up soft switching
+     * back to the mani tasklet from another stack, but that screws up with assumptions
+     * of the caller.  e.g. the main tasklet might make callbacks back into the program, but
+     * it really shouln't do that from a different stack.  For example, the main stack might
+     * have structured exception handlers installed.
+     */
+    if (prev == ts->st.main)
+        goto hard_switching;
+
     /* start of soft switching code */
 
     /* handle exception */

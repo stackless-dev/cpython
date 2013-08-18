@@ -231,30 +231,7 @@ slp_run_initial_stub(PyThreadState *ts, tealet_run_t func, void **arg)
     return 0;
 }
 
-/* run the top level loop from the main tasklet.  This invocation expects
- * a return value
- */
-PyObject *
-slp_run_stub_from_main(PyThreadState *ts)
-{
-    int result;
-    void *arg;
-    tealet_t *old_main;
-
-    /* switch into a stub duplicate.  Run evaluation loop.  Then switch back.
-     * Set the "main" to be us, so that a switch out of the tasklet_stub_func
-     * lands us here
-     */
-    old_main = ts->st.tealet_main;
-    ts->st.tealet_main = tealet_current(old_main);
-    result = slp_run_initial_stub(ts, &tasklet_stub_func, &arg);
-    ts->st.tealet_main = old_main;
-    if (result)
-        return NULL;
-    return (PyObject*)arg;
-}
-
-/* call the top level loop as a means of startin a new such loop, hardswitching out
+/* call the top level loop as a means of starting a new such loop, hardswitching out
  * of a tasklet.  This invocation does not expect a return value
  */
 int
