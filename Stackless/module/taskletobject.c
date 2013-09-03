@@ -487,7 +487,7 @@ static TASKLET_INSERT_HEAD(impl_tasklet_insert)
     if (task->next == NULL) {
         if (task->f.frame == NULL && task != ts->st.current)
             RUNTIME_ERROR("You cannot run an unbound(dead) tasklet", -1);
-        if (task->cstate->tstate->st.main == NULL)
+        if (task->tstate->st.main == NULL)
             RUNTIME_ERROR("Target thread isn't initialized", -1);
         Py_INCREF(task);
         slp_current_insert(task);
@@ -555,7 +555,7 @@ static TASKLET_RUN_HEAD(impl_tasklet_run)
     if (ts->st.main == NULL) return PyTasklet_Run_M(task);
     inserted = task->next == NULL;
 
-    if (ts == task->cstate->tstate) {
+    if (ts == task->tstate) {
         /* same thread behaviour.  Insert at the end of the queue and then
          * switch to that task.  Notice that this behaviour upsets FIFO
          * order
@@ -563,7 +563,7 @@ static TASKLET_RUN_HEAD(impl_tasklet_run)
         fail = impl_tasklet_insert(task);
     } else {
         /* interthread. */
-        PyThreadState *rts = task->cstate->tstate;
+        PyThreadState *rts = task->tstate;
         PyTaskletObject *current = rts->st.current;
         if (rts->st.thread.is_idle) {
             /* remote thread is blocked, or unblocked and hasn't got the GIL yet.
