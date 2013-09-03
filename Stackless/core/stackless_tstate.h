@@ -19,7 +19,8 @@ typedef struct _sts {
 #ifdef WITH_THREAD
     struct {
         PyObject *block_lock;                   /* to block the thread */
-        int is_blocked;
+        int is_blocked;                         /* waiting to be unblocked */
+        int is_idle;                            /* unblocked, but waiting for GIL */
     } thread;
 #endif
     /* number of nested interpreters (1.0/2.0 merge) */
@@ -71,12 +72,14 @@ void slp_tealet_cleanup(struct _ts *tstate);
 #define STACKLESS_PYSTATE_NEW \
     __STACKLESS_PYSTATE_NEW \
     tstate->st.thread.block_lock = NULL; \
-    tstate->st.thread.is_blocked = 0;
+    tstate->st.thread.is_blocked = 0;\
+    tstate->st.thread.is_idle = 0;
 
 #define STACKLESS_PYSTATE_CLEAR \
     __STACKLESS_PYSTATE_CLEAR \
     Py_CLEAR(tstate->st.thread.block_lock); \
-    tstate->st.thread.is_blocked = 0;
+    tstate->st.thread.is_blocked = 0; \
+    tstate->st.thread.is_idle = 0;
 
 #else
 

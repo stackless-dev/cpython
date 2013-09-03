@@ -7,12 +7,7 @@ import sys
 import traceback
 import contextlib
 
-from support import StacklessTestCase
-try:
-    import threading
-    withThreads = True
-except:
-    withThreads = False
+from support import StacklessTestCase, AsTaskletTestCase
 
 def in_psyco():
     try:
@@ -320,30 +315,30 @@ class TestSwitchTrap(StacklessTestCase):
             stackless.switch_trap(-1)
     switch_trap = SwitchTrap()
 
-    def _test_schedule(self):
+    def test_schedule(self):
         s = stackless.tasklet(lambda:None)()
         with self.switch_trap:
             self.assertRaisesRegex(RuntimeError, "switch_trap", stackless.schedule)
         stackless.run()
 
-    def _test_schedule_remove(self):
+    def test_schedule_remove(self):
         main = []
-        s = stackless.tasklet(lambda:stackless.insert(main[0]))()
+        s = stackless.tasklet(lambda:main[0].insert())()
         with self.switch_trap:
             self.assertRaisesRegex(RuntimeError, "switch_trap", stackless.schedule_remove)
         main.append(stackless.getcurrent())
         stackless.schedule_remove()
 
-    def _test_run(self):
+    def test_run(self):
         s = stackless.tasklet(lambda:None)()
         with self.switch_trap:
             self.assertRaisesRegex(RuntimeError, "switch_trap", stackless.run)
         stackless.run()
 
-    def _test_run_specific(self):
+    def test_run_specific(self):
         s = stackless.tasklet(lambda:None)()
         with self.switch_trap:
-            self.asserself.assertRaisesRegex(RuntimeError, "switch_trap", s.run)
+            self.assertRaisesRegex(RuntimeError, "switch_trap", s.run)
         s.run()
 
     def test_send(self):
@@ -484,24 +479,7 @@ class TestErrorHandler(StacklessTestCase):
 # See http://www.stackless.com/ticket/22
 #
 
-class AsTaskletTestCase(StacklessTestCase):
-    """A test case class, that runs tests as tasklets"""
-    def setUp(self):
-        self._ran_AsTaskletTestCase_setUp = True
-        if stackless.enable_softswitch(None):
-            self.assertEqual(stackless.current.nesting_level, 0)
-            
-        super(StacklessTestCase, self).setUp()  # yes, its intended: call setUp on the grand parent class
-        self.assertEqual(stackless.getruncount(), 1, "Leakage from other tests, with %d tasklets still in the scheduler" % (stackless.getruncount() - 1))        
-        if withThreads:
-            self.assertEqual(threading.activeCount(), 1, "Leakage from other threads, with %d threads running (1 expected)" % (threading.activeCount()))
 
-    def run(self, result=None):
-        super_run = super(AsTaskletTestCase, self).run
-        stackless.tasklet(super_run)(result)
-        stackless.run()
-        assert self._ran_AsTaskletTestCase_setUp
-        
 def _create_contextlib_test_classes():
     import test.test_contextlib as module
     g = globals()
@@ -517,7 +495,7 @@ _create_contextlib_test_classes()
 class TestContextManager(StacklessTestCase):
     def nestingLevel(self):
         self.assertFalse(stackless.getcurrent().nesting_level)
-        
+
         class C(object):
             def __enter__(self_):
                 self.assertFalse(stackless.getcurrent().nesting_level)
@@ -527,14 +505,84 @@ class TestContextManager(StacklessTestCase):
                 return False
         with C() as c:
             self.assertTrue(isinstance(c,C))
-            
+
     def test_nestingLevel(self):
         if not stackless.enable_softswitch(None):
             # the test requires softswitching
-            return 
+            return
         stackless.tasklet(self.nestingLevel)()
         stackless.run()
-        
+
+
+class TestAtomic(StacklessTestCase):
+    """Test the getting and setting of the tasklet's 'atomic' flag, and the
+       context manager to set it to True
+    """
+    def testAtomic(self):
+        old = stackless.getcurrent().atomic
+        try:
+            val = stackless.getcurrent().set_atomic(False)
+            self.assertEqual(val, old)
+            self.assertEqual(stackless.getcurrent().atomic, False)
+
+            val = stackless.getcurrent().set_atomic(True)
+            self.assertEqual(val, False)
+            self.assertEqual(stackless.getcurrent().atomic, True)
+
+            val = stackless.getcurrent().set_atomic(True)
+            self.assertEqual(val, True)
+            self.assertEqual(stackless.getcurrent().atomic, True)
+
+            val = stackless.getcurrent().set_atomic(False)
+            self.assertEqual(val, True)
+            self.assertEqual(stackless.getcurrent().atomic, False)
+
+        finally:
+            stackless.getcurrent().set_atomic(old)
+        self.assertEqual(stackless.getcurrent().atomic, old)
+
+    def testAtomicCtxt(self):
+        old = stackless.getcurrent().atomic
+        stackless.getcurrent().set_atomic(False)
+        try:
+            with stackless.atomic():
+                self.assertTrue(stackless.getcurrent().atomic)
+        finally:
+            stackless.getcurrent().set_atomic(old)
+
+    def testAtomicNopCtxt(self):
+        old = stackless.getcurrent().atomic
+        stackless.getcurrent().set_atomic(True)
+        try:
+            with stackless.atomic():
+                self.assertTrue(stackless.getcurrent().atomic)
+        finally:
+            stackless.getcurrent().set_atomic(old)
+
+class TestSchedule(AsTaskletTestCase):
+    def setUp(self):
+        super(TestSchedule, self).setUp()
+        self.events = []
+
+    def testSchedule(self):
+        def foo(previous):
+            self.events.append("foo")
+            self.assertTrue(previous.scheduled)
+        t = stackless.tasklet(foo)(stackless.getcurrent())
+        self.assertTrue(t.scheduled)
+        stackless.schedule()
+        self.assertEqual(self.events, ["foo"])
+
+    def testScheduleRemoveFail(self):
+        def foo(previous):
+            self.events.append("foo")
+            self.assertFalse(previous.scheduled)
+            previous.insert()
+            self.assertTrue(previous.scheduled)
+        t = stackless.tasklet(foo)(stackless.getcurrent())
+        stackless.schedule_remove()
+        self.assertEqual(self.events, ["foo"])
+
 class TestUncollectables(StacklessTestCase):
     def _testNone(self):
         self.assertEqual(stackless.uncollectables, [])
@@ -560,6 +608,8 @@ class TestUncollectables(StacklessTestCase):
         c = stackless.channel()
         def func1():
             stackless.test_cstate(func2) # force hard switch
+
+
         def func2():
             c.receive()
         t1 = stackless.tasklet(func1)()
@@ -572,6 +622,7 @@ class TestUncollectables(StacklessTestCase):
         stackless.run()
         after = set(stackless.uncollectables)
         self.assertEqual(after, before)
+
 
 
 #///////////////////////////////////////////////////////////////////////////////

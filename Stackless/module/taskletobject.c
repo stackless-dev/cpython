@@ -484,9 +484,11 @@ static TASKLET_INSERT_HEAD(impl_tasklet_insert)
         return slp_current_wrapper(PyTasklet_Insert, task);
     if (task->flags.blocked)
         RUNTIME_ERROR("You cannot run a blocked tasklet", -1);
-    if (task->f.frame == NULL && task != ts->st.current)
-        RUNTIME_ERROR("You cannot run an unbound(dead) tasklet", -1);
     if (task->next == NULL) {
+        if (task->f.frame == NULL && task != ts->st.current)
+            RUNTIME_ERROR("You cannot run an unbound(dead) tasklet", -1);
+        if (task->cstate->tstate->st.main == NULL)
+            RUNTIME_ERROR("Target thread isn't initialized", -1);
         Py_INCREF(task);
         slp_current_insert(task);
         /* The tasklet may belong to a different thread, and that thread may
@@ -552,8 +554,37 @@ static TASKLET_RUN_HEAD(impl_tasklet_run)
     assert(PyTasklet_Check(task));
     if (ts->st.main == NULL) return PyTasklet_Run_M(task);
     inserted = task->next == NULL;
-    if (PyTasklet_Insert(task))
+
+    if (ts == task->cstate->tstate) {
+        /* same thread behaviour.  Insert at the end of the queue and then
+         * switch to that task.  Notice that this behaviour upsets FIFO
+         * order
+         */
+        fail = impl_tasklet_insert(task);
+    } else {
+        /* interthread. */
+        PyThreadState *rts = task->cstate->tstate;
+        PyTaskletObject *current = rts->st.current;
+        if (rts->st.thread.is_idle) {
+            /* remote thread is blocked, or unblocked and hasn't got the GIL yet.
+             * insert it before the "current"
+             */
+            fail = impl_tasklet_insert(task);
+            if (!fail)
+                rts->st.current = task;
+        } else if (rts->st.current) {
+            /* remote thread is executing, put target after the current one */
+            rts->st.current = rts->st.current->next;
+            fail = impl_tasklet_insert(task);
+            rts->st.current = current;
+        } else {
+            /* remote thread is in a weird state.  Just insert it */
+            fail = impl_tasklet_insert(task);
+        }
+    }
+    if (fail)
         return NULL;
+    /* this is redundant in the interthread case, since insert already did the work */
     fail = slp_schedule_task(&ret, ts->st.current, task, stackless, 0);
     if (fail) {
         if (inserted) {

@@ -13,6 +13,122 @@
 #include "core/stackless_methods.h"
 #include "pythread.h"
 
+
+/******************************************************
+
+  The atomic context manager
+  This is provided here for perfomance, because setting
+  the atomic state is an important part of writing higher
+  level operations.  It is equivalent to the following,
+  but much faster:
+  @contextlib.contextmanager
+  def atomic():
+      old = stackless.getcurrent().set_atomic(True)
+      try:
+          yield
+      finally:
+          stackless.getcurrent().set_atomic(old)
+
+ ******************************************************/
+typedef struct PyAtomicObject
+{
+    PyObject_HEAD
+    int old;
+} PyAtomicObject;
+
+static PyObject *
+atomic_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
+
+static void
+atomic_dealloc(PyObject *self)
+{
+    PyObject_DEL(self);
+}
+
+static PyObject *
+atomic_enter(PyObject *self)
+{
+    PyAtomicObject *a = (PyAtomicObject*)self;
+    PyObject *c = PyStackless_GetCurrent();
+    if (c) {
+        a->old = PyTasklet_GetAtomic((PyTaskletObject*)c);
+        PyTasklet_SetAtomic((PyTaskletObject*)c, 1);
+        Py_DECREF(c);
+    }
+    Py_RETURN_NONE;
+}
+
+static PyObject *
+atomic_exit(PyObject *self, PyObject *args)
+{
+    PyAtomicObject *a = (PyAtomicObject*)self;
+    PyObject *c = PyStackless_GetCurrent();
+    if (c) {
+        PyTasklet_SetAtomic((PyTaskletObject*)c, a->old);
+        Py_DECREF(c);
+    }
+    Py_RETURN_NONE;
+}
+
+static PyMethodDef atomic_methods[] = {
+    {"__enter__", (PyCFunction)atomic_enter, METH_NOARGS, NULL},
+    {"__exit__",  (PyCFunction)atomic_exit, METH_VARARGS, NULL},
+    {NULL, NULL}
+};
+
+PyDoc_STRVAR(PyAtomic_Type__doc__,
+"A context manager for setting the 'atomic' flag of the \n\
+current tasklet to true for the duration.\n");
+
+PyTypeObject PyAtomic_Type = {
+    PyObject_HEAD_INIT(NULL)
+    0,
+    "stackless.atomic",
+    sizeof(PyAtomicObject),
+    0,
+    atomic_dealloc,                             /* tp_dealloc */
+    0,                                          /* tp_print */
+    0,                                          /* tp_getattr */
+    0,                                          /* tp_setattr */
+    0,                                          /* tp_compare */
+    0,                                          /* tp_repr */
+    0,                                          /* tp_as_number */
+    0,                                          /* tp_as_sequence */
+    0,                                          /* tp_as_mapping */
+    0,                                          /* tp_hash */
+    0,                                          /* tp_call */
+    0,                                          /* tp_str */
+    PyObject_GenericGetAttr,                    /* tp_getattro */
+    PyObject_GenericSetAttr,                    /* tp_setattro */
+    0,                                          /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                         /* tp_flags */
+    PyAtomic_Type__doc__,                       /* tp_doc */
+    0,                                          /* tp_traverse */
+    0,                                          /* tp_clear */
+    0,                                          /* tp_richcompare */
+    0,                                          /* tp_weaklistoffset */
+    0,                                          /* tp_iter */
+    0,                                          /* tp_iternext */
+    atomic_methods,                             /* tp_methods */
+    0,                                          /* tp_members */
+    0,                                          /* tp_getset */
+    0,                                          /* tp_base */
+    0,                                          /* tp_dict */
+    0,                                          /* tp_descr_get */
+    0,                                          /* tp_descr_set */
+    0,                                          /* tp_dictoffset */
+    0,                                          /* tp_init */
+    0,                                          /* tp_alloc */
+    atomic_new,                                 /* tp_new */
+};
+
+static PyObject *
+atomic_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    PyAtomicObject *a = PyObject_NEW(PyAtomicObject, &PyAtomic_Type);
+    return (PyObject *)a;
+}
+
 /******************************************************
 
   The Stackless Module
@@ -863,7 +979,6 @@ PyStackless_CallMethod_Main(PyObject *o, char *name, char *format, ...)
             return NULL;
         }
     } else {
-        /* direct call to object */
         func = o;
         Py_INCREF(func);
     }
@@ -1440,6 +1555,7 @@ _PyStackless_InitTypes(void)
         || init_flextype()
         || init_tasklettype()
         || init_channeltype()
+        || PyType_Ready(&PyAtomic_Type)
         )
         return 0;
     return -1;
@@ -1495,6 +1611,7 @@ _PyStackless_Init(void)
     INSERT("channel",   &PyChannel_Type);
     INSERT("_test_nostacklesscall", test_nostacklesscall);
     INSERT("stackless", slp_module);
+    INSERT("atomic",    &PyAtomic_Type);
 
     m = (PySlpModuleObject *) slp_module;
     if (slpmodule_set__tasklet__(m, &PyTasklet_Type, NULL)) goto error;
