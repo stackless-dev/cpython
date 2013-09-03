@@ -608,8 +608,6 @@ class TestUncollectables(StacklessTestCase):
         c = stackless.channel()
         def func1():
             stackless.test_cstate(func2) # force hard switch
-
-
         def func2():
             c.receive()
         t1 = stackless.tasklet(func1)()
@@ -622,7 +620,6 @@ class TestUncollectables(StacklessTestCase):
         stackless.run()
         after = set(stackless.uncollectables)
         self.assertEqual(after, before)
-
 
 
 #///////////////////////////////////////////////////////////////////////////////
