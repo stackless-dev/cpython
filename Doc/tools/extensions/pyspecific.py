@@ -15,6 +15,7 @@ from os import path
 from time import asctime
 from pprint import pformat
 from docutils.io import StringOutput
+from docutils.parsers.rst import Directive
 from docutils.utils import new_document
 
 from docutils import nodes, utils
@@ -22,7 +23,6 @@ from docutils import nodes, utils
 from sphinx import addnodes
 from sphinx.builders import Builder
 from sphinx.util.nodes import split_explicit_title
-from sphinx.util.compat import Directive
 from sphinx.writers.html import HTMLTranslator
 from sphinx.writers.text import TextWriter
 from sphinx.writers.latex import LaTeXTranslator
@@ -34,7 +34,7 @@ import suspicious
 
 
 ISSUE_URI = 'https://bugs.python.org/issue%s'
-SOURCE_URI = 'https://hg.python.org/cpython/file/3.4/%s'
+SOURCE_URI = 'https://github.com/python/cpython/tree/3.4/%s'
 
 # monkey-patch reST parser to disable alphabetic and roman enumerated lists
 from docutils.parsers.rst.states import Body
