@@ -4,16 +4,11 @@ Stackless-Python News
 This file documents user visible changes to the Stackless extension of C-Python.
 For other changes see Misc/NEWS.
 
-What's New in Stackless 3.X.X?
-==============================
+What's New in Stackless 3.5.3 and 3.5.4?
+========================================
 
-*Release date: 20XX-XX-XX*
-
-
-What's New in Stackless 3.5.3?
-==============================
-
-*Release date: 2017-09-03*
+*Release date: 2017-09-03*  (3.5.4)
+*Release date: 2017-09-03*  (3.5.3)
 
 - https://bitbucket.org/stackless-dev/stackless/issues/130
   Pickling exhausted generators no longer crashes.
