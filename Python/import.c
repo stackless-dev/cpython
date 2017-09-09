@@ -483,9 +483,17 @@ PyImport_Cleanup(void)
 #undef STORE_MODULE_WEAKREF
 }
 
+/* Issue #29537: handle issue27286 bytecode incompatibility
+ *
+ * In order to avoid forcing recompilation of all extension modules, we export
+ * the legacy 3.5.0 magic number here rather than putting it in a header file.
+ *
+ * See Lib/importlib/_bootstrap_external.py for general discussion
+ */
+PY_UINT32_T _Py_BACKCOMPAT_MAGIC_NUMBER = 168627478;
+PY_UINT32_T _Py_BACKCOMPAT_HALF_MAGIC = 3350;
 
 /* Helper for pythonrun.c -- return magic number and tag. */
-
 long
 PyImport_GetMagicNumber(void)
 {
@@ -1453,11 +1461,9 @@ PyImport_ImportModuleLevelObject(PyObject *name, PyObject *given_globals,
                 Py_DECREF(partition);
             }
         }
-
-        if (PyDict_GetItem(interp->modules, package) == NULL) {
-            PyErr_Format(PyExc_SystemError,
-                    "Parent module %R not loaded, cannot perform relative "
-                    "import", package);
+        if (PyUnicode_GET_LENGTH(package) == 0) {
+            PyErr_SetString(PyExc_ImportError,
+                    "attempted relative import with no known parent package");
             goto error;
         }
     }
@@ -1798,9 +1804,13 @@ PyImport_Import(PyObject *module_name)
     Py_DECREF(r);
 
     modules = PyImport_GetModuleDict();
-    r = PyDict_GetItem(modules, module_name);
-    if (r != NULL)
+    r = PyDict_GetItemWithError(modules, module_name);
+    if (r != NULL) {
         Py_INCREF(r);
+    }
+    else if (!PyErr_Occurred()) {
+        PyErr_SetObject(PyExc_KeyError, module_name);
+    }
 
   err:
     Py_XDECREF(globals);

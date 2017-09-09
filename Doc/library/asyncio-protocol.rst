@@ -33,7 +33,7 @@ BaseTransport
 
    Base class for transports.
 
-   .. method:: close(self)
+   .. method:: close()
 
       Close the transport.  If the transport has a buffer for outgoing
       data, buffered data will be flushed asynchronously.  No more data
@@ -41,7 +41,7 @@ BaseTransport
       protocol's :meth:`connection_lost` method will be called with
       :const:`None` as its argument.
 
-   .. method:: is_closing(self)
+   .. method:: is_closing()
 
       Return ``True`` if the transport is closing or is closed.
 
@@ -160,10 +160,16 @@ WriteTransport
 
       Set the *high*- and *low*-water limits for write flow control.
 
-      These two values control when call the protocol's
+      These two values (measured in number of
+      bytes) control when the protocol's
       :meth:`pause_writing` and :meth:`resume_writing` methods are called.
       If specified, the low-water limit must be less than or equal to the
       high-water limit.  Neither *high* nor *low* can be negative.
+
+      :meth:`pause_writing` is called when the buffer size becomes greater
+      than or equal to the *high* value. If writing has been paused,
+      :meth:`resume_writing` is called when the buffer size becomes less
+      than or equal to the *low* value.
 
       The defaults are implementation-specific.  If only the
       high-water limit is given, the low-water limit defaults to an
@@ -248,7 +254,7 @@ BaseSubprocessTransport
       if it hasn't returned, similarly to the
       :attr:`subprocess.Popen.returncode` attribute.
 
-   .. method:: kill(self)
+   .. method:: kill()
 
       Kill the subprocess, as in :meth:`subprocess.Popen.kill`.
 
@@ -381,7 +387,7 @@ The following callbacks are called on :class:`Protocol` instances:
 
 .. method:: Protocol.eof_received()
 
-   Calls when the other end signals it won't send any more data
+   Called when the other end signals it won't send any more data
    (for example by calling :meth:`write_eof`, if the other end also uses
    asyncio).
 

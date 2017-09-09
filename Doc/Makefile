@@ -4,13 +4,14 @@
 #
 
 # You can set these variables from the command line.
-PYTHON       = python
+PYTHON       = python3
 SPHINXBUILD  = sphinx-build
+BLURB = $(PYTHON) -m blurb
 PAPER        =
 SOURCES      =
 DISTVERSION  = $(shell $(PYTHON) tools/extensions/patchlevel.py)
 
-ALLSPHINXOPTS = -b $(BUILDER) -d build/doctrees -D latex_paper_size=$(PAPER) \
+ALLSPHINXOPTS = -b $(BUILDER) -d build/doctrees -D latex_elements.papersize=$(PAPER) \
                 $(SPHINXOPTS) . build/$(BUILDER) $(SOURCES)
 
 .PHONY: help build html htmlhelp latex text changes linkcheck \
@@ -38,6 +39,20 @@ help:
 	@echo "  serve      to serve the documentation on the localhost (8000)"
 
 build:
+	-mkdir -p build
+# Look first for a Misc/NEWS file (building from a source release tarball
+# or old repo) and use that, otherwise look for a Misc/NEWS.d directory
+# (building from a newer repo) and use blurb to generate the NEWS file.
+	@if [ -f  ../Misc/NEWS ] ; then \
+		echo "Using existing Misc/NEWS file"; \
+		cp ../Misc/NEWS build/NEWS; \
+	elif [ -d ../Misc/NEWS.d ]; then \
+		echo "Building NEWS from Misc/NEWS.d with blurb"; \
+		$(BLURB) merge -f build/NEWS; \
+	else \
+		echo "Neither Misc/NEWS.d nor Misc/NEWS found; cannot build docs"; \
+		exit 1; \
+	fi
 	$(SPHINXBUILD) $(ALLSPHINXOPTS)
 	@echo
 
@@ -107,7 +122,7 @@ clean:
 
 venv:
 	$(PYTHON) -m venv venv
-	./venv/bin/python3 -m pip install -U Sphinx
+	./venv/bin/python3 -m pip install -U Sphinx blurb
 
 dist:
 	rm -rf dist

@@ -62,12 +62,15 @@ typedef struct
 #ifdef __GNUC__
 __attribute__((packed))
 #elif defined(_MSC_VER)
-_declspec(align(4))
+#pragma pack(push, 4)
 #endif
 {
     PyObject *filename;
     unsigned int lineno;
 } frame_t;
+#ifdef _MSC_VER
+#pragma pack(pop)
+#endif
 
 typedef struct {
     Py_uhash_t hash;
@@ -1412,7 +1415,7 @@ _PyTraceMalloc_Init(void)
         if (key == NULL)
             return -1;
 
-        value = PyDict_GetItemWithError(xoptions, key);
+        value = PyDict_GetItemWithError(xoptions, key); /* borrowed */
         Py_DECREF(key);
         if (value == NULL) {
             if (PyErr_Occurred())
@@ -1423,7 +1426,6 @@ _PyTraceMalloc_Init(void)
         }
 
         nframe = parse_sys_xoptions(value);
-        Py_DECREF(value);
         if (nframe < 0) {
             Py_FatalError("-X tracemalloc=NFRAME: invalid number of frames");
         }

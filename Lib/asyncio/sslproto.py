@@ -542,14 +542,19 @@ class SSLProtocol(protocols.Protocol):
     def _get_extra_info(self, name, default=None):
         if name in self._extra:
             return self._extra[name]
-        else:
+        elif self._transport is not None:
             return self._transport.get_extra_info(name, default)
+        else:
+            return default
 
     def _start_shutdown(self):
         if self._in_shutdown:
             return
-        self._in_shutdown = True
-        self._write_appdata(b'')
+        if self._in_handshake:
+            self._abort()
+        else:
+            self._in_shutdown = True
+            self._write_appdata(b'')
 
     def _write_appdata(self, data):
         self._write_backlog.append((data, 0))
@@ -680,12 +685,14 @@ class SSLProtocol(protocols.Protocol):
             self._transport._force_close(exc)
 
     def _finalize(self):
+        self._sslpipe = None
+
         if self._transport is not None:
             self._transport.close()
 
     def _abort(self):
-        if self._transport is not None:
-            try:
+        try:
+            if self._transport is not None:
                 self._transport.abort()
-            finally:
-                self._finalize()
+        finally:
+            self._finalize()

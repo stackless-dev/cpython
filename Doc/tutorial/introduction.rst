@@ -100,10 +100,8 @@ give you an error::
 There is full support for floating point; operators with mixed type operands
 convert the integer operand to floating point::
 
-   >>> 3 * 3.75 / 1.5
-   7.5
-   >>> 7.0 / 2
-   3.5
+   >>> 4 * 3.75 - 1
+   14.0
 
 In interactive mode, the last printed expression is assigned to the variable
 ``_``.  This means that when you are using Python as a desk calculator, it is
@@ -356,7 +354,7 @@ The built-in function :func:`len` returns the length of a string::
       Information about string formatting with :meth:`str.format`.
 
    :ref:`old-string-formatting`
-      The old formatting operations invoked when strings and Unicode strings are
+      The old formatting operations invoked when strings are
       the left operand of the ``%`` operator are described in more detail here.
 
 

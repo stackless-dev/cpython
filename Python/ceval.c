@@ -2150,9 +2150,15 @@ slp_eval_frame_value(PyFrameObject *f, int throwflag, PyObject *retval)
         TARGET(BINARY_MODULO) {
             PyObject *divisor = POP();
             PyObject *dividend = TOP();
-            PyObject *res = PyUnicode_CheckExact(dividend) ?
-                PyUnicode_Format(dividend, divisor) :
-                PyNumber_Remainder(dividend, divisor);
+            PyObject *res;
+            if (PyUnicode_CheckExact(dividend) && (
+                  !PyUnicode_Check(divisor) || PyUnicode_CheckExact(divisor))) {
+              /* fast path; string formatting, but not if the RHS is a str subclass
+                 (see issue28598) */
+              res = PyUnicode_Format(dividend, divisor);
+            } else {
+              res = PyNumber_Remainder(dividend, divisor);
+            }
             Py_DECREF(divisor);
             Py_DECREF(dividend);
             SET_TOP(res);
@@ -3271,14 +3277,22 @@ slp_eval_frame_value(PyFrameObject *f, int throwflag, PyObject *retval)
                         if (PyErr_ExceptionMatches(PyExc_AttributeError) ||
                             !PyMapping_Check(arg)) {
                             int function_location = (oparg>>8) & 0xff;
-                            PyObject *func = (
-                                    PEEK(function_location + num_maps));
-                            PyErr_Format(PyExc_TypeError,
-                                    "%.200s%.200s argument after ** "
-                                    "must be a mapping, not %.200s",
-                                    PyEval_GetFuncName(func),
-                                    PyEval_GetFuncDesc(func),
-                                    arg->ob_type->tp_name);
+                            if (function_location == 1) {
+                                PyObject *func = (
+                                        PEEK(function_location + num_maps));
+                                PyErr_Format(PyExc_TypeError,
+                                        "%.200s%.200s argument after ** "
+                                        "must be a mapping, not %.200s",
+                                        PyEval_GetFuncName(func),
+                                        PyEval_GetFuncDesc(func),
+                                        arg->ob_type->tp_name);
+                            }
+                            else {
+                                PyErr_Format(PyExc_TypeError,
+                                        "argument after ** "
+                                        "must be a mapping, not %.200s",
+                                        arg->ob_type->tp_name);
+                            }
                         }
                         Py_DECREF(sum);
                         goto error;
@@ -3288,21 +3302,34 @@ slp_eval_frame_value(PyFrameObject *f, int throwflag, PyObject *retval)
                         Py_ssize_t idx = 0;
                         PyObject *key;
                         int function_location = (oparg>>8) & 0xff;
-                        PyObject *func = PEEK(function_location + num_maps);
                         Py_hash_t hash;
                         _PySet_NextEntry(intersection, &idx, &key, &hash);
-                        if (!PyUnicode_Check(key)) {
-                            PyErr_Format(PyExc_TypeError,
-                                    "%.200s%.200s keywords must be strings",
-                                    PyEval_GetFuncName(func),
-                                    PyEval_GetFuncDesc(func));
-                        } else {
-                            PyErr_Format(PyExc_TypeError,
-                                    "%.200s%.200s got multiple "
-                                    "values for keyword argument '%U'",
-                                    PyEval_GetFuncName(func),
-                                    PyEval_GetFuncDesc(func),
-                                    key);
+                        if (function_location == 1) {
+                            PyObject *func = PEEK(function_location + num_maps);
+                            if (!PyUnicode_Check(key)) {
+                                PyErr_Format(PyExc_TypeError,
+                                        "%.200s%.200s keywords must be strings",
+                                        PyEval_GetFuncName(func),
+                                        PyEval_GetFuncDesc(func));
+                            } else {
+                                PyErr_Format(PyExc_TypeError,
+                                        "%.200s%.200s got multiple "
+                                        "values for keyword argument '%U'",
+                                        PyEval_GetFuncName(func),
+                                        PyEval_GetFuncDesc(func),
+                                        key);
+                            }
+                        }
+                        else {
+                            if (!PyUnicode_Check(key)) {
+                                PyErr_SetString(PyExc_TypeError,
+                                        "keywords must be strings");
+                            } else {
+                                PyErr_Format(PyExc_TypeError,
+                                        "function got multiple "
+                                        "values for keyword argument '%U'",
+                                        key);
+                            }
                         }
                         Py_DECREF(intersection);
                         Py_DECREF(sum);
@@ -3315,13 +3342,21 @@ slp_eval_frame_value(PyFrameObject *f, int throwflag, PyObject *retval)
                     if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
                         if (with_call) {
                             int function_location = (oparg>>8) & 0xff;
-                            PyObject *func = PEEK(function_location + num_maps);
-                            PyErr_Format(PyExc_TypeError,
-                                    "%.200s%.200s argument after ** "
-                                    "must be a mapping, not %.200s",
-                                    PyEval_GetFuncName(func),
-                                    PyEval_GetFuncDesc(func),
-                                    arg->ob_type->tp_name);
+                            if (function_location == 1) {
+                                PyObject *func = PEEK(function_location + num_maps);
+                                PyErr_Format(PyExc_TypeError,
+                                        "%.200s%.200s argument after ** "
+                                        "must be a mapping, not %.200s",
+                                        PyEval_GetFuncName(func),
+                                        PyEval_GetFuncDesc(func),
+                                        arg->ob_type->tp_name);
+                            }
+                            else {
+                                PyErr_Format(PyExc_TypeError,
+                                        "argument after ** "
+                                        "must be a mapping, not %.200s",
+                                        arg->ob_type->tp_name);
+                            }
                         }
                         else {
                             PyErr_Format(PyExc_TypeError,
@@ -3431,13 +3466,16 @@ slp_eval_frame_value(PyFrameObject *f, int throwflag, PyObject *retval)
         TARGET(IMPORT_STAR) {
             PyObject *from = POP(), *locals;
             int err;
-            if (PyFrame_FastToLocalsWithError(f) < 0)
+            if (PyFrame_FastToLocalsWithError(f) < 0) {
+                Py_DECREF(from);
                 goto error;
+            }
 
             locals = f->f_locals;
             if (locals == NULL) {
                 PyErr_SetString(PyExc_SystemError,
                     "no locals found during 'import *'");
+                Py_DECREF(from);
                 goto error;
             }
             READ_TIMESTAMP(intr0);
@@ -5873,17 +5911,13 @@ ext_call_fail:
 /* Extract a slice index from a PyLong or an object with the
    nb_index slot defined, and store in *pi.
    Silently reduce values larger than PY_SSIZE_T_MAX to PY_SSIZE_T_MAX,
-   and silently boost values less than -PY_SSIZE_T_MAX-1 to -PY_SSIZE_T_MAX-1.
+   and silently boost values less than PY_SSIZE_T_MIN to PY_SSIZE_T_MIN.
    Return 0 on error, 1 on success.
-*/
-/* Note:  If v is NULL, return success without storing into *pi.  This
-   is because_PyEval_SliceIndex() is called by apply_slice(), which can be
-   called by the SLICE opcode with v and/or w equal to NULL.
 */
 int
 _PyEval_SliceIndex(PyObject *v, Py_ssize_t *pi)
 {
-    if (v != NULL) {
+    if (v != Py_None) {
         Py_ssize_t x;
         if (PyIndex_Check(v)) {
             x = PyNumber_AsSsize_t(v, NULL);
@@ -5900,6 +5934,26 @@ _PyEval_SliceIndex(PyObject *v, Py_ssize_t *pi)
     }
     return 1;
 }
+
+int
+_PyEval_SliceIndexNotNone(PyObject *v, Py_ssize_t *pi)
+{
+    Py_ssize_t x;
+    if (PyIndex_Check(v)) {
+        x = PyNumber_AsSsize_t(v, NULL);
+        if (x == -1 && PyErr_Occurred())
+            return 0;
+    }
+    else {
+        PyErr_SetString(PyExc_TypeError,
+                        "slice indices must be integers or "
+                        "have an __index__ method");
+        return 0;
+    }
+    *pi = x;
+    return 1;
+}
+
 
 #define CANNOT_CATCH_MSG "catching classes that do not inherit from "\
                          "BaseException is not allowed"
