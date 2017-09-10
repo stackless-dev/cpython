@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Usage: $0 hg_python_dir version
+# Usage: $0 git_python_dir version
 
 # Create a source archive below $TMPDIR, that has correct internal
 # timestamps and contains its members in the correct order.
@@ -8,15 +8,15 @@
 
 if [ $# != 3 ] ; then
    echo "Usage:" 1>&2
-   echo "  $0 hg_python_dir -v version" 1>&2
-   echo "  $0 hg_python_dir -r revision" 1>&2
+   echo "  $0 git_python_dir -v version" 1>&2
+   echo "  $0 git_python_dir -r revision" 1>&2
    echo "  version is: major '.' minor '.' micro" 1>&2
    exit 1
 fi
 
-: ${excludes:=-X.gitignore -X.hg* -X.bzrignore}
+: ${excludes:=.gitignore .git* .hg* .bzrignore .mention-bot .travis.yml}
  
-hg_python_dir="$1" ; shift
+git_python_dir="$1" ; shift
 if [ "x$1" = "x-v" ] ; then
   shift
   version="$1" ; shift
@@ -39,9 +39,11 @@ set -f   # no globbing
 tmpdir="${TMPDIR:-/tmp}/$tag.$$"
 mkdir "$tmpdir"
 
-cd "$hg_python_dir"
-hg archive --type files -r "$tag" $excludes "${tmpdir}/${srcdir}"
+cd "$git_python_dir"
+git archive --format=tar --prefix="${srcdir}/" "$tag" | \
+  ( cd "${tmpdir}" && tar xf - )
 cd "${tmpdir}"
+( cd "${srcdir}" && set +f && rm -rf $excludes )
 
 touch "${srcdir}/Include"
 touch "${srcdir}/Python"
