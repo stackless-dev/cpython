@@ -68,5 +68,8 @@
     <ClCompile Include="..\Modules\expat\xmltok.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\Modules\expat\loadlibrary.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
