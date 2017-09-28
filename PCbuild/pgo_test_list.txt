@@ -301,7 +301,8 @@ test_univnewlines2k
 test_unpack
 test_urllib
 test_urllib2
-test_urllib2_localnettest_urlparse
+test_urllib2_localnet
+test_urlparse
 test_userdict
 test_userlist
 test_userstring
