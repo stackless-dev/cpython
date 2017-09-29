@@ -12,7 +12,7 @@ from distutils.spawn import find_executable
 # 0 for official python.org releases
 # 1 for intermediate releases by anybody, with
 # a new product code for every package.
-snapshot = 1
+snapshot = int(os.environ.get("SNAPSHOT", "1"))
 # 1 means that file extension is px, not py,
 # and binaries start with x
 testpackage = 0
@@ -21,15 +21,15 @@ srcdir = os.path.abspath("../..")
 # Text to be displayed as the version in dialogs etc.
 # goes into file name and ProductCode. Defaults to
 # current_version.day for Snapshot, current_version otherwise
-full_current_version = None
+full_current_version = os.environ.get("CURRENT_VERSION")
 # Is Tcl available at all?
 have_tcl = True
 # path to PCbuild directory
-PCBUILD="PCbuild"
+PCBUILD = os.environ.get("PCBUILD", "PCbuild")
 # msvcrt version
 MSVCR = "100"
 # Name of certificate in default store to sign MSI with
-certname = None
+certname = os.environ.get("CERTNAME", None)
 # Make a zip file containing the PDB files for this build?
 pdbzip = True
 
@@ -964,7 +964,7 @@ class PyDirectory(Directory):
 
 def hgmanifest():
     # Fetch file list from Mercurial
-    process = subprocess.Popen(['hg', 'manifest'], stdout=subprocess.PIPE)
+    process = subprocess.Popen(['git', 'ls-tree', '-r', '--full-tree', '--name-only', 'HEAD'], stdout=subprocess.PIPE)
     stdout, stderr = process.communicate()
     # Create nested directories for file tree
     result = {}
@@ -990,7 +990,7 @@ def add_files(db):
     root = PyDirectory(db, cab, None, srcdir, "TARGETDIR", "SourceDir")
     default_feature.set_current()
     root.add_file("README.txt", src="README")
-    root.add_file("NEWS.txt", src="Misc/NEWS")
+    root.add_file("NEWS.txt", src="Doc/build/NEWS")
     generate_license()
     root.add_file("LICENSE.txt", src=os.path.abspath("LICENSE.txt"))
     root.start_component("python.exe", keyfile="python.exe")
