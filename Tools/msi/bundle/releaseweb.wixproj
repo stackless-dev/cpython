@@ -2,7 +2,7 @@
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{71CDE213-CB39-4BD9-B89D-BBB878689144}</ProjectGuid>
-        <OutputName>python</OutputName>
+        <OutputName>stackless</OutputName>
         <OutputSuffix>webinstall</OutputSuffix>
     </PropertyGroup>
 
