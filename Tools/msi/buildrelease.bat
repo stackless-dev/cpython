@@ -12,7 +12,7 @@ rem
 rem The following substitutions will be applied to the release URI:
 rem     Variable        Description         Example
 rem     {arch}          architecture        amd64, win32
-set RELEASE_URI=http://www.python.org/{arch}
+set RELEASE_URI=http://www.stackless.com/{arch}
 
 rem This is the URL that will be used to download installation files.
 rem The files available from the default URL *will* conflict with your
@@ -25,7 +25,7 @@ rem     {version}       version number      3.5.0
 rem     {arch}          architecture        amd64, win32
 rem     {releasename}   release name        a1, b2, rc3 (or blank for final)
 rem     {msi}           MSI filename        core.msi
-set DOWNLOAD_URL=https://www.python.org/ftp/python/{version}/{arch}{releasename}/{msi}
+set DOWNLOAD_URL=http://www.stackless.com/binaries/MSI/{version}/{arch}{releasename}/{msi}
 
 set D=%~dp0
 set PCBUILD=%D%..\..\PCBuild\
