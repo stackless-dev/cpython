@@ -415,8 +415,8 @@ slp_find_execname(PyFrameObject *f, int *valid)
     if (exec_name == NULL) {
         char msg[500];
         PyErr_Clear();
-        sprintf(msg, "frame exec function at %lx is not registered!",
-            (unsigned long)(void *)f->f_execute);
+        sprintf(msg, "frame exec function at %p is not registered!",
+            (void *)f->f_execute);
         PyErr_SetString(PyExc_ValueError, msg);
         valid = 0;
     }
@@ -885,7 +885,8 @@ frame_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static PyObject *
 frame_setstate(PyFrameObject *f, PyObject *args)
 {
-    int f_lasti, f_lineno, i;
+    int f_lasti, f_lineno;
+    Py_ssize_t i;
     PyObject *f_globals, *f_locals, *blockstack_as_tuple;
     PyObject *localsplus_as_tuple, *exc_as_tuple, *trace, *f_code;
     PyObject *exec_name = NULL;
@@ -967,7 +968,7 @@ frame_setstate(PyFrameObject *f, PyObject *args)
                                                    localsplus_as_tuple);
     }
     else if (localsplus_as_tuple == Py_None) {
-        int ncells, nfreevars;
+        Py_ssize_t ncells, nfreevars;
 
         f->f_stacktop = NULL;
         valid = 0;  /* cannot run frame without stack */
