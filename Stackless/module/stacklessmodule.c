@@ -324,7 +324,7 @@ PyStackless_GetCurrentId(void)
         t = ts->st.current;
         if (t && t != ts->st.main && ts->st.main != NULL) {
 #if SIZEOF_VOID_P > SIZEOF_LONG
-            return (long)t ^ (long)((intptr_t)t >> 32);
+            return (long)((Py_intptr_t)t) ^ (long)((Py_intptr_t)t >> 32);
 #else
             return (long)t;
 #endif
@@ -1362,16 +1362,16 @@ _peek(PyObject *self, PyObject *v)
     int i;
 
     if (v == Py_None) {
-        return PyLong_FromLong((int)_peek);
+        return PyLong_FromVoidPtr((void *)_peek);
     }
     if (PyCode_Check(v)) {
-        return PyLong_FromLong((int)(((PyCodeObject*)v)->co_code));
+        return PyLong_FromVoidPtr((void *)(((PyCodeObject*)v)->co_code));
     }
     if (PyLong_Check(v) && PyLong_AsLong(v) == 0) {
-        return PyLong_FromLong((int)(&PyEval_EvalFrameEx_slp));
+        return PyLong_FromVoidPtr((void *)(&PyEval_EvalFrameEx_slp));
     }
     if (!PyLong_Check(v)) goto noobject;
-    o = (PyObject*) PyLong_AsLong(v);
+    o = (PyObject*) PyLong_AsVoidPtr(v);
     /* this is plain heuristics, use for now */
     if (CANNOT_READ_MEM(o, sizeof(PyObject))) goto noobject;
     if (IS_ON_STACK(o)) goto noobject;
