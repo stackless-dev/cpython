@@ -1649,9 +1649,13 @@ Please refer to their documentation.\n\
 
 /* This function is called to make sure the type has
  * space in its tp_as_mapping to hold the slpslots.  If it has
- * the Py_TMPFLAGS_HAVE_STACKLESS_EXTENSION bit, then any struct present
+ * the Py_TPFLAGS_HAVE_STACKLESS_EXTENSION bit, then any struct present
  * is deemed large enough.  But if it is missing, then a struct already
  * present needs to be grown.
+ *
+ * This function is the only place where we set Py_TPFLAGS_HAVE_STACKLESS_EXTENSION
+ * for heap types (== type with Py_TPFLAGS_HEAPTYPE). This way we can free
+ * the memory later in type_dealloc() in typeobject.c.
  */
 int
 slp_prepare_slots(PyTypeObject * type)
@@ -1659,19 +1663,31 @@ slp_prepare_slots(PyTypeObject * type)
     PyMappingMethods *map, *old = type->tp_as_mapping;
     if (old == NULL || !(type->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_EXTENSION)) {
         /* need to allocate a new struct */
-        map = (PyMappingMethods *)PyMem_MALLOC(sizeof(PyMappingMethods));
+
+        /* For heap types ensure, that 'old' is part of the
+         * PyHeapTypeObject. Otherwise we would leak 'old'.
+         */
+        assert(!(type->tp_flags & Py_TPFLAGS_HEAPTYPE) ||
+                (old == (PyMappingMethods*)
+                        &((PyHeapTypeObject*)type)->as_mapping));
+
+        map = (PyMappingMethods *)PyObject_Calloc(1, sizeof(PyMappingMethods));
         if (map == NULL) {
             PyErr_NoMemory();
             return -1;
-            }
-        memset(map, 0, sizeof(PyMappingMethods));
+        }
         if (old) {
             /* copy the old method slots, and mark the type */
             memcpy(map, old, offsetof(PyMappingMethods, slpflags));
-            type->tp_flags |= Py_TPFLAGS_HAVE_STACKLESS_EXTENSION;
         }
-        /* we are leaking this pointer */
+        /* We are leaking 'map' and 'old', except for heap types
+         * (with Py_TPFLAGS_HEAPTYPE set)). Theses types have a
+         * tp_dealloc function, which frees 'map'.
+         * For heap types 'old' is a member of PyHeapTypeObject and
+         * must not be freed.
+         */
         type->tp_as_mapping = map;
+        type->tp_flags |= Py_TPFLAGS_HAVE_STACKLESS_EXTENSION;
     }
     return 0;
 }
@@ -1692,7 +1708,6 @@ static int init_stackless_methods(void)
         if (ind)
             t = *((PyTypeObject **)t);
         /* this type has stackless slot methods.  Set the flag */
-        t->tp_flags |= Py_TPFLAGS_HAVE_STACKLESS_EXTENSION;
         if (slp_prepare_slots(t))
             return -1;
         ((signed char *) t->tp_as_mapping)[ofs] = -1;
