@@ -11,7 +11,7 @@ ch = channel()
 
 def f1(n):
     print "f1 called"
-    for i in xrange(n):
+    for i in range(n):
         # print "f1", i
         if i == 4:
             if test_exception:
@@ -22,7 +22,7 @@ def f1(n):
 
 def f2(n):
     print "f2 called"
-    for i in xrange(n):
+    for i in range(n):
         # print "f2", i
         if i % 1000 == 0:
             schedule()

@@ -10,7 +10,7 @@ PY3 = sys.version_info[0] >= 3
 # speed test
 if PY3:
     import _thread as thread
-    xrange = range
+    range = range
 else:
     import thread
 
@@ -74,7 +74,7 @@ except:
 
 
 def f(n, sched):
-    for i in xrange(0, n, 20):
+    for i in range(0, n, 20):
         sched()
         sched()
         sched()
@@ -127,7 +127,7 @@ def tester(func, niter, args, msg, ntasks=10, run=run):
 
 
 def gf(n):
-    for i in xrange(0, n, 20):
+    for i in range(0, n, 20):
         yield i
         yield i
         yield i
@@ -263,7 +263,7 @@ def chantest(n, nest=0, use_thread=False, bulk=False):
     else:
         tasklet(channel_sender)(chan, nest, bulk)
     if bulk:
-        for i in xrange(0, n, 20):
+        for i in range(0, n, 20):
             # list(chan)
             for i in chan:
                 pass
@@ -279,7 +279,7 @@ def chantest(n, nest=0, use_thread=False, bulk=False):
             chan.receive()
             getcurrent().next.run()
             schedule()
-    for i in xrange(0, n, 20):
+    for i in range(0, n, 20):
         recv()
         recv()
         recv()

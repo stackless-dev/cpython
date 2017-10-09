@@ -393,7 +393,7 @@ class StacklessTestCaseMixin(object):
         # compute objects, which are alive, but have to less referrers to
         # justify their live.
         candidates = []
-        for i in xrange(len(objects)):
+        for i in range(len(objects)):
             if id(objects[i]) in oids:
                 continue
             if len(gc.get_referrers(objects[i])) <= 1:

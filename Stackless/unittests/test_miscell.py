@@ -31,7 +31,7 @@ def is_soft():
 
 def runtask():
     x = 0
-    # evoke pickling of an xrange object
+    # evoke pickling of an range object
     dummy = range(10)
     for ii in range(1000):
         x += 1

@@ -63,7 +63,7 @@ tmp = enable_softswitch(0)
 
 
 def f(n, sched):
-    for i in xrange(0, n, 20):
+    for i in range(0, n, 20):
         sched()
         sched()
         sched()

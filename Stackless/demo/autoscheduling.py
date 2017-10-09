@@ -28,7 +28,7 @@ if __name__ == "__main__":
 
     # Helpers
     def runtask(name):
-        for ii in xrange(1000):
+        for ii in range(1000):
             if ii % 50:
                 run_atomic(print_name, name, ii)
 

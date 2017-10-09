@@ -17,7 +17,7 @@ print numbers
 
 
 def counter(n, ch):
-    for i in xrange(n):
+    for i in range(n):
         schedule()
     ch.send(n)
 
