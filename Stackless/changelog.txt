@@ -10,6 +10,9 @@ What's New in Stackless 2.7.XX?
 
 *Release date: XXXX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/135
+  Fix small memory leaks for types with Stackless extensions.
+
 
 What's New in Stackless 2.7.14?
 ===============================

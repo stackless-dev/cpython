@@ -2786,6 +2786,23 @@ type_dealloc(PyTypeObject *type)
     PyObject_Free((char *)type->tp_doc);
     Py_XDECREF(et->ht_name);
     Py_XDECREF(et->ht_slots);
+
+#ifdef STACKLESS
+    /* A type's tp_as_mapping is heap allocated, if
+     * the flag Py_TPFLAGS_HAVE_STACKLESS_EXTENSION is set.
+     * The allocation happens in stacklessmodule.c
+     * function slp_prepare_slots().
+     */
+    if (type->tp_as_mapping &&
+            (type->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_EXTENSION)) {
+        void *tp_as_mapping = type->tp_as_mapping;
+        assert(type->tp_flags & Py_TPFLAGS_HEAPTYPE);
+        type->tp_flags &= ~Py_TPFLAGS_HAVE_STACKLESS_EXTENSION;
+        type->tp_as_mapping = NULL;
+        PyObject_FREE(tp_as_mapping);
+    }
+#endif
+
     Py_TYPE(type)->tp_free((PyObject *)type);
 }
 
