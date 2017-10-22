@@ -5793,7 +5793,7 @@ do_call(PyObject *func, PyObject ***pp_stack, int na, int nk)
     else
         PCALL(PCALL_OTHER);
 #endif
-    STACKLESS_PROPOSE(func);
+    STACKLESS_PROPOSE_ALL();
     if (PyCFunction_Check(func)) {
         PyThreadState *tstate = PyThreadState_GET();
         C_TRACE(result, PyCFunction_Call(func, callargs, kwdict));
@@ -5893,7 +5893,7 @@ ext_do_call(PyObject *func, PyObject ***pp_stack, int flags, int na, int nk)
     else
         PCALL(PCALL_OTHER);
 #endif
-    STACKLESS_PROPOSE(func);
+    STACKLESS_PROPOSE_ALL();
     if (PyCFunction_Check(func)) {
         PyThreadState *tstate = PyThreadState_GET();
         C_TRACE(result, PyCFunction_Call(func, callargs, kwdict));
