@@ -410,6 +410,8 @@ slp_find_execname(PyFrameObject *f, int *valid)
     PyObject *dic = dp ? dp->dict : NULL;
     PyObject *exec_addr = PyLong_FromVoidPtr(f->f_execute);
 
+    assert(valid != NULL);
+
     if (exec_addr == NULL) return NULL;
     exec_name = dic ? PyDict_GetItem(dic, exec_addr) : NULL;
     if (exec_name == NULL) {
@@ -418,7 +420,7 @@ slp_find_execname(PyFrameObject *f, int *valid)
         sprintf(msg, "frame exec function at %p is not registered!",
             (void *)f->f_execute);
         PyErr_SetString(PyExc_ValueError, msg);
-        valid = 0;
+        *valid = 0;
     }
     else {
         PyFrame_ExecFunc *good, *bad;
@@ -427,7 +429,7 @@ slp_find_execname(PyFrameObject *f, int *valid)
             goto err_exit;
         }
         if (f->f_execute == bad)
-            valid = 0;
+            *valid = 0;
         else if (f->f_execute != good) {
             PyErr_SetString(PyExc_SystemError,
                 "inconsistent c?frame function registration");
