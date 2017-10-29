@@ -43,7 +43,7 @@ generic_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     assert(type->tp_base->tp_new != NULL);
     inst = type->tp_base->tp_new(type->tp_base, args, kwds);
     if (inst != NULL)
-        inst->ob_type = type;
+        Py_TYPE(inst) = type;
     return inst;
 }
 
@@ -51,7 +51,7 @@ int
 generic_init(PyObject *ob, PyObject *args, PyObject *kwds)
 {
 
-    initproc init = ob->ob_type->tp_base->tp_init;
+    initproc init = Py_TYPE(ob)->tp_base->tp_init;
 
     if (init)
         return init(ob, args, kwds);
@@ -61,8 +61,8 @@ generic_init(PyObject *ob, PyObject *args, PyObject *kwds)
 static PyObject *
 generic_setstate(PyObject *self, PyObject *args)
 {
-    if (is_wrong_type(self->ob_type)) return NULL;
-    self->ob_type = self->ob_type->tp_base;
+    if (is_wrong_type(Py_TYPE(self))) return NULL;
+    Py_TYPE(self) = Py_TYPE(self)->tp_base;
     Py_INCREF(self);
     return self;
 }
@@ -99,29 +99,29 @@ _new_wrapper(PyObject *self, PyObject *args, PyObject *kwds)
 static void
 _wrap_dealloc(PyObject *ob)
 {
-    ob->ob_type = ob->ob_type->tp_base;
-    if (ob->ob_type->tp_dealloc != NULL)
-        ob->ob_type->tp_dealloc(ob);
+    Py_TYPE(ob) = Py_TYPE(ob)->tp_base;
+    if (Py_TYPE(ob)->tp_dealloc != NULL)
+        Py_TYPE(ob)->tp_dealloc(ob);
 }
 
 static int
 _wrap_traverse(PyObject *ob, visitproc visit, void *arg)
 {
-    PyTypeObject *type = ob->ob_type;
+    PyTypeObject *type = Py_TYPE(ob);
     int ret = 0;
-    ob->ob_type = ob->ob_type->tp_base;
-    if (ob->ob_type->tp_traverse != NULL)
-        ret = ob->ob_type->tp_traverse(ob, visit, arg);
-    ob->ob_type = type;
+    Py_TYPE(ob) = type->tp_base;
+    if (Py_TYPE(ob)->tp_traverse != NULL)
+        ret = Py_TYPE(ob)->tp_traverse(ob, visit, arg);
+    Py_TYPE(ob) = type;
     return ret;
 }
 
 static void
 _wrap_clear(PyObject *ob)
 {
-    ob->ob_type = ob->ob_type->tp_base;
-    if (ob->ob_type->tp_clear != NULL)
-        ob->ob_type->tp_clear(ob);
+    Py_TYPE(ob) = Py_TYPE(ob)->tp_base;
+    if (Py_TYPE(ob)->tp_clear != NULL)
+        Py_TYPE(ob)->tp_clear(ob);
 }
 
 
@@ -604,7 +604,7 @@ cell_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
     ob = PyCell_New(NULL);
     if (ob != NULL)
-        ob->ob_type = type;
+        Py_TYPE(ob) = type;
     return ob;
 }
 
@@ -616,14 +616,14 @@ cell_setstate(PyObject *self, PyObject *args)
     PyCellObject *cell = (PyCellObject *) self;
     PyObject *ob = NULL;
 
-    if (is_wrong_type(self->ob_type)) return NULL;
+    if (is_wrong_type(Py_TYPE(self))) return NULL;
     if (!PyArg_ParseTuple (args, "|O", &ob))
         return NULL;
     Py_XDECREF(cell->ob_ref);
     cell->ob_ref = ob;
     Py_XINCREF(cell->ob_ref);
     Py_INCREF(self);
-    self->ob_type = self->ob_type->tp_base;
+    Py_TYPE(self) = Py_TYPE(self)->tp_base;
     return self;
 }
 
@@ -675,7 +675,7 @@ func_new(PyTypeObject *type, PyObject *args, PyObject *kewd)
     if ((co = Py_CompileString("", "", Py_file_input)) != NULL)
         if ((globals = PyDict_New()) != NULL)
             if ((ob = PyFunction_New(co, globals)) != NULL)
-                ob->ob_type = type;
+                Py_TYPE(ob) = type;
     Py_XDECREF(co);
     Py_XDECREF(globals);
     return ob;
@@ -690,13 +690,13 @@ func_setstate(PyObject *self, PyObject *args)
     PyFunctionObject *fu;
     PyObject *args2;
 
-    if (is_wrong_type(self->ob_type)) return NULL;
-    self->ob_type = self->ob_type->tp_base;
+    if (is_wrong_type(Py_TYPE(self))) return NULL;
+    Py_TYPE(self) = Py_TYPE(self)->tp_base;
     args2 = PyTuple_GetSlice(args, 0, 5);
     if (args2 == NULL)
         return NULL;
     fu = (PyFunctionObject *)
-         self->ob_type->tp_new(self->ob_type, args2, NULL);
+        Py_TYPE(self)->tp_new(Py_TYPE(self), args2, NULL);
     Py_DECREF(args2);
     if (fu != NULL) {
         PyFunctionObject *target = (PyFunctionObject *) self;
@@ -2072,7 +2072,7 @@ methw_setstate(PyObject *self, PyObject *args)
     PyObject *name, *inst;
     PyObject *w;
 
-    if (is_wrong_type(self->ob_type)) return NULL;
+    if (is_wrong_type(Py_TYPE(self))) return NULL;
     if (!PyArg_ParseTuple(args, "O!O:method-wrapper",
                           &PyString_Type, &name,
                           &inst))
@@ -2097,7 +2097,7 @@ methw_setstate(PyObject *self, PyObject *args)
         neww->self = oldw->self;
     }
     Py_DECREF(w);
-    self->ob_type = self->ob_type->tp_base;
+    Py_TYPE(self) = Py_TYPE(self)->tp_base;
     Py_INCREF(self);
     return self;
 }
