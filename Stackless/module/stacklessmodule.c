@@ -1375,8 +1375,8 @@ _peek(PyObject *self, PyObject *v)
     /* this is plain heuristics, use for now */
     if (CANNOT_READ_MEM(o, sizeof(PyObject))) goto noobject;
     if (IS_ON_STACK(o)) goto noobject;
-    if (o->ob_refcnt < 1 || o->ob_refcnt > 10000) goto noobject;
-    t = o->ob_type;
+    if (Py_REFCNT(o) < 1 || Py_REFCNT(o) > 10000) goto noobject;
+    t = Py_TYPE(o);
     for (i=0; i<100; i++) {
         if (t == &PyType_Type)
             break;
@@ -1423,15 +1423,15 @@ _get_refinfo(PyObject *self)
     refchain = PyTuple_New(0)->_ob_next; /* None doesn't work in 2.2 */
     Py_DECREF(refchain->_ob_prev);
     /* find real refchain */
-    while (refchain->ob_type != NULL)
+    while (Py_TYPE(refchain) != NULL)
         refchain = refchain->_ob_next;
 
     for (op = refchain->_ob_next; op != refchain; op = op->_ob_next) {
-    if (op->ob_refcnt > max->ob_refcnt)
+    if (Py_REFCNT(op) > Py_REFCNT(max))
         max = op;
-        computed_total += op->ob_refcnt;
+        computed_total += Py_REFCNT(op);
     }
-    return Py_BuildValue("(Onnn)", max, max->ob_refcnt, ref_total,
+    return Py_BuildValue("(Onnn)", max, Py_REFCNT(max), ref_total,
                          computed_total);
 }
 
@@ -1445,7 +1445,7 @@ _get_all_objects(PyObject *self)
     lis = PyList_New(0);
     if (lis) {
         ob = lis->_ob_next;
-        while (ob != lis && ob->ob_type != NULL) {
+        while (ob != lis && Py_TYPE(ob) != NULL) {
             if (PyList_Append(lis, ob))
                 return NULL;
             ob = ob->_ob_next;

@@ -452,15 +452,15 @@ PyTaskletObject * slp_get_watchdog(PyThreadState *ts, int interrupt);
 
 #define STACKLESS_PROMOTE(func) \
     (stackless ? slp_try_stackless = \
-     (func)->ob_type->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_CALL : 0)
+     Py_TYPE(func)->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_CALL : 0)
 
 #define STACKLESS_PROMOTE_FLAG(flag) \
     (stackless ? slp_try_stackless = (flag) : 0)
 
 #define STACKLESS_PROMOTE_METHOD(obj, meth) do { \
-    if ((obj->ob_type->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_EXTENSION) && \
-         obj->ob_type->tp_as_mapping) \
-        slp_try_stackless = stackless & obj->ob_type->tp_as_mapping->slpflags.meth; \
+    if ((Py_TYPE(obj)->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_EXTENSION) && \
+     Py_TYPE(obj)->tp_as_mapping) \
+        slp_try_stackless = stackless & Py_TYPE(obj)->tp_as_mapping->slpflags.meth; \
 } while (0)
 
 #define STACKLESS_PROMOTE_WRAPPER(wp) \

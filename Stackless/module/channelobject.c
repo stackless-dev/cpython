@@ -67,7 +67,7 @@ channel_dealloc(PyObject *ob)
     }
     if (ch->chan_weakreflist != NULL)
         PyObject_ClearWeakRefs((PyObject *)ch);
-    ob->ob_type->tp_free(ob);
+    Py_TYPE(ob)->tp_free(ob);
 }
 
 /* see if a tasklet is queued on a channel */
