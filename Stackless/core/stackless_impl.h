@@ -679,11 +679,23 @@ do { \
 } while(0)
 
 /* ditto, without incref. Made no sense to optimize. */
+#if defined(__GNUC__) && defined(__STDC__) && (__STDC_VERSION__ >= 199901L)
+#define SLP_DISABLE_GCC_W_ADDRESS \
+	    _Pragma("GCC diagnostic push") \
+	    _Pragma("GCC diagnostic ignored \"-Waddress\"")
+#define SLP_RESTORE_WARNINGS \
+	    _Pragma("GCC diagnostic pop")
+#else
+#define SLP_DISABLE_GCC_W_ADDRESS /**/
+#define SLP_RESTORE_WARNINGS /**/
+#endif
 
 #define TASKLET_SETVAL_OWN(task, val) \
 do { \
     PyObject *hold = (task)->tempval; \
+    SLP_DISABLE_GCC_W_ADDRESS /* suppress warning, if val == Py_NONE */ \
     assert(val != NULL); \
+    SLP_RESTORE_WARNINGS \
     (task)->tempval = (PyObject *) val; \
     Py_DECREF(hold); \
 } while(0)
