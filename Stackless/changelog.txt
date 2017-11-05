@@ -10,6 +10,9 @@ What's New in Stackless 2.7.XX?
 
 *Release date: XXXX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/141
+  Call Py_DECREF(frame) with the right recursion_depth.
+
 - https://github.com/stackless-dev/stackless/issues/140
   Fix bugs in prickelpit.c slp_find_execname().
 

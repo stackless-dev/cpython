@@ -4049,8 +4049,6 @@ PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
             Py_DECREF(retval);
             retval = slp_eval_frame(f);
         }
-        Py_DECREF(f);
-        return retval;
     }
 #else
     retval = PyEval_EvalFrameEx(f,0);
