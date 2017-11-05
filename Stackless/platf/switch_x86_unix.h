@@ -21,6 +21,8 @@
  *      Ported from i386.
  */
 
+#define SLP_USE_NATIVE_BITFIELD_LAYOUT 1
+
 #define STACK_REFPLUS 1
 
 #ifdef SLP_EVAL
@@ -78,12 +80,12 @@ slp_switch(void)
     register int *stackref, stsizediff;
 #if STACKLESS_FRHACK
     __asm__ volatile (
-	""
+        ""
         : : : REGS_CLOBBERED );
 #else
     void * ebp;
     __asm__ volatile (
-	"movl %%ebp, %0\n\t"
+        "movl %%ebp, %0\n\t"
         : "=m" (ebp) : : REGS_CLOBBERED );
 #endif
     __asm__ ("movl %%esp, %0" : "=g" (stackref));

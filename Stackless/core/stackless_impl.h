@@ -43,7 +43,21 @@ extern "C" {
  * This would usually be done in place with the assembly macros.
  */
 
+/*
+ * Macros used to extract bit-field values from an integer in a portable
+ * way.
+ */
+#define SLP_EXTRACT_BITS_(integer, bits, offset) \
+    (((integer) & (((1U << (bits))-1U) << (offset))) >> (offset))
 
+#define SLP_SET_BITFIELD(NAME_PREFIX, bitfield_struct, integer, member) \
+    (bitfield_struct).member = SLP_EXTRACT_BITS_((integer), NAME_PREFIX ## _BITS_ ## member, NAME_PREFIX ## _OFFSET_ ## member)
+
+#define SLP_PREPARE_BITS_(value, offset) \
+    (((unsigned int)(value)) << (offset))
+
+#define SLP_GET_BITFIELD(NAME_PREFIX, bitfield_struct, member) \
+    SLP_PREPARE_BITS_((bitfield_struct).member, NAME_PREFIX ## _OFFSET_ ## member)
 
 /*
  * About the reference counting of frames and C-frames
@@ -681,10 +695,10 @@ do { \
 /* ditto, without incref. Made no sense to optimize. */
 #if defined(__GNUC__) && defined(__STDC__) && (__STDC_VERSION__ >= 199901L)
 #define SLP_DISABLE_GCC_W_ADDRESS \
-	    _Pragma("GCC diagnostic push") \
-	    _Pragma("GCC diagnostic ignored \"-Waddress\"")
+            _Pragma("GCC diagnostic push") \
+            _Pragma("GCC diagnostic ignored \"-Waddress\"")
 #define SLP_RESTORE_WARNINGS \
-	    _Pragma("GCC diagnostic pop")
+            _Pragma("GCC diagnostic pop")
 #else
 #define SLP_DISABLE_GCC_W_ADDRESS /**/
 #define SLP_RESTORE_WARNINGS /**/

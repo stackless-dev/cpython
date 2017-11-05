@@ -22,6 +22,8 @@
  *      Initial final version after lots of iterations for i386.
  */
 
+#define SLP_USE_NATIVE_BITFIELD_LAYOUT 1
+
 #define alloca _alloca
 
 #define STACK_REFPLUS 1

@@ -22,6 +22,8 @@
  *      Initial final version after lots of iterations for i386.
  */
 
+#define SLP_USE_NATIVE_BITFIELD_LAYOUT 1
+
 /* for the SEH things */
 #ifndef _WINDOWS_
 #define WIN32_LEAN_AND_MEAN
