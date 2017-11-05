@@ -13,6 +13,37 @@
 static void
 channel_remove_all(PyObject *ob);
 
+Py_LOCAL_INLINE(PyChannelFlagStruc)
+channel_flags_from_integer(int flags) {
+#if defined(SLP_USE_NATIVE_BITFIELD_LAYOUT) && SLP_USE_NATIVE_BITFIELD_LAYOUT
+    PyChannelFlagStruc f;
+    Py_MEMCPY(&f, &flags, sizeof(f));
+#else
+    /* the portable way */
+    PyChannelFlagStruc f = {0, };
+    SLP_SET_BITFIELD(SLP_CHANNEL_FLAGS, f, flags, closing);
+    SLP_SET_BITFIELD(SLP_CHANNEL_FLAGS, f, flags, preference);
+    SLP_SET_BITFIELD(SLP_CHANNEL_FLAGS, f, flags, schedule_all);
+#endif
+    (void) Py_BUILD_ASSERT_EXPR(sizeof(f) == sizeof(flags));
+    return f;
+}
+
+Py_LOCAL_INLINE(int)
+channel_flags_as_integer(PyChannelFlagStruc flags) {
+    int f;
+    (void) Py_BUILD_ASSERT_EXPR(sizeof(f) == sizeof(flags));
+#if defined(SLP_USE_NATIVE_BITFIELD_LAYOUT) && SLP_USE_NATIVE_BITFIELD_LAYOUT
+    Py_MEMCPY(&f, &flags, sizeof(f));
+#else
+    /* the portable way */
+    f = SLP_GET_BITFIELD(SLP_CHANNEL_FLAGS, flags, closing) |
+            SLP_GET_BITFIELD(SLP_CHANNEL_FLAGS, flags, preference) |
+            SLP_GET_BITFIELD(SLP_CHANNEL_FLAGS, flags, schedule_all);
+#endif
+    return f;
+}
+
 /* GC support.  The tasklets already know if they are collectable
  * or not.  If they are not, and referenced by the channel, then
  * no channel_clear() will be performed.  Thus, the GC support
@@ -163,7 +194,7 @@ PyChannel_New(PyTypeObject *type)
         c->head = c->tail = (PyTaskletObject *) c;
         c->balance = 0;
         c->chan_weakreflist = NULL;
-        *(int*)&c->flags = 0;
+        memset(&c->flags, 0, sizeof(c->flags));
         c->flags.preference = -1; /* default fast receive */
     }
     return c;
@@ -1095,7 +1126,7 @@ channel_reduce(PyChannelObject * ch)
     tup = Py_BuildValue("(O()(iiO))",
                         ch->ob_type,
                         ch->balance,
-                        ch->flags,
+                        channel_flags_as_integer(ch->flags),
                         lis
                         );
 err_exit:
@@ -1124,7 +1155,7 @@ channel_setstate(PyObject *self, PyObject *args)
 
     channel_remove_all((PyObject *) ch);
     n = PyList_GET_SIZE(lis);
-    *(int *)&ch->flags = flags;
+    ch->flags = channel_flags_from_integer(flags);
     dir = balance > 0 ? 1 : -1;
 
     for (i = 0; i < n; i++) {

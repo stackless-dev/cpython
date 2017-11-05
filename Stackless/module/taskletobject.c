@@ -9,6 +9,48 @@
 #ifdef STACKLESS
 #include "core/stackless_impl.h"
 
+/*
+ * Convert C-bitfield
+ */
+Py_LOCAL_INLINE(PyTaskletFlagStruc)
+tasklet_flags_from_integer(int flags) {
+#if defined(SLP_USE_NATIVE_BITFIELD_LAYOUT) && SLP_USE_NATIVE_BITFIELD_LAYOUT
+    PyTaskletFlagStruc f;
+    Py_MEMCPY(&f, &flags, sizeof(f));
+#else
+    /* the portable way */
+    PyTaskletFlagStruc f = {0, };
+    SLP_SET_BITFIELD(SLP_TASKLET_FLAGS, f, flags, blocked);
+    SLP_SET_BITFIELD(SLP_TASKLET_FLAGS, f, flags, atomic);
+    SLP_SET_BITFIELD(SLP_TASKLET_FLAGS, f, flags, ignore_nesting);
+    SLP_SET_BITFIELD(SLP_TASKLET_FLAGS, f, flags, autoschedule);
+    SLP_SET_BITFIELD(SLP_TASKLET_FLAGS, f, flags, block_trap);
+    SLP_SET_BITFIELD(SLP_TASKLET_FLAGS, f, flags, is_zombie);
+    SLP_SET_BITFIELD(SLP_TASKLET_FLAGS, f, flags, pending_irq);
+#endif
+    (void) Py_BUILD_ASSERT_EXPR(sizeof(f) == sizeof(flags));
+    return f;
+}
+
+Py_LOCAL_INLINE(int)
+tasklet_flags_as_integer(PyTaskletFlagStruc flags) {
+    int f;
+    (void) Py_BUILD_ASSERT_EXPR(sizeof(f) == sizeof(flags));
+#if defined(SLP_USE_NATIVE_BITFIELD_LAYOUT) && SLP_USE_NATIVE_BITFIELD_LAYOUT
+    Py_MEMCPY(&f, &flags, sizeof(f));
+#else
+    /* the portable way */
+    f = SLP_GET_BITFIELD(SLP_TASKLET_FLAGS, flags, blocked) |
+            SLP_GET_BITFIELD(SLP_TASKLET_FLAGS, flags, atomic) |
+            SLP_GET_BITFIELD(SLP_TASKLET_FLAGS, flags, ignore_nesting) |
+            SLP_GET_BITFIELD(SLP_TASKLET_FLAGS, flags, autoschedule) |
+            SLP_GET_BITFIELD(SLP_TASKLET_FLAGS, flags, block_trap) |
+            SLP_GET_BITFIELD(SLP_TASKLET_FLAGS, flags, is_zombie) |
+            SLP_GET_BITFIELD(SLP_TASKLET_FLAGS, flags, pending_irq);
+#endif
+    return f;
+}
+
 void
 slp_current_insert(PyTaskletObject *task)
 {
@@ -366,7 +408,7 @@ tasklet_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     t = (PyTaskletObject *) type->tp_alloc(type, 0);
     if (t == NULL)
         return NULL;
-    *(int*)&t->flags = 0;
+    memset(&t->flags, 0, sizeof(t->flags));
     t->recursion_depth = 0;
     t->next = NULL;
     t->prev = NULL;
@@ -452,8 +494,8 @@ tasklet_reduce(PyTaskletObject * t)
     if (PyList_Reverse(lis)) goto err_exit;
     assert(t->cstate != NULL);
     tup = Py_BuildValue("(O()(" TASKLET_TUPLEFMT "))",
-                        t->ob_type,
-                        t->flags,
+                        Py_TYPE(t),
+                        tasklet_flags_as_integer(t->flags),
                         t->tempval,
                         t->cstate->nesting_level,
                         lis
@@ -506,7 +548,7 @@ tasklet_setstate(PyObject *self, PyObject *args)
      * channel would have set it.
      */
     j = t->flags.blocked;
-    *(int *)&t->flags = flags;
+    t->flags = tasklet_flags_from_integer(flags);
     if (t->next == NULL) {
         t->flags.blocked = 0;
     } else {

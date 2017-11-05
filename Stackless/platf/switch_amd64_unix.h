@@ -29,6 +29,8 @@
  *      Ported from i386.
  */
 
+#define SLP_USE_NATIVE_BITFIELD_LAYOUT 1
+
 #define STACK_REFPLUS 1
 
 #ifdef SLP_EVAL
@@ -86,7 +88,7 @@
 /* Maximum possible clobber list. It gives the same assembly code as the minimum list.
    If the ABI evolves, it might be necessary to add some of these registers */
 #define REGS_CLOBBERED "memory", "rax", "rbx", "rcx", "rdx", "rsi", "rdi", \
-    "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15",		        \
+    "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15",                       \
     "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)", \
     "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", \
     "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"
@@ -130,13 +132,13 @@ slp_switch(void)
         SLP_RESTORE_STATE();
 #if STACKLESS_FRHACK
         __asm__ volatile (
-	    "ldmxcsr %1\n\t"
+            "ldmxcsr %1\n\t"
             "fldcw %0\n\t"
             : : "m" (x87cw), "m" (mxcsr));
 #else
         __asm__ volatile (
             "movq %2, %%rbp\n\t"
-	    "ldmxcsr %1\n\t"
+            "ldmxcsr %1\n\t"
             "fldcw %0\n\t"
             : : "m" (x87cw), "m" (mxcsr), "m" (rbp));
 #endif

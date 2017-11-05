@@ -62,14 +62,36 @@ extern "C" {
 
  ***************************************************************************/
 
+#define SLP_TASKLET_FLAGS_BITS_blocked 2
+#define SLP_TASKLET_FLAGS_BITS_atomic 1
+#define SLP_TASKLET_FLAGS_BITS_ignore_nesting 1
+#define SLP_TASKLET_FLAGS_BITS_autoschedule 1
+#define SLP_TASKLET_FLAGS_BITS_block_trap 1
+#define SLP_TASKLET_FLAGS_BITS_is_zombie 1
+#define SLP_TASKLET_FLAGS_BITS_pending_irq 1
+
+#define SLP_TASKLET_FLAGS_OFFSET_blocked 0
+#define SLP_TASKLET_FLAGS_OFFSET_atomic \
+    (SLP_TASKLET_FLAGS_OFFSET_blocked + SLP_TASKLET_FLAGS_BITS_blocked)
+#define SLP_TASKLET_FLAGS_OFFSET_ignore_nesting \
+    (SLP_TASKLET_FLAGS_OFFSET_atomic + SLP_TASKLET_FLAGS_BITS_atomic)
+#define SLP_TASKLET_FLAGS_OFFSET_autoschedule \
+    (SLP_TASKLET_FLAGS_OFFSET_ignore_nesting + SLP_TASKLET_FLAGS_BITS_ignore_nesting)
+#define SLP_TASKLET_FLAGS_OFFSET_block_trap \
+    (SLP_TASKLET_FLAGS_OFFSET_autoschedule + SLP_TASKLET_FLAGS_BITS_autoschedule)
+#define SLP_TASKLET_FLAGS_OFFSET_is_zombie \
+    (SLP_TASKLET_FLAGS_OFFSET_block_trap + SLP_TASKLET_FLAGS_BITS_block_trap)
+#define SLP_TASKLET_FLAGS_OFFSET_pending_irq \
+    (SLP_TASKLET_FLAGS_OFFSET_is_zombie + SLP_TASKLET_FLAGS_BITS_is_zombie)
+
 typedef struct _tasklet_flags {
-    int blocked: 2;
-    unsigned int atomic: 1;
-    unsigned int ignore_nesting: 1;
-    unsigned int autoschedule: 1;
-    unsigned int block_trap: 1;
-    unsigned int is_zombie: 1;
-    unsigned int pending_irq: 1;
+    signed int blocked: SLP_TASKLET_FLAGS_BITS_blocked;
+    unsigned int atomic: SLP_TASKLET_FLAGS_BITS_atomic;
+    unsigned int ignore_nesting: SLP_TASKLET_FLAGS_BITS_ignore_nesting;
+    unsigned int autoschedule: SLP_TASKLET_FLAGS_BITS_autoschedule;
+    unsigned int block_trap: SLP_TASKLET_FLAGS_BITS_block_trap;
+    unsigned int is_zombie: SLP_TASKLET_FLAGS_BITS_is_zombie;
+    unsigned int pending_irq: SLP_TASKLET_FLAGS_BITS_pending_irq;
 } PyTaskletFlagStruc;
 
 /* a partial copy of PyThreadState. Used to preserve 
@@ -160,10 +182,20 @@ typedef struct _bomb {
 
  ***************************************************************************/
 
+#define SLP_CHANNEL_FLAGS_BITS_closing 1
+#define SLP_CHANNEL_FLAGS_BITS_preference 2
+#define SLP_CHANNEL_FLAGS_BITS_schedule_all 1
+
+#define SLP_CHANNEL_FLAGS_OFFSET_closing 0
+#define SLP_CHANNEL_FLAGS_OFFSET_preference \
+    (SLP_CHANNEL_FLAGS_OFFSET_closing + SLP_CHANNEL_FLAGS_BITS_closing)
+#define SLP_CHANNEL_FLAGS_OFFSET_schedule_all \
+    (SLP_CHANNEL_FLAGS_OFFSET_preference + SLP_CHANNEL_FLAGS_BITS_preference)
+
 typedef struct _channel_flags {
-    unsigned int closing: 1;
-    int preference: 2;
-    unsigned int schedule_all:1;
+    unsigned int closing: SLP_CHANNEL_FLAGS_BITS_closing;
+    signed int preference: SLP_CHANNEL_FLAGS_BITS_preference;
+    unsigned int schedule_all: SLP_CHANNEL_FLAGS_BITS_schedule_all;
 } PyChannelFlagStruc;
 
 typedef struct _channel {
