@@ -8,7 +8,7 @@ places:
 
 Stackless extends the Python documentation. The entry point
 is the file Doc/stackless-python.rst. Or read the documentation online
-at http://stackless.readthedocs.io/en/latest/stackless-python.html
+at http://stackless.readthedocs.io
 
 2. The Stackless Web Site http://www.stackless.com
 
@@ -22,7 +22,7 @@ Stackless mailing list: http://www.stackless.com/mailman/listinfo/stackless
 
 4. The Source
 
-It is the ultimate truth. Read it at https://bitbucket.org/stackless-dev/stackless
+It is the ultimate truth. Read it at https://github.com/stackless-dev/stackless
 
 Building Stackless
 ------------------
