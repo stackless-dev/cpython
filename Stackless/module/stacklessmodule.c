@@ -871,10 +871,9 @@ test_cframe(PyObject *self, PyObject *args, PyObject *kwds)
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "l|l:test_cframe",
                                      argnames, &switches, &extra))
         return NULL;
-        if (extra < 0 || extra > STACK_MAX_USEFUL)
-            VALUE_ERROR(
-                "test_cframe: words are limited by 0 and " \
-                STACK_MAX_USESTR, NULL);
+    if (extra < 0 || extra > STACK_MAX_USEFUL)
+        VALUE_ERROR("test_cframe: words are limited by 0 and " \
+                    STACK_MAX_USESTR, NULL);
     if (extra > 0)
         alloca(extra*sizeof(PyObject*));
     Py_INCREF(ret);
