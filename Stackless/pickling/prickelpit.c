@@ -1475,39 +1475,34 @@ static int init_methodtype(void)
 
  ******************************************************/
 
-/*
- * unfortunately we have to copy here.
- * XXX automate checking such situations.
- */
-
-
-typedef struct {
-    PyObject_HEAD
-    PyDictObject *dv_dict;
-} dictviewobject;
 
 static PyTypeObject wrap_PyDictKeys_Type;
 
-PyObject *
+static PyObject *
 dictview_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    dictviewobject *inst;
+    PyObject *inst;
     PyObject *dict;
-    if (PyTuple_Size(args) != 1)
+    Py_ssize_t size = PyTuple_Size(args);
+
+    if (size == -1) {
         return NULL;
+    }
+    if (size != 1) {
+        PyErr_SetString(PyExc_ValueError, "args must contain exactly one argument");
+        return NULL;
+    }
     dict = PyTuple_GetItem(args, 0);
-    inst = PyObject_GC_New(dictviewobject, type->tp_base);
-    if (inst == NULL)
+    if (dict == NULL)
         return NULL;
-    Py_INCREF(dict);
-    inst->dv_dict = (PyDictObject *)dict;
+    inst = _PyDictView_New(dict, type->tp_base);
     if (inst != NULL)
         Py_TYPE(inst) = type;
     return (PyObject *)inst;
 }
 
 static PyObject *
-dictkeysview_reduce(dictviewobject *di)
+dictkeysview_reduce(_PyDictViewObject *di)
 {
     PyObject *tup;
 
@@ -1522,7 +1517,7 @@ dictkeysview_reduce(dictviewobject *di)
 static PyTypeObject wrap_PyDictValues_Type;
 
 static PyObject *
-dictvaluesview_reduce(dictviewobject *di)
+dictvaluesview_reduce(_PyDictViewObject *di)
 {
     PyObject *tup;
 
@@ -1537,7 +1532,7 @@ dictvaluesview_reduce(dictviewobject *di)
 static PyTypeObject wrap_PyDictItems_Type;
 
 static PyObject *
-dictitemsview_reduce(dictviewobject *di)
+dictitemsview_reduce(_PyDictViewObject *di)
 {
     PyObject *tup;
 
