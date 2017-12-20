@@ -9,6 +9,15 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/145
+  Fix the upper bound of tests in test/test_doctest.py.
+
+- https://github.com/stackless-dev/stackless/issues/144
+  Replace copied code in pricklepit.c dictview_new.
+
+- https://github.com/stackless-dev/stackless/issues/143
+  Fix non-portable usage of bit fields.
+
 - https://github.com/stackless-dev/stackless/issues/141
   Call Py_DECREF(frame) with the right recursion_depth.
 
