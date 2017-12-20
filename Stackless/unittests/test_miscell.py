@@ -285,7 +285,7 @@ class TestTaskletThrowBase(object):
         s.throw(TaskletExit)
         # the tasklet should be dead
         stackless.run()
-        self.assertRaisesRegexp(RuntimeError, "dead", s.run)
+        self.assertRaisesRegex(RuntimeError, "dead", s.run)
 
     def test_dead(self):
         c = stackless.channel()
@@ -684,7 +684,7 @@ class TestErrorHandler(StacklessTestCase):
     def test_broken_handler(self):
         stackless.tasklet(self.func)(self.broken_handler)
         with self.handler_ctx(self.broken_handler):
-            self.assertRaisesRegexp(IndexError, "mods", stackless.run)
+            self.assertRaisesRegex(IndexError, "mods", stackless.run)
         self.assertTrue(self.ran)
         self.assertTrue(self.handled)
 
@@ -872,13 +872,13 @@ class TestBind(StacklessTestCase):
 
         self.assertFalse(t.alive)
         self.assertIsNone(t.frame)
-        self.assertEquals(t.nesting_level, 0)
+        self.assertEqual(t.nesting_level, 0)
 
         t.bind(None)  # must not change the tasklet
 
         self.assertFalse(t.alive)
         self.assertIsNone(t.frame)
-        self.assertEquals(t.nesting_level, 0)
+        self.assertEqual(t.nesting_level, 0)
 
         t.bind(self.task)
         t.setup(False)
@@ -901,7 +901,7 @@ class TestBind(StacklessTestCase):
     def test_bind_fail_not_callable(self):
         class C(object):
             pass
-        self.assertRaisesRegexp(TypeError, "callable", stackless.current.bind, C())
+        self.assertRaisesRegex(TypeError, "callable", stackless.current.bind, C())
 
     def test_unbind_ok(self):
         if not stackless.enable_softswitch(None):
@@ -927,7 +927,7 @@ class TestBind(StacklessTestCase):
         self.assertEqual(self.finally_run_count, 0)
 
     def test_unbind_fail_current(self):
-        self.assertRaisesRegexp(RuntimeError, "current tasklet", stackless.current.bind, None)
+        self.assertRaisesRegex(RuntimeError, "current tasklet", stackless.current.bind, None)
 
     def test_unbind_fail_scheduled(self):
         t = stackless.tasklet(self.task)(False)
@@ -939,7 +939,7 @@ class TestBind(StacklessTestCase):
         self.assertTrue(t.alive)
         self.assertIsInstance(t.frame, types.FrameType)
 
-        self.assertRaisesRegexp(RuntimeError, "scheduled", t.bind, None)
+        self.assertRaisesRegex(RuntimeError, "scheduled", t.bind, None)
 
     def test_unbind_fail_cstate(self):
         t = stackless.tasklet(self.task)(True)
@@ -952,7 +952,7 @@ class TestBind(StacklessTestCase):
         self.assertGreaterEqual(t.nesting_level, 1)
         self.assertIsInstance(t.frame, types.FrameType)
 
-        self.assertRaisesRegexp(RuntimeError, "C state", t.bind, None)
+        self.assertRaisesRegex(RuntimeError, "C state", t.bind, None)
 
         # remove the tasklet. Must run the finally clause
         t = None
@@ -1181,7 +1181,7 @@ class TestSwitch(StacklessTestCase):
         t = stackless.tasklet(self.blocked_target)()
         t.run()
         self.assertTrue(t.blocked)
-        self.assertRaisesRegexp(RuntimeError, "blocked", t.switch)
+        self.assertRaisesRegex(RuntimeError, "blocked", t.switch)
         self.c.send(None)
         self.assertTrue(self.finished)
 
@@ -1196,7 +1196,7 @@ class TestSwitch(StacklessTestCase):
         t = stackless.tasklet(self.target)()
         self.assertFalse(t.paused)
         with switch_trapped():
-            self.assertRaisesRegexp(RuntimeError, "switch_trap", t.switch)
+            self.assertRaisesRegex(RuntimeError, "switch_trap", t.switch)
         self.assertFalse(t.paused)
         t.switch()
         self.assertTrue(self.finished)
@@ -1211,7 +1211,7 @@ class TestSwitch(StacklessTestCase):
         t.run()
         self.assertTrue(t.blocked)
         with switch_trapped():
-            self.assertRaisesRegexp(RuntimeError, "blocked", t.switch)
+            self.assertRaisesRegex(RuntimeError, "blocked", t.switch)
         self.assertTrue(t.blocked)
         self.c.send(None)
         self.assertTrue(self.finished)
@@ -1221,7 +1221,7 @@ class TestSwitch(StacklessTestCase):
         t.bind(args=())
         self.assertTrue(t.paused)
         with switch_trapped():
-            self.assertRaisesRegexp(RuntimeError, "switch_trap", t.switch)
+            self.assertRaisesRegex(RuntimeError, "switch_trap", t.switch)
         self.assertTrue(t.paused)
         t.switch()
         self.assertTrue(self.finished)

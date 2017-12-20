@@ -258,7 +258,7 @@ class TestTracingState(StacklessTestCase):
         self.maxDiff = None
         expected = [('mark', self.Tasklet2.__name__, i) for i in
                     ('start', 'before schedule', 'after schedule', 'end schedule')]
-        self.assertEquals(trace_in_tasklet, expected)
+        self.assertEqual(trace_in_tasklet, expected)
 
     # Test the combination of Exception and Trace State
 
@@ -336,7 +336,7 @@ class TestTracingState(StacklessTestCase):
 
         # test if the tracing cframe is present / not present
         self.assertListEqual(reduced_tasklet1[2][3], [frame])
-        self.assertEquals(len(reduced_tasklet2[2][3]), 2)
+        self.assertEqual(len(reduced_tasklet2[2][3]), 2)
         self.assertIs(reduced_tasklet2[2][3][0], frame)
         self.assertIsInstance(reduced_tasklet2[2][3][1], stackless.cframe)
 

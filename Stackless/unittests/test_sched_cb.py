@@ -141,9 +141,9 @@ class SchedulingCallbackTestCase(StacklessTestCase):
         stackless.set_schedule_callback(None)
         for real_name, ex, current_name in switches:
             if real_name:
-                self.assertEquals(real_name, current_name)
+                self.assertEqual(real_name, current_name)
             if ex:
-                self.assertEquals(ex.name, current_name)
+                self.assertEqual(ex.name, current_name)
 
     def testGetCallback(self):
         mon = SchedulingMonitor()
