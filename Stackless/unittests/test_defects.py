@@ -375,7 +375,7 @@ class TestShutdown(StacklessTestCase):
         # test for issue #91 https://bitbucket.org/stackless-dev/stackless/issues/91/
         """A test for issue #91, wrong recursion level after tasklet re-binding
 
-        Assertion failed: ts->recursion_depth == 0 || (ts->st.main == NULL && prev == next), file ..\Stackless\module\scheduling.c, line 1291
+        Assertion failed: ts->recursion_depth == 0 || (ts->st.main == NULL && prev == next), file ../Stackless/module/scheduling.c, line 1291
         The assertion fails with ts->recursion_depth > 0
 
         It is in function

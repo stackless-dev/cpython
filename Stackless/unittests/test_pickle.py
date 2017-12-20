@@ -565,7 +565,7 @@ class TestFramePickling(StacklessTestCase):
         wrap_frame = r[0](*r[1])
         self.assertIsInstance(wrap_frame, stackless._wrap.frame)
         invalid_state = r[2][:-2] + ((("Not a", "tuple of 3", "integers"),), r[2][-1])
-        self.assertRaisesRegexp(TypeError, "an integer is required", wrap_frame.__setstate__, invalid_state)
+        self.assertRaisesRegex(TypeError, "an integer is required", wrap_frame.__setstate__, invalid_state)
         # must not raise an assertion
         wrap_frame.__setstate__(r[2])
         self.assertIs(type(wrap_frame), types.FrameType)

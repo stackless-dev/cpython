@@ -128,13 +128,13 @@ class TestTracingProperties(StacklessTestCase):
     def testSetTraceOnDeadTasklet(self):
         t = stackless.tasklet()
         self.assertIsNone(t.trace_function)
-        self.assertRaisesRegexp(RuntimeError, "tasklet is not alive",
+        self.assertRaisesRegex(RuntimeError, "tasklet is not alive",
                                 setattr, t, "trace_function", self.nullTraceFunc)
 
     def testSetProfileOnDeadTasklet(self):
         t = stackless.tasklet()
         self.assertIsNone(t.trace_function)
-        self.assertRaisesRegexp(RuntimeError, "tasklet is not alive",
+        self.assertRaisesRegex(RuntimeError, "tasklet is not alive",
                                 setattr, t, "profile_function", self.nullTraceFunc)
 
     def testSetTraceOnTasklet1(self):
