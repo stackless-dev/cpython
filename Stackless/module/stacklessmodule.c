@@ -1725,6 +1725,7 @@ _PyStackless_InitTypes(void)
     slp_initial_tstate = PyThreadState_GET();
 
     if (0
+        || slp_init_bombtype()
         || init_stackless_methods()
         || PyType_Ready(&PyTasklet_Type) /* need this early for the main tasklet */
         )
@@ -1755,7 +1756,6 @@ PyInit__stackless(void)
     if (0
         || init_cframetype()
         || PyType_Ready(&PyChannel_Type)
-        || slp_init_bombtype()
         || PyType_Ready(&PyAtomic_Type)
         )
         return NULL;

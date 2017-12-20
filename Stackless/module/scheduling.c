@@ -176,6 +176,7 @@ PyObject *
 slp_curexc_to_bomb(void)
 {
     PyBombObject *bomb;
+    assert(mem_bomb != NULL);  /* assert, that the bomb-type was initialized */
     if (PyErr_ExceptionMatches(PyExc_MemoryError)) {
         bomb = mem_bomb;
         Py_INCREF(bomb);
