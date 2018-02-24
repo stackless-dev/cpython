@@ -4,10 +4,10 @@ Stackless-Python News
 This file documents user visible changes to the Stackless extension of C-Python.
 For other changes see Misc/NEWS.
 
-What's New in Stackless 3.X.X?
+What's New in Stackless 3.5.5?
 ==============================
 
-*Release date: 20XX-XX-XX*
+*Release date: 2018-02-24*
 
 - https://github.com/stackless-dev/stackless/issues/146
   Always initialize _stackless.bonb type. Prevents a NULL-pointer access,
