@@ -1426,8 +1426,8 @@ _get_refinfo(PyObject *self)
         refchain = refchain->_ob_next;
 
     for (op = refchain->_ob_next; op != refchain; op = op->_ob_next) {
-    if (Py_REFCNT(op) > Py_REFCNT(max))
-        max = op;
+        if (Py_REFCNT(op) > Py_REFCNT(max))
+            max = op;
         computed_total += Py_REFCNT(op);
     }
     return Py_BuildValue("(Onnn)", max, Py_REFCNT(max), ref_total,
