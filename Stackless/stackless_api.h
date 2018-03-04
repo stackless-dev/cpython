@@ -308,6 +308,20 @@ PyAPI_FUNC(int) PyStackless_GetRunCount(void);
 PyAPI_FUNC(PyObject *) PyStackless_GetCurrent(void);
 
 /*
+ * get a unique integer ID for the current tasklet.
+ *
+ * Threadsafe.
+ * This is useful for for example benchmarking code that
+ * needs to get some sort of a stack identifier and must
+ * not worry about the GIL being present and so on.
+ * Notes:
+ * 1) the "main" tasklet on each thread will have
+ * the same id even if a proper tasklet has not been initialized
+ * 2) IDs may get recycled for new tasklets.
+ */
+PyAPI_FUNC(long) PyStackless_GetCurrentId(void);
+
+/*
  * run the runnable tasklet queue until all are done,
  * an uncaught exception occoured, or the timeout
  * has been met.
