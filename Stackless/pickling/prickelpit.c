@@ -191,7 +191,6 @@ static struct _typeobject wrap_##type = { \
     0,                                          /* tp_free */ \
 };
 
-static PyObject *types_mod = NULL;
 static PyObject *reduce_frame_func = NULL;
 
 PyDoc_STRVAR(set_reduce_frame__doc__,
@@ -292,7 +291,7 @@ static struct PyMethodDef _new_methoddef[] = {
     {0}
 };
 
-static int init_type(PyTypeObject *t, int (*initchain)(void))
+static int init_type(PyTypeObject *t, int (*initchain)(PyObject *), PyObject * mod)
 {
     PyMethodDescrObject *reduce;
     PyWrapperDescrObject *init;
@@ -305,7 +304,7 @@ static int init_type(PyTypeObject *t, int (*initchain)(void))
     t->tp_basicsize = t->tp_base->tp_basicsize;
     t->tp_itemsize  = t->tp_base->tp_itemsize;
     t->tp_flags     = t->tp_base->tp_flags & ~Py_TPFLAGS_READY;
-    if (PyObject_SetAttrString(types_mod, name, (PyObject *) t))
+    if (PyObject_SetAttrString(mod, name, (PyObject *) t))
         return -1;
     /* patch the method descriptors to require the base type */
     if (PyType_Ready(t)) return -1;
@@ -320,7 +319,7 @@ static int init_type(PyTypeObject *t, int (*initchain)(void))
     if (func == NULL || PyDict_SetItemString(t->tp_dict, "__new__", func))
         return -1;
     if (initchain != NULL)
-        return initchain();
+        return initchain(mod);
     return 0;
 }
 
@@ -648,9 +647,9 @@ code_reduce(PyCodeObject * co)
 MAKE_WRAPPERTYPE(PyCode_Type, code, "code", code_reduce, generic_new,
                  generic_setstate)
 
-static int init_codetype(void)
+static int init_codetype(PyObject * mod)
 {
-    return init_type(&wrap_PyCode_Type, initchain);
+    return init_type(&wrap_PyCode_Type, initchain, mod);
 }
 #undef initchain
 #define initchain init_codetype
@@ -724,9 +723,9 @@ cell_setstate(PyObject *self, PyObject *args)
 
 MAKE_WRAPPERTYPE(PyCell_Type, cell, "cell", cell_reduce, cell_new, cell_setstate)
 
-static int init_celltype(void)
+static int init_celltype(PyObject * mod)
 {
-    return init_type(&wrap_PyCell_Type, initchain);
+    return init_type(&wrap_PyCell_Type, initchain, mod);
 }
 #undef initchain
 #define initchain init_celltype
@@ -816,9 +815,9 @@ func_setstate(PyObject *self, PyObject *args)
 MAKE_WRAPPERTYPE(PyFunction_Type, func, "function", func_reduce, func_new,
                  func_setstate)
 
-static int init_functype(void)
+static int init_functype(PyObject * mod)
 {
-    return init_type(&wrap_PyFunction_Type, initchain);
+    return init_type(&wrap_PyFunction_Type, initchain, mod);
 }
 #undef initchain
 #define initchain init_functype
@@ -1188,7 +1187,7 @@ slp_ensure_new_frame(PyFrameObject *f)
 
 MAKE_WRAPPERTYPE(PyFrame_Type, frame, "frame", frameobject_reduce, frame_new, frame_setstate)
 
-static int init_frametype(void)
+static int init_frametype(PyObject * mod)
 {
     return slp_register_execute(&PyFrame_Type, "eval_frame",
                              PyEval_EvalFrameEx_slp, REF_INVALID_EXEC(eval_frame))
@@ -1208,7 +1207,7 @@ static int init_frametype(void)
                              slp_restore_tracing, REF_INVALID_EXEC(slp_restore_tracing))
         || slp_register_execute(&PyCFrame_Type, "slp_tp_init_callback",
                              slp_tp_init_callback, REF_INVALID_EXEC(slp_tp_init_callback))
-        || init_type(&wrap_PyFrame_Type, initchain);
+        || init_type(&wrap_PyFrame_Type, initchain, mod);
 }
 #undef initchain
 #define initchain init_frametype
@@ -1311,9 +1310,9 @@ tb_setstate(PyObject *self, PyObject *args)
 
 MAKE_WRAPPERTYPE(PyTraceBack_Type, tb, "traceback", tb_reduce, tb_new, tb_setstate)
 
-static int init_tracebacktype(void)
+static int init_tracebacktype(PyObject * mod)
 {
-    return init_type(&wrap_PyTraceBack_Type, initchain);
+    return init_type(&wrap_PyTraceBack_Type, initchain, mod);
 }
 #undef initchain
 #define initchain init_tracebacktype
@@ -1395,9 +1394,9 @@ module_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 MAKE_WRAPPERTYPE(PyModule_Type, module, "module", module_reduce, module_new, generic_setstate)
 
-static int init_moduletype(void)
+static int init_moduletype(PyObject * mod)
 {
-    return init_type(&wrap_PyModule_Type, initchain);
+    return init_type(&wrap_PyModule_Type, initchain, mod);
 }
 #undef initchain
 #define initchain init_moduletype
@@ -1483,9 +1482,9 @@ dictitemsview_reduce(_PyDictViewObject *di)
 MAKE_WRAPPERTYPE(PyDictKeys_Type, dictkeysview, "dict_keys",
          dictkeysview_reduce, dictview_new, generic_setstate)
 
-static int init_dictkeysviewtype(void)
+static int init_dictkeysviewtype(PyObject * mod)
 {
-    return init_type(&wrap_PyDictKeys_Type, initchain);
+    return init_type(&wrap_PyDictKeys_Type, initchain, mod);
 }
 #undef initchain
 #define initchain init_dictkeysviewtype
@@ -1493,9 +1492,9 @@ static int init_dictkeysviewtype(void)
 MAKE_WRAPPERTYPE(PyDictValues_Type, dictvaluesview, "dict_values",
          dictvaluesview_reduce, dictview_new, generic_setstate)
 
-static int init_dictvaluesviewtype(void)
+static int init_dictvaluesviewtype(PyObject * mod)
 {
-    return init_type(&wrap_PyDictValues_Type, initchain);
+    return init_type(&wrap_PyDictValues_Type, initchain, mod);
 }
 #undef initchain
 #define initchain init_dictvaluesviewtype
@@ -1503,9 +1502,9 @@ static int init_dictvaluesviewtype(void)
 MAKE_WRAPPERTYPE(PyDictItems_Type, dictitemsview, "dict_items",
          dictitemsview_reduce, dictview_new, generic_setstate)
 
-static int init_dictitemsviewtype(void)
+static int init_dictitemsviewtype(PyObject * mod)
 {
-    return init_type(&wrap_PyDictItems_Type, initchain);
+    return init_type(&wrap_PyDictItems_Type, initchain, mod);
 }
 #undef initchain
 #define initchain init_dictitemsviewtype
@@ -1811,7 +1810,7 @@ MAKE_WRAPPERTYPE(PyGen_Type, gen, "generator", gen_reduce,
 
 DEF_INVALID_EXEC(gen_iternext_callback)
 
-static int init_generatortype(void)
+static int init_generatortype(PyObject * mod)
 {
     int res;
     PyGenObject *gen = (PyGenObject *) run_script(
@@ -1826,7 +1825,7 @@ static int init_generatortype(void)
     res = slp_register_execute(Py_TYPE(cbframe), "gen_iternext_callback",
               gen->gi_frame->f_back->f_execute,
               REF_INVALID_EXEC(gen_iternext_callback))
-          || init_type(&wrap_PyGen_Type, initchain);
+          || init_type(&wrap_PyGen_Type, initchain, mod);
 
     assert(gen_exhausted_frame == NULL);
     gen_exhausted_frame = slp_ensure_new_frame(gen->gi_frame);
@@ -1849,9 +1848,9 @@ coro_reduce(PyGenObject *gen)
 MAKE_WRAPPERTYPE(PyCoro_Type, coro, "coroutine", coro_reduce,
     gen_new, gen_setstate)
 
-static int init_coroutinetype(void)
+static int init_coroutinetype(PyObject * mod)
 {
-    return init_type(&wrap_PyCoro_Type, initchain);
+    return init_type(&wrap_PyCoro_Type, initchain, mod);
 }
 #undef initchain
 #define initchain init_coroutinetype
@@ -1990,15 +1989,13 @@ init_prickelpit(void)
 {
     PyObject *tmp;
 
-    types_mod = PyModule_Create(&_wrapmodule);
-    if (types_mod == NULL)
+    tmp = PyModule_Create(&_wrapmodule);
+    if (tmp == NULL)
         return NULL;
-    if (initchain()) {
-        Py_CLEAR(types_mod);
+    if (initchain(tmp)) {
+        Py_CLEAR(tmp);
         return NULL;
     }
-    tmp = types_mod;
-    types_mod = NULL;
     return tmp;
 }
 
