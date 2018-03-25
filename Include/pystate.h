@@ -189,10 +189,6 @@ typedef struct _ts {
     int trash_delete_nesting;
     PyObject *trash_delete_later;
 
-#ifdef STACKLESS
-PyStacklessState st;
-#endif
-
     /* Called when a thread state is deleted normally, but not when it
      * is destroyed after fork().
      * Pain:  to prevent rare but fatal shutdown errors (issue 18808),
@@ -227,6 +223,9 @@ PyStacklessState st;
 
     /* XXX signal handlers should also be here */
 
+#ifdef STACKLESS
+    PyStacklessState st;
+#endif
 } PyThreadState;
 #endif
 

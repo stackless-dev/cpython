@@ -256,16 +256,6 @@ PyAPI_DATA(PyTypeObject) PyChannel_Type;
 #define PyChannel_Check(op) PyObject_TypeCheck(op, &PyChannel_Type)
 #define PyChannel_CheckExact(op) (Py_TYPE(op) == PyChannel_TypePtr)
 
-/*** these are in other bits of C-Python(r) ***/
-PyAPI_DATA(PyTypeObject) PyDictIterKey_Type;
-PyAPI_DATA(PyTypeObject) PyDictIterValue_Type;
-PyAPI_DATA(PyTypeObject) PyDictIterItem_Type;
-PyAPI_DATA(PyTypeObject) PyListIter_Type;
-PyAPI_DATA(PyTypeObject) PySetIter_Type;
-PyAPI_DATA(PyTypeObject) PyRangeIter_Type;
-PyAPI_DATA(PyTypeObject) PyTupleIter_Type;
-PyAPI_DATA(PyTypeObject) PyEnum_Type;
-
 #ifdef __cplusplus
 }
 #endif

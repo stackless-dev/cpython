@@ -3641,7 +3641,7 @@ excess_args(PyObject *args, PyObject *kwds)
 }
 
 #ifdef STACKLESS
-int generic_init(PyObject *ob, PyObject *args, PyObject *kwds);
+int slp_generic_init(PyObject *ob, PyObject *args, PyObject *kwds);
 #endif
 
 static int
@@ -3650,7 +3650,7 @@ object_init(PyObject *self, PyObject *args, PyObject *kwds)
     PyTypeObject *type = Py_TYPE(self);
 #ifdef STACKLESS
     /* The following checking clashes with Stackless unpickling. */
-    if (type->tp_init == generic_init)
+    if (type->tp_init == slp_generic_init)
         type = type->tp_base;
 #endif
     if (excess_args(args, kwds)) {

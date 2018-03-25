@@ -61,7 +61,7 @@ generic_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 int
-generic_init(PyObject *ob, PyObject *args, PyObject *kwds)
+slp_generic_init(PyObject *ob, PyObject *args, PyObject *kwds)
 {
 
     initproc init = Py_TYPE(ob)->tp_base->tp_init;
@@ -185,7 +185,7 @@ static struct _typeobject wrap_##type = { \
     0,                                          /* tp_descr_get */ \
     0,                                          /* tp_descr_set */ \
     0,                                          /* tp_dictoffset */ \
-    generic_init,                               /* tp_init */ \
+    slp_generic_init,                           /* tp_init */ \
     0,                                          /* tp_alloc */ \
     newfunc,                                    /* tp_new */ \
     0,                                          /* tp_free */ \
