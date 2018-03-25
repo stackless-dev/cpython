@@ -98,6 +98,10 @@ typedef struct _is {
     PyObject *after_forkers_parent;
     PyObject *after_forkers_child;
 #endif
+
+#ifdef STACKLESS
+    PyStacklessInterpreterState st;
+#endif
 } PyInterpreterState;
 #endif
 

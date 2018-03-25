@@ -5,9 +5,9 @@
 extern "C" {
 #endif
 
-/* platform specific constants (mainly SEH stuff to store )*/
-#include "platf/slp_platformselect.h"
+#include "frameobject.h"
 
+#ifdef STACKLESS
 
 
 /*** important structures: tasklet ***/
@@ -255,6 +255,13 @@ PyAPI_DATA(PyTypeObject) PyTasklet_Type;
 PyAPI_DATA(PyTypeObject) PyChannel_Type;
 #define PyChannel_Check(op) PyObject_TypeCheck(op, &PyChannel_Type)
 #define PyChannel_CheckExact(op) (Py_TYPE(op) == PyChannel_TypePtr)
+
+/*
+ * runtime state */
+struct _stackless_runtime_state {
+};
+
+#endif /* #ifdef STACKLESS */
 
 #ifdef __cplusplus
 }

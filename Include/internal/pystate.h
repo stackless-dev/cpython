@@ -11,6 +11,7 @@ extern "C" {
 #include "internal/mem.h"
 #include "internal/ceval.h"
 #include "internal/warnings.h"
+#include "core/stackless_structs.h"
 
 
 /* GIL state */
@@ -70,7 +71,9 @@ typedef struct pyruntimestate {
     struct _warnings_runtime_state warnings;
     struct _ceval_runtime_state ceval;
     struct _gilstate_runtime_state gilstate;
-
+#ifdef STACKLESS
+    struct _stackless_runtime_state st;
+#endif
     // XXX Consolidate globals found via the check-c-globals script.
 } _PyRuntimeState;
 

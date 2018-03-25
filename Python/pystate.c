@@ -48,6 +48,7 @@ _PyRuntimeState_Init(_PyRuntimeState *runtime)
     _PyMem_Initialize(&runtime->mem);
     _PyGC_Initialize(&runtime->gc);
     _PyEval_Initialize(&runtime->ceval);
+    slp_initialize(&runtime->sl);
 
     runtime->gilstate.check_enabled = 1;
     /* A TSS key must be initialized with Py_tss_NEEDS_INIT
@@ -141,6 +142,9 @@ PyInterpreterState_New(void)
         interp->after_forkers_parent = NULL;
         interp->after_forkers_child = NULL;
 #endif
+#ifdef STACKLESS
+        SPL_INTERPRETERSTATE_NEW(interp);
+#endif
 
         HEAD_LOCK();
         interp->next = _PyRuntime.interpreters.head;
@@ -186,6 +190,9 @@ PyInterpreterState_Clear(PyInterpreterState *interp)
     Py_CLEAR(interp->before_forkers);
     Py_CLEAR(interp->after_forkers_parent);
     Py_CLEAR(interp->after_forkers_child);
+#endif
+#ifdef STACKLESS
+    SPL_INTERPRETERSTATE_CLEAR(interp);
 #endif
 }
 

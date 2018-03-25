@@ -11,6 +11,14 @@
 #endif
 #endif
 
+typedef struct {
+} PyStacklessInterpreterState;
+
+#define SPL_INTERPRETERSTATE_NEW(interp) /* empty */
+
+#define SPL_INTERPRETERSTATE_CLEAR(interp) /* empty */
+
+
 struct _frame; /* Avoid including frameobject.h */
 
 typedef struct _sts {

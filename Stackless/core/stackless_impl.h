@@ -15,8 +15,9 @@ extern "C" {
 
 #include "structmember.h"
 #include "compile.h"
-#include "frameobject.h"
 
+/* platform specific constants (mainly SEH stuff to store )*/
+#include "platf/slp_platformselect.h"
 #include "core/stackless_structs.h"
 #include "pickling/prickelpit.h"
 
@@ -685,6 +686,9 @@ int slp_schedule_task(PyObject **result,
 void slp_thread_unblock(PyThreadState *ts);
 
 int slp_initialize_main_and_current(void);
+/* not yet implemented
+void slp_initialize(struct _stackless_runtime_state *); */
+#define slp_initialize(s) /* empty */
 
 /* setting the tasklet's tempval, optimized for no change */
 
@@ -853,6 +857,8 @@ long slp_parse_thread_id(PyObject *thread_id, unsigned long *id);
 #define STACKLESS_ASSERT_UNWINDING_VALUE_IS_NOT(tstate, obj, val) assert(1)
 
 #define STACKLESS_DECLARE_METHOD(type, meth)
+
+#define slp_initialize(s) /* empty */
 
 #endif /* STACKLESS */
 
