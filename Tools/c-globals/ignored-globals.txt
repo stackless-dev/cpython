@@ -482,6 +482,37 @@ whatstrings
 
 
 #######################################
+# Stackless
+
+# Objects/exceptions.c
+_PyExc_TaskletExit
+PyExc_TaskletExit
+
+# Stackless/core/stackless_methods.h
+_stackless_methtable
+
+# Stackless/core/stacklesseval.c
+cstack_cache
+cstack_cachecount
+unwind_token
+Py_UnwindToken
+
+# Stackless/module/scheduling.c
+mem_bomb
+
+# Stackless/pickling/prickelpit.c
+gen_exhausted_frame
+_new_methoddef
+
+# hacks
+# Stackless/core/slp_transfer.c (write only, prevent optimization)
+_dont_optimise_away_goobledigoobs
+# Stackless/module/scheduling.c
+_dont_optimise_away_saved_tstat_with_magic
+
+
+
+#######################################
 # hacks
 
 # Objects/object.c
