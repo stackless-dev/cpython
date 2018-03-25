@@ -259,6 +259,11 @@ PyAPI_DATA(PyTypeObject) PyChannel_Type;
 /*
  * runtime state */
 struct _stackless_runtime_state {
+    struct {
+        PyCStackObject **cstprev;
+        PyCStackObject *cst;
+        PyTaskletObject *prev;
+    } transfer;
 };
 
 #endif /* #ifdef STACKLESS */

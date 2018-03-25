@@ -19,8 +19,10 @@ or disable the STACKLESS flag.
  * specific code, in order to simplify maintenance.
  */
 
-static PyCStackObject **_cstprev, *_cst;
-static PyTaskletObject *_prev;
+#define _cstprev (_PyRuntime.st.transfer.cstprev)
+#define _cst (_PyRuntime.st.transfer.cst)
+#define _prev (_PyRuntime.st.transfer.prev)
+
 
 #define __return(x) return (x)
 
