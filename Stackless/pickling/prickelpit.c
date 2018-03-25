@@ -191,7 +191,6 @@ static struct _typeobject wrap_##type = { \
     0,                                          /* tp_free */ \
 };
 
-static PyObject *reduce_frame_func = NULL;
 
 PyDoc_STRVAR(set_reduce_frame__doc__,
 "set_reduce_frame(func) -- set the function used to reduce frames during pickling.\n"
@@ -200,25 +199,27 @@ PyDoc_STRVAR(set_reduce_frame__doc__,
 static PyObject *
 set_reduce_frame(PyObject *self, PyObject *func)
 {
+    PyThreadState * ts = PyThreadState_GET();
     if (func == Py_None) {
-        Py_CLEAR(reduce_frame_func);
+        Py_CLEAR(ts->interp->st.reduce_frame_func);
     } else {
         if (!PyCallable_Check(func)) {
             TYPE_ERROR("func must be callable", NULL);
         }
         Py_INCREF(func);
-        Py_XSETREF(reduce_frame_func, func);
+        Py_XSETREF(ts->interp->st.reduce_frame_func, func);
     }
     Py_RETURN_NONE;
 }
 
 PyObject *
 slp_reduce_frame(PyFrameObject * frame) {
-    if (!PyFrame_Check(frame) || reduce_frame_func == NULL) {
+    PyThreadState * ts = PyThreadState_GET();
+    if (!PyFrame_Check(frame) || ts->interp->st.reduce_frame_func == NULL) {
         Py_INCREF(frame);
         return (PyObject *)frame;
     }
-    return PyObject_CallFunctionObjArgs(reduce_frame_func, (PyObject *)frame, NULL);
+    return PyObject_CallFunctionObjArgs(ts->interp->st.reduce_frame_func, (PyObject *)frame, NULL);
 }
 
 /* Helper function for gen_setstate and tb_setstate.
@@ -231,6 +232,7 @@ slp_reduce_frame(PyFrameObject * frame) {
  */
 static PyObject *
 unwrap_frame_arg(PyObject * args) {
+    PyThreadState * ts = PyThreadState_GET();
     PyObject *wrapper_type, *arg0, *result;
     int is_instance;
     Py_ssize_t len, i;
@@ -247,7 +249,8 @@ unwrap_frame_arg(PyObject * args) {
     }
     if ((arg0 = PyTuple_GetItem(args, 0)) == NULL) /* arg0 is a borrowed reference */
         return NULL;
-    if ((wrapper_type = PyObject_GetAttrString(reduce_frame_func, "__self__")) == NULL)
+    if ((wrapper_type = PyObject_GetAttrString(
+            ts->interp->st.reduce_frame_func, "__self__")) == NULL)
         return NULL;
     is_instance = PyObject_IsInstance(arg0, wrapper_type);
     Py_DECREF(wrapper_type);
@@ -1955,7 +1958,6 @@ static int
 _wrapmodule_traverse(PyObject *self, visitproc visit, void *arg)
 {
     Py_VISIT(gen_exhausted_frame);
-    Py_VISIT(reduce_frame_func);
     return 0;
 }
 
@@ -1963,7 +1965,6 @@ static int
 _wrapmodule_clear(PyObject *self)
 {
     Py_CLEAR(gen_exhausted_frame);
-    Py_CLEAR(reduce_frame_func);
     return 0;
 }
 

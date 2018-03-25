@@ -12,11 +12,14 @@
 #endif
 
 typedef struct {
+    PyObject * reduce_frame_func;
 } PyStacklessInterpreterState;
 
-#define SPL_INTERPRETERSTATE_NEW(interp) /* empty */
+#define SPL_INTERPRETERSTATE_NEW(interp) \
+    (interp)->st.reduce_frame_func = NULL
 
-#define SPL_INTERPRETERSTATE_CLEAR(interp) /* empty */
+#define SPL_INTERPRETERSTATE_CLEAR(interp) \
+	Py_CLEAR((interp)->st.reduce_frame_func)
 
 
 struct _frame; /* Avoid including frameobject.h */
