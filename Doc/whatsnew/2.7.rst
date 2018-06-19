@@ -1218,6 +1218,11 @@ changes, or look through the Subversion logs for all the details.
   created some new files that should be included.
   (Fixed by Tarek Ziadé; :issue:`8688`.)
 
+  The ``upload`` command now longer tries to change CR end-of-line characters
+  to CRLF.  This fixes a corruption issue with sdists that ended with a byte
+  equivalent to CR.
+  (Contributed by Bo Bayles in :issue:`32304`.)
+
 * The :mod:`doctest` module's :const:`IGNORE_EXCEPTION_DETAIL` flag
   will now ignore the name of the module containing the exception
   being tested.  (Patch by Lennart Regebro; :issue:`7490`.)
@@ -2538,6 +2543,21 @@ Python 3, or else by publishing it on the Python Package Index.
 In addition to the specific proposals listed below, there is a general
 exemption allowing new ``-3`` warnings to be added in any Python 2.7
 maintenance release.
+
+
+Two new environment variables for debug mode
+--------------------------------------------
+
+In debug mode, the ``[xxx refs]`` statistic is not written by default, the
+:envvar:`PYTHONSHOWREFCOUNT` environment variable now must also be set.
+(Contributed by Victor Stinner; :issue:`31733`.)
+
+When Python is compiled with ``COUNT_ALLOC`` defined, allocation counts are no
+longer dumped by default anymore: the :envvar:`PYTHONSHOWALLOCCOUNT` environment
+variable must now also be set. Moreover, allocation counts are now dumped into
+stderr, rather than stdout. (Contributed by Victor Stinner; :issue:`31692`.)
+
+.. versionadded:: 2.7.15
 
 
 PEP 434: IDLE Enhancement Exception for All Branches

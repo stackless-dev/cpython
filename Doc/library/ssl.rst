@@ -211,7 +211,7 @@ instead.
 
    The *ciphers* parameter sets the available ciphers for this SSL object.
    It should be a string in the `OpenSSL cipher list format
-   <https://www.openssl.org/docs/apps/ciphers.html#CIPHER-LIST-FORMAT>`_.
+   <https://wiki.openssl.org/index.php/Manual:Ciphers(1)#CIPHER_LIST_FORMAT>`_.
 
    The parameter ``do_handshake_on_connect`` specifies whether to do the SSL
    handshake automatically after doing a :meth:`socket.connect`, or whether the
@@ -1134,7 +1134,7 @@ to speed up repeated connections from the same clients.
    The *capath* string, if present, is
    the path to a directory containing several CA certificates in PEM format,
    following an `OpenSSL specific layout
-   <https://www.openssl.org/docs/ssl/SSL_CTX_load_verify_locations.html>`_.
+   <https://www.openssl.org/docs/man1.1.0/ssl/SSL_CTX_load_verify_locations.html>`_.
 
    The *cadata* object, if present, is either an ASCII string of one or more
    PEM-encoded certificates or a bytes-like object of DER-encoded
@@ -1167,7 +1167,7 @@ to speed up repeated connections from the same clients.
 
    Set the available ciphers for sockets created with this context.
    It should be a string in the `OpenSSL cipher list format
-   <https://www.openssl.org/docs/apps/ciphers.html#CIPHER-LIST-FORMAT>`_.
+   <https://wiki.openssl.org/index.php/Manual:Ciphers(1)#CIPHER_LIST_FORMAT>`_.
    If no cipher can be selected (because compile-time options or other
    configuration forbids use of all the specified ciphers), an
    :class:`SSLError` will be raised.
@@ -1310,7 +1310,7 @@ to speed up repeated connections from the same clients.
 
    Get statistics about the SSL sessions created or managed by this context.
    A dictionary is returned which maps the names of each `piece of information
-   <https://www.openssl.org/docs/ssl/SSL_CTX_sess_number.html>`_ to their
+   <https://www.openssl.org/docs/man1.1.0/ssl/SSL_CTX_sess_number.html>`_ to their
    numeric values.  For example, here is the total number of hits and misses
    in the session cache since the context was created::
 
@@ -1330,7 +1330,7 @@ to speed up repeated connections from the same clients.
 
       import socket, ssl
 
-      context = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+      context = ssl.SSLContext(ssl.PROTOCOL_TLS)
       context.verify_mode = ssl.CERT_REQUIRED
       context.check_hostname = True
       context.load_default_certs()
@@ -1536,7 +1536,7 @@ If you prefer to tune security settings yourself, you might create
 a context from scratch (but beware that you might not get the settings
 right)::
 
-   >>> context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+   >>> context = ssl.SSLContext(ssl.PROTOCOL_TLS)
    >>> context.verify_mode = ssl.CERT_REQUIRED
    >>> context.check_hostname = True
    >>> context.load_verify_locations("/etc/ssl/certs/ca-bundle.crt")
@@ -1806,6 +1806,23 @@ handle forked processes.  Applications must change the PRNG state of the
 parent process if they use any SSL feature with :func:`os.fork`.  Any
 successful call of :func:`~ssl.RAND_add`, :func:`~ssl.RAND_bytes` or
 :func:`~ssl.RAND_pseudo_bytes` is sufficient.
+
+
+.. ssl-libressl:
+
+LibreSSL support
+----------------
+
+LibreSSL is a fork of OpenSSL 1.0.1. The ssl module has limited support for
+LibreSSL. Some features are not available when the ssl module is compiled
+with LibreSSL.
+
+* LibreSSL >= 2.6.1 no longer supports NPN. The methods
+  :meth:`SSLContext.set_npn_protocols` and
+  :meth:`SSLSocket.selected_npn_protocol` are not available.
+* :meth:`SSLContext.set_default_verify_paths` ignores the env vars
+  :envvar:`SSL_CERT_FILE` and :envvar:`SSL_CERT_PATH` although
+  :func:`get_default_verify_paths` still reports them.
 
 
 .. seealso::
