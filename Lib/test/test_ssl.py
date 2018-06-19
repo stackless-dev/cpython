@@ -168,6 +168,13 @@ class BasicSocketTests(unittest.TestCase):
             ssl.OP_NO_COMPRESSION
         self.assertIn(ssl.HAS_SNI, {True, False})
         self.assertIn(ssl.HAS_ECDH, {True, False})
+        ssl.OP_NO_SSLv2
+        ssl.OP_NO_SSLv3
+        ssl.OP_NO_TLSv1
+        ssl.OP_NO_TLSv1_3
+        if ssl.OPENSSL_VERSION_INFO >= (1, 0, 1):
+            ssl.OP_NO_TLSv1_1
+            ssl.OP_NO_TLSv1_2
 
     def test_random(self):
         v = ssl.RAND_status()
@@ -1588,34 +1595,6 @@ class NetworkedTests(unittest.TestCase):
                                         cert_reqs=ssl.CERT_NONE, ciphers="^$:,;?*'dorothyx")
                     s.connect(remote)
 
-    def test_algorithms(self):
-        # Issue #8484: all algorithms should be available when verifying a
-        # certificate.
-        # SHA256 was added in OpenSSL 0.9.8
-        if ssl.OPENSSL_VERSION_INFO < (0, 9, 8, 0, 15):
-            self.skipTest("SHA256 not available on %r" % ssl.OPENSSL_VERSION)
-        # sha256.tbs-internet.com needs SNI to use the correct certificate
-        if not ssl.HAS_SNI:
-            self.skipTest("SNI needed for this test")
-        # https://sha2.hboeck.de/ was used until 2011-01-08 (no route to host)
-        remote = ("sha256.tbs-internet.com", 443)
-        sha256_cert = os.path.join(os.path.dirname(__file__), "sha256.pem")
-        with support.transient_internet("sha256.tbs-internet.com"):
-            ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
-            ctx.verify_mode = ssl.CERT_REQUIRED
-            ctx.load_verify_locations(sha256_cert)
-            s = ctx.wrap_socket(socket.socket(socket.AF_INET),
-                                server_hostname="sha256.tbs-internet.com")
-            try:
-                s.connect(remote)
-                if support.verbose:
-                    sys.stdout.write("\nCipher with %r is %r\n" %
-                                     (remote, s.cipher()))
-                    sys.stdout.write("Certificate is:\n%s\n" %
-                                     pprint.pformat(s.getpeercert()))
-            finally:
-                s.close()
-
     def test_get_ca_certs_capath(self):
         # capath certs are loaded on request
         with support.transient_internet(REMOTE_HOST):
@@ -2811,6 +2790,24 @@ else:
                     s.connect((HOST, server.port))
                     self.assertEqual(s.version(), 'TLSv1')
                 self.assertIs(s.version(), None)
+
+        @unittest.skipUnless(ssl.HAS_TLSv1_3,
+                             "test requires TLSv1.3 enabled OpenSSL")
+        def test_tls1_3(self):
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+            context.load_cert_chain(CERTFILE)
+            # disable all but TLS 1.3
+            context.options |= (
+                ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1 | ssl.OP_NO_TLSv1_2
+            )
+            with ThreadedEchoServer(context=context) as server:
+                with context.wrap_socket(socket.socket()) as s:
+                    s.connect((HOST, server.port))
+                    self.assertIn(s.cipher()[0], [
+                        'TLS13-AES-256-GCM-SHA384',
+                        'TLS13-CHACHA20-POLY1305-SHA256',
+                        'TLS13-AES-128-GCM-SHA256',
+                    ])
 
         @unittest.skipUnless(ssl.HAS_ECDH, "test requires ECDH-enabled OpenSSL")
         def test_default_ecdh_curve(self):
