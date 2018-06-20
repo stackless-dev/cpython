@@ -10,6 +10,9 @@ What's New in Stackless 2.7.XX?
 
 *Release date: XXXX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/154
+  Fix a minor bug in STACKLESS_PROMOTE_WRAPPER and STACKLESS_PROMOTE_METHOD.
+
 - https://github.com/stackless-dev/stackless/issues/141
   Call Py_DECREF(frame) with the right recursion_depth.
 
