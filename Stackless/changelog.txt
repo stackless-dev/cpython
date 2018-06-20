@@ -9,6 +9,9 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/154
+  Fix a minor bug in STACKLESS_PROMOTE_WRAPPER and STACKLESS_PROMOTE_METHOD.
+
 - https://github.com/stackless-dev/stackless/issues/150
   The prototype of PyStackless_GetCurrentId(void) was missing from
   stackless_api.h. It is now defined.
