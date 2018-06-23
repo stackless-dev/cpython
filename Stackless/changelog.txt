@@ -5,10 +5,10 @@ This file documents user visible changes to the Stackless extension of C-Python.
 For other changes see Misc/NEWS.
 
 
-What's New in Stackless 2.7.XX?
+What's New in Stackless 2.7.15?
 ===============================
 
-*Release date: XXXX-XX-XX*
+*Release date: 2018-06-23*
 
 - https://github.com/stackless-dev/stackless/issues/160
   There is a compiler warning with recent gcc versions for Python/ceval.c
