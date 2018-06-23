@@ -1302,7 +1302,7 @@ slp_eval_frame_value(PyFrameObject *f, int throwflag, PyObject *retval)
 
             if (retval) {
                 u = TOP();
-                if (u != Py_None)
+                if (u != Py_None && !PyInt_Check(u))
                     err = PyObject_IsTrue(retval);
                 else
                     err = 0;

@@ -10,11 +10,9 @@ What's New in Stackless 2.7.XX?
 
 *Release date: XXXX-XX-XX*
 
-
-What's New in Stackless 2.7.15?
-===============================
-
-*Release date: 2018-06-21*
+- https://github.com/stackless-dev/stackless/issues/159
+  Fix a crash, if the __exit__ function of a context manager
+  switches to another tasklet.
 
 - https://github.com/stackless-dev/stackless/issues/154
   Fix a minor bug in STACKLESS_PROMOTE_WRAPPER and STACKLESS_PROMOTE_METHOD.
