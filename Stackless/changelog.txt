@@ -10,6 +10,11 @@ What's New in Stackless 2.7.XX?
 
 *Release date: XXXX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/160
+  There is a compiler warning with recent gcc versions for Python/ceval.c
+  that the variables "u" and "v" may be used uninitialized in function
+  "slp_eval_frame_value". Asserts ensure that this warning does not apply.
+
 - https://github.com/stackless-dev/stackless/issues/159
   Fix a crash, if the __exit__ function of a context manager
   switches to another tasklet.

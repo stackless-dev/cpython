@@ -3310,9 +3310,45 @@ stackless_setup_with_return:
             Py_DECREF(exit_func);
 #ifdef STACKLESS
             if (STACKLESS_UNWINDING(x)) {
+                /* We must preserve the values of u, v and w over the inserted jumps.
+                 * Here we test the precondition: depending on 'u', the values of 'v' and 'w'
+                 * are on the stack.
+                 **/
+                assert(u == TOP() || (u == Py_None && PyInt_Check(TOP())));
+                assert(u == Py_None || v == SECOND());
+                assert(u == Py_None || w == THIRD());
+
                 goto stackless_with_cleanup;
-            }
 stackless_with_cleanup_return:
+#if 1
+                /* Now test the postcondition: either an error occurred (x == NULL) or
+                 * the precondition is still valid.
+                 **/
+                assert(!x || u == TOP() || (u == Py_None && PyInt_Check(TOP())));
+                assert(!x || u == Py_None || v == SECOND());
+                assert(!x || u == Py_None || w == THIRD());
+#else
+                /* The compiler can not verify, that u and v are initialized at this point,
+                 * and may emit a warning about using u and/or v uninitialized.
+                 * If you don't like the warning, you can enable the following code.
+                 * It reloads the variables from the stack.
+                 *
+                 * See also Stackless issue #160
+                 */
+                if (x != NULL) {
+                    u = TOP();
+                    v = w = Py_None; /* make GCC happy. */
+                    if (u != Py_None) {
+                        if (PyInt_Check(u)) {
+                            u = Py_None;
+                        } else {
+                            v = SECOND();
+                            w = THIRD();
+                        }
+                    }
+                }
+#endif
+            }
 #endif
             if (x == NULL)
                 break; /* Go to error exit */

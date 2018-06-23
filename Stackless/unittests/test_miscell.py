@@ -796,6 +796,40 @@ class TestContextManager(StacklessTestCase):
         t.run()
         self.assertFalse(t.alive)  # tasklet done
 
+    def test_soft_switch_in_exitfunc_after_exception(self):
+        # A test for Stackless issue #160.
+        # The test must not crash python. It exercises the relevant code path in
+        # Python/ceval.c
+
+        self.task_done = False
+
+        class ContextManager(object):
+            def __enter__(self):
+                return None
+
+            def another_method(self):
+                pass
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                # call another python method. This triggers a unwinding out of the
+                # context manager.
+                self.another_method()
+                # return True to enable the code path used to silence an exception
+                return True
+
+        def task():
+            e = ZeroDivisionError()
+            with ContextManager():
+                # you can set a gdb breakpoint in stacklessmodule.c test_cframe()
+                stackless.test_cframe(0, 0)
+                # Raise an exception
+                raise e
+            self.task_done = True
+
+        t = stackless.tasklet(task)()
+        t.run()
+        self.assertTrue(self.task_done)
+
 
 class TestAtomic(StacklessTestCase):
     """Test the getting and setting of the tasklet's 'atomic' flag, and the
