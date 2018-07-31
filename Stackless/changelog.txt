@@ -10,6 +10,10 @@ What's New in Stackless 2.7.XX?
 
 *Release date: XXXX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/166
+  Fix C-API functions PyEval_EvalFrameEx() and PyEval_EvalFrame().
+  They are now compatible with C-Python.
+
 
 What's New in Stackless 2.7.15?
 ===============================
