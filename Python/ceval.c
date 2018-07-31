@@ -803,7 +803,56 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
      * This method is not used by Stackless Python. It is provided for compatibility
      * with extension modules and Cython.
      */
-    return PyEval_EvalFrameEx_slp(f, throwflag, NULL);
+    PyThreadState *tstate = PyThreadState_GET();
+    PyObject * retval = NULL;
+
+    if (f == NULL)
+        return NULL;
+    /* make sure that the Stackless system has been initialized. */
+    assert(tstate->st.main && tstate->st.current);
+    /* sanity check. */
+    assert(SLP_CURRENT_FRAME_IS_VALID(tstate));
+    if (!throwflag) {
+        /* If throwflag is true, retval must be NULL. Otherwise it must be non-NULL.
+         */
+        Py_INCREF(Py_None);
+        retval = Py_None;
+    }
+    if (PyFrame_Check(f) && f->f_execute == NULL) {
+        /* A new frame returned from PyFrame_New() has f->f_execute == NULL.
+         */
+        f->f_execute = PyEval_EvalFrameEx_slp;
+    } else {
+        /* The layout of PyFrameObject differs between Stackless and C-Python.
+         * Stackless f->f_execute is C-Python f->f_code. Stackless f->f_code is at
+         * the end, just before f_localsplus.
+         *
+         * In order to detect a C-Python frame, we must compare f->f_execute
+         * with every valid frame function. Hard to implement completely.
+         * Therefore I'll check only for relevant functions.
+         * Amend the list as needed.
+         *
+         * If needed, we could try to fix an C-Python frame on the fly.
+         *
+         * (It is not possible to detect an C-Python frame by its size, because
+         * we need the code object to compute the expected size and the location
+         * of code objects varies between Stackless and C-Python frames).
+         */
+        if (!PyCFrame_Check(f) &&
+                f->f_execute != PyEval_EvalFrameEx_slp &&
+                f->f_execute != slp_eval_frame_value &&
+                f->f_execute != slp_eval_frame_noval &&
+                f->f_execute != slp_eval_frame_iter &&
+                f->f_execute != slp_eval_frame_setup_with &&
+                f->f_execute != slp_eval_frame_with_cleanup)  {
+            PyErr_BadInternalCall();
+            return NULL;
+        }
+    }
+    retval = slp_frame_dispatch(f, f->f_back, throwflag, retval);
+    assert(!STACKLESS_UNWINDING(retval));
+    assert(SLP_CURRENT_FRAME_IS_VALID(tstate));
+    return retval;
 }
 
 PyObject *

@@ -9,6 +9,10 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/166
+  Fix C-API functions PyEval_EvalFrameEx() and PyEval_EvalFrame().
+  They are now compatible with C-Python.
+
 - https://github.com/stackless-dev/stackless/issues/167
   Replace 'printf(...)' calls by PySys_WriteStderr(...). They are used to emit
   an error message, if there is a pending error while entering Stackless
