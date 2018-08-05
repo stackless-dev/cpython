@@ -786,6 +786,49 @@ PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
 
 
 /* Interpreter main loop */
+#ifdef STACKLESS
+static PyObject *
+run_frame_dispatch(PyFrameObject *f, int exc, PyObject *retval)
+{
+    PyThreadState *ts = PyThreadState_GET();
+    PyCFrameObject *cf = (PyCFrameObject*) f;
+    PyFrameObject *f_back;
+    int done = cf->i;
+
+    SLP_SET_CURRENT_FRAME(ts, f);
+
+    if (retval == NULL || done)
+        goto exit_run_frame_dispatch;
+
+    Py_DECREF(retval);
+
+    f = (PyFrameObject *)cf->ob1;
+    Py_INCREF(f);  /* cf->ob1 is just a borrowed ref */
+    f_back = (PyFrameObject *)cf->ob2;
+    Py_XINCREF(f_back);  /* cf->ob2 is just a borrowed ref */
+    if (cf->n) {  /* cf->n is throwflag */
+        retval = NULL;
+        slp_bomb_explode(cf->ob3); /* slp_bomb_explode steals the ref to the bomb */
+        cf->ob3 = NULL;
+    } else {
+        retval = cf->ob3; /* cf->ob3 is just a borrowed ref */
+        Py_XINCREF(retval);
+    }
+    retval = slp_frame_dispatch(f, f_back, cf->n, retval);
+    assert(!STACKLESS_UNWINDING(retval));
+    assert(SLP_CURRENT_FRAME_IS_VALID(ts));
+
+    cf->i = 1; /* mark ourself as done */
+
+    Py_DECREF(f);
+    Py_XDECREF(f_back);
+
+    /* pop frame */
+exit_run_frame_dispatch:
+    SLP_STORE_NEXT_FRAME(ts, cf->f_back);
+    return retval;
+}
+#endif /* #ifdef STACKLESS */
 
 PyObject *
 PyEval_EvalFrame(PyFrameObject *f) {
@@ -805,19 +848,11 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
      */
     PyThreadState *tstate = PyThreadState_GET();
     PyObject * retval = NULL;
+    PyFrameObject * f_back;
 
     if (f == NULL)
         return NULL;
-    /* make sure that the Stackless system has been initialized. */
-    assert(tstate->st.main && tstate->st.current);
-    /* sanity check. */
-    assert(SLP_CURRENT_FRAME_IS_VALID(tstate));
-    if (!throwflag) {
-        /* If throwflag is true, retval must be NULL. Otherwise it must be non-NULL.
-         */
-        Py_INCREF(Py_None);
-        retval = Py_None;
-    }
+
     if (PyFrame_Check(f) && f->f_execute == NULL) {
         /* A new frame returned from PyFrame_New() has f->f_execute == NULL.
          */
@@ -849,7 +884,42 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             return NULL;
         }
     }
-    retval = slp_frame_dispatch(f, f->f_back, throwflag, retval);
+
+    if (!throwflag) {
+        /* If throwflag is true, retval must be NULL. Otherwise it must be non-NULL.
+         */
+        Py_INCREF(Py_None);
+        retval = Py_None;
+    }
+
+    /* test, if the stackless system has been initialized. */
+    if (tstate->st.main == NULL) {
+        /* Call from extern. Same logic as PyStackless_Call_Main */
+        PyCFrameObject *cf;
+
+        cf = slp_cframe_new(run_frame_dispatch, 0);
+        if (cf == NULL)
+            return NULL;
+        if (throwflag) {
+            retval = slp_curexc_to_bomb();
+        }
+        Py_INCREF(f);
+        cf->ob1 = (PyObject*)f;
+        Py_XINCREF(f->f_back);
+        cf->ob2 = (PyObject*)f->f_back;
+        cf->ob3 = retval; /* transfer our ref. slp_frame_dispatch steals the ref */
+        cf->n = throwflag;
+        retval = slp_eval_frame((PyFrameObject *) cf);
+        Py_DECREF((PyObject *)cf);
+        return retval;
+    }
+
+    /* sanity check. */
+    assert(SLP_CURRENT_FRAME_IS_VALID(tstate));
+    f_back = f->f_back;
+    Py_XINCREF(f_back);
+    retval = slp_frame_dispatch(f, f_back, throwflag, retval);
+    Py_XDECREF(f_back);
     assert(!STACKLESS_UNWINDING(retval));
     assert(SLP_CURRENT_FRAME_IS_VALID(tstate));
     return retval;

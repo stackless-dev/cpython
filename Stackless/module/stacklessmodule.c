@@ -1134,19 +1134,25 @@ by Stackless Python.\n\
 The function creates a frame from code, globals and args and executes the frame.");
 
 static PyObject* test_PyEval_EvalFrameEx(PyObject *self, PyObject *args, PyObject *kwds) {
-    static char *kwlist[] = {"code", "globals", "args", "alloca", NULL};
+    static char *kwlist[] = {"code", "globals", "args", "alloca", "throw", NULL};
     PyThreadState *tstate = PyThreadState_GET();
     PyCodeObject *co;
     PyObject *globals, *co_args = NULL;
     Py_ssize_t alloca_size = 0;
+    PyObject *exc = NULL;
     PyFrameObject *f;
     PyObject *result = NULL;
     void *p;
     Py_ssize_t na;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!O!|O!n:test_PyEval_EvalFrameEx", kwlist,
-            &PyCode_Type, &co, &PyDict_Type, &globals, &PyTuple_Type, &co_args, &alloca_size))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!O!|O!nO:test_PyEval_EvalFrameEx", kwlist,
+            &PyCode_Type, &co, &PyDict_Type, &globals, &PyTuple_Type, &co_args, &alloca_size,
+            &exc))
         return NULL;
+    if (exc && !PyExceptionInstance_Check(exc)) {
+        PyErr_SetString(PyExc_TypeError, "exc must be an exception instance");
+        return NULL;
+    }
     p = alloca(alloca_size);
     assert(globals != NULL);
     assert(tstate != NULL);
@@ -1184,7 +1190,10 @@ static PyObject* test_PyEval_EvalFrameEx(PyObject *self, PyObject *args, PyObjec
             Py_SETREF(fastlocals[0], PyLong_FromVoidPtr(p));
         }
     }
-    result = PyEval_EvalFrameEx(f,0);
+    if (exc) {
+        PyErr_SetObject(PyExceptionInstance_Class(exc), exc);
+    }
+    result = PyEval_EvalFrameEx(f, exc != NULL);
     /* result = Py_None; Py_INCREF(Py_None); */
 exit:
     ++tstate->recursion_depth;
