@@ -1288,9 +1288,9 @@ slp_initialize_main_and_current(void)
         Py_XINCREF(value);
         Py_XINCREF(traceback);
         PyErr_Restore(type, value, traceback);
-        printf("Pending error while entering Stackless subsystem:\n");
+        PySys_WriteStderr("Pending error while entering Stackless subsystem:\n");
         PyErr_Print();
-        printf("Above exception is re-raised to the caller.\n");
+        PySys_WriteStderr("Above exception is re-raised to the caller.\n");
         PyErr_Restore(type, value, traceback);
 #endif
     return 1;
