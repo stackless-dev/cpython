@@ -787,16 +787,22 @@ PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
 
 /* Interpreter main loop */
 
-#ifdef STACKLESS
 PyObject *
-PyEval_EvalFrame(PyFrameObject *f)
-{
-    return PyEval_EvalFrameEx_slp(f, 0, NULL);
+PyEval_EvalFrame(PyFrameObject *f) {
+    /* This is for backward compatibility with extension modules that
+       used this API; core interpreter code should call
+       PyEval_EvalFrameEx() */
+    return PyEval_EvalFrameEx(f, 0);
 }
 
+#ifdef STACKLESS
 PyObject *
 PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 {
+    /*
+     * This method is not used by Stackless Python. It is provided for compatibility
+     * with extension modules and Cython.
+     */
     return PyEval_EvalFrameEx_slp(f, throwflag, NULL);
 }
 
@@ -805,14 +811,6 @@ PyEval_EvalFrameEx_slp(PyFrameObject *f, int throwflag, PyObject *retval)
 {
     PyThreadState *tstate = PyThreadState_GET();
 #else
-
-PyObject *
-PyEval_EvalFrame(PyFrameObject *f) {
-    /* This is for backward compatibility with extension modules that
-       used this API; core interpreter code should call
-       PyEval_EvalFrameEx() */
-    return PyEval_EvalFrameEx(f, 0);
-}
 
 PyObject *
 PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
@@ -1790,7 +1788,7 @@ slp_eval_frame_value(PyFrameObject *f, int throwflag, PyObject *retval)
             }
         }
         else {
-            /* don't push it, frame ignores value */
+            /* don't push retval, frame ignores the value */
             assert (f->f_execute == slp_eval_frame_noval);
             Py_XDECREF(retval);
         }
