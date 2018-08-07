@@ -767,6 +767,34 @@ class TestContextManager(StacklessTestCase):
         stackless.tasklet(self.nestingLevel)()
         stackless.run()
 
+    def test_tasklet_switch_in_exitfunc_after_return(self):
+        # A test for Stackless issue #159.
+        # The test must not crash python.
+
+        class ContextManager(object):
+            def __enter__(self):
+                return None
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                # soft switch to the main tasklet
+                stackless.schedule_remove(4711)
+                # return True to enable the code path used to silence an exception
+                return True  # python used to crash here, until #159 was fixed
+
+        def task():
+            with ContextManager():
+                # you can set a gdb breakpoint in stacklessmodule.c test_cframe()
+                stackless.test_cframe(0, 0)
+                # We need a return statement, to set stack TOP to an int()
+                return None
+            self.fail("Not reached")
+
+        t = stackless.tasklet(task)()
+        t.run()
+        self.assertEqual(t.tempval, 4711)  # back from context manager __exit__
+        t.run()
+        self.assertFalse(t.alive)  # tasklet done
+
 
 class TestAtomic(StacklessTestCase):
     """Test the getting and setting of the tasklet's 'atomic' flag, and the
