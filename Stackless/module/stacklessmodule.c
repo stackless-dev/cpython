@@ -1131,20 +1131,21 @@ by Stackless Python.\n\
 The function creates a frame from code, globals and args and executes the frame.");
 
 static PyObject* test_PyEval_EvalFrameEx(PyObject *self, PyObject *args, PyObject *kwds) {
-    static char *kwlist[] = {"code", "globals", "args", "alloca", "throw", NULL};
+    static char *kwlist[] = {"code", "globals", "args", "alloca", "throw", "oldcython", NULL};
     PyThreadState *tstate = PyThreadState_GET();
     PyCodeObject *co;
     PyObject *globals, *co_args = NULL;
     Py_ssize_t alloca_size = 0;
     PyObject *exc = NULL;
+    PyObject *oldcython = NULL;
     PyFrameObject *f;
     PyObject *result = NULL;
     void *p;
     Py_ssize_t na;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!O!|O!nO:test_PyEval_EvalFrameEx", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!O!|O!nOO!:test_PyEval_EvalFrameEx", kwlist,
             &PyCode_Type, &co, &PyDict_Type, &globals, &PyTuple_Type, &co_args, &alloca_size,
-            &exc))
+            &exc, &PyBool_Type, &oldcython))
         return NULL;
     if (exc && !PyExceptionInstance_Check(exc)) {
         PyErr_SetString(PyExc_TypeError, "exc must be an exception instance");
@@ -1175,6 +1176,13 @@ static PyObject* test_PyEval_EvalFrameEx(PyObject *self, PyObject *args, PyObjec
             goto exit;
         }
         fastlocals = f->f_localsplus;
+        if (oldcython == Py_True) {
+            /* Use the f_localsplus offset from regular C-Python. Old versions of cython used to
+             * access f_localplus directly. Current versions compute the field offset for
+             * f_localsplus at run-time.
+             */
+            fastlocals--;
+        }
         for (i = 0; i < na; i++) {
             PyObject *arg = PyTuple_GetItem(co_args, i);
             if (arg == NULL) {
