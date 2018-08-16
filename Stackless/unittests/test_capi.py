@@ -75,6 +75,10 @@ class Test_PyEval_EvalFrameEx(StacklessTestCase):
         # Force stack spilling. 16384 is the value of CSTACK_WATERMARK from slp_platformselect.h
         self.call_PyEval_EvalFrameEx(None, alloca=16384 * 8)
 
+    def test_oldcython_frame(self):
+        # A test for Stackless issue #168
+        self.assertEqual(self.call_PyEval_EvalFrameEx(47110816, oldcython=True), 47110816)
+
     def test_stack_unwinding(self):
         # Calling the __init__ method of a new-style class involves stack unwinding
         class C(object):
