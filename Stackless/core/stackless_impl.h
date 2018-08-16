@@ -43,6 +43,12 @@ extern "C" {
  * This would usually be done in place with the assembly macros.
  */
 
+/* back port from Python 3.6 */
+#ifndef Py_MEMBER_SIZE
+/* Get the size of a structure member in bytes */
+#define Py_MEMBER_SIZE(type, member) sizeof(((type *)0)->member)
+#endif
+
 /*
  * Macros used to extract bit-field values from an integer in a portable
  * way.
