@@ -42,6 +42,10 @@ extern "C" {
 #define Py_BUILD_ASSERT_EXPR(cond) \
     (sizeof(char [1 - 2*!(cond)]) - 1)
 #endif
+#ifndef Py_MEMBER_SIZE
+/* Get the size of a structure member in bytes */
+#define Py_MEMBER_SIZE(type, member) sizeof(((type *)0)->member)
+#endif
 
 /*
  * Macros used to extract bit-field values from an integer in a portable
