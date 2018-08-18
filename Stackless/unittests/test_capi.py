@@ -75,10 +75,6 @@ class Test_PyEval_EvalFrameEx(StacklessTestCase):
         # Force stack spilling. 16384 is the value of CSTACK_WATERMARK from slp_platformselect.h
         self.call_PyEval_EvalFrameEx(None, alloca=16384 * 8)
 
-    def test_oldcython_frame(self):
-        # A test for Stackless issue #168
-        self.assertEqual(self.call_PyEval_EvalFrameEx(47110816, oldcython=True), 47110816)
-
     def test_stack_unwinding(self):
         # Calling the __init__ method of a new-style class involves stack unwinding
         class C(object):
@@ -164,6 +160,27 @@ class Test_PyEval_EvalFrameEx(StacklessTestCase):
         self.assertNotIn("Pending error while entering Stackless subsystem", msg)
         self.assertIn(str(exc), msg)
         #print(msg)
+
+    def test_oldcython_frame(self):
+        # A test for Stackless issue #168
+        self.assertEqual(self.call_PyEval_EvalFrameEx(47110816, oldcython=True), 47110816)
+
+    def test_oldcython_frame_code_is_1st_arg(self):
+        # A pathological test for Stackless issue #168
+        def f(code):
+            return code
+
+        def f2(code):
+            return code
+
+        self.assertIs(stackless.test_PyEval_EvalFrameEx(f.__code__, f.__globals__, (f.__code__,), oldcython=False), f.__code__)
+        self.assertIs(stackless.test_PyEval_EvalFrameEx(f.__code__, f.__globals__, (f2.__code__,), oldcython=True), f2.__code__)
+        # we can't fix this particular case:
+        #  - running code object is its 1st arg and
+        #  - oldcython=True,
+        # because a fix would result in a segmentation fault, if the number of
+        # arguments is to low (test case test_0_args)
+        self.assertRaises(UnboundLocalError, stackless.test_PyEval_EvalFrameEx, f.__code__, f.__globals__, (f.__code__,), oldcython=True)
 
 
 if __name__ == "__main__":
