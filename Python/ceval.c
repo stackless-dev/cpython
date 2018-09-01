@@ -775,7 +775,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
             /* and (&(f->f_code))[-1] looks like a valid code object */
             (&(f->f_code))[-1] && PyCode_Check((&(f->f_code))[-1]) &&
             /* and there are arguments */
-            (&(f->f_code))[-1]->co_argcount > 0)
+            (&(f->f_code))[-1]->co_argcount > 0 &&
+            /* the last argument is NULL */
+            f->f_localsplus[(&(f->f_code))[-1]->co_argcount - 1] == NULL)
         {
             PyCodeObject * code = (&(f->f_code))[-1];
             memmove(f->f_localsplus, f->f_localsplus-1, code->co_argcount * sizeof(f->f_localsplus[0]));

@@ -1138,9 +1138,10 @@ by Stackless Python.\n\
 The function creates a frame from code, globals and args and executes the frame.");
 
 static PyObject* test_PyEval_EvalFrameEx(PyObject *self, PyObject *args, PyObject *kwds) {
-    static char *kwlist[] = {"code", "globals", "args", "alloca", "throw", "oldcython", NULL};
+    static char *kwlist[] = {"code", "globals", "args", "alloca", "throw", "oldcython",
+                             "code2", NULL};
     PyThreadState *tstate = PyThreadState_GET();
-    PyCodeObject *co;
+    PyCodeObject *co, *code2 = NULL;
     PyObject *globals, *co_args = NULL;
     Py_ssize_t alloca_size = 0;
     PyObject *exc = NULL;
@@ -1150,9 +1151,9 @@ static PyObject* test_PyEval_EvalFrameEx(PyObject *self, PyObject *args, PyObjec
     void *p;
     Py_ssize_t na;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!O!|O!nOO!:test_PyEval_EvalFrameEx", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!O!|O!nOO!O!:test_PyEval_EvalFrameEx", kwlist,
             &PyCode_Type, &co, &PyDict_Type, &globals, &PyTuple_Type, &co_args, &alloca_size,
-            &exc, &PyBool_Type, &oldcython))
+            &exc, &PyBool_Type, &oldcython, &PyCode_Type, &code2))
         return NULL;
     if (exc && !PyExceptionInstance_Check(exc)) {
         PyErr_SetString(PyExc_TypeError, "exc must be an exception instance");
@@ -1204,6 +1205,10 @@ static PyObject* test_PyEval_EvalFrameEx(PyObject *self, PyObject *args, PyObjec
     }
     if (exc) {
         PyErr_SetObject(PyExceptionInstance_Class(exc), exc);
+    }
+    if (code2) {
+        Py_INCREF(code2);
+        Py_SETREF(f->f_code, code2);
     }
     result = PyEval_EvalFrameEx(f, exc != NULL);
     /* result = Py_None; Py_INCREF(Py_None); */
