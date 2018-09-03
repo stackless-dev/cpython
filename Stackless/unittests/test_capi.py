@@ -31,7 +31,8 @@ import traceback
 import unittest
 
 from support import test_main  # @UnusedImport
-from support import StacklessTestCase, withThreads, require_one_thread
+from support import (StacklessTestCase, withThreads, require_one_thread,
+                     testcase_leaks_references)
 
 if withThreads:
     try:
@@ -160,6 +161,44 @@ class Test_PyEval_EvalFrameEx(StacklessTestCase):
         self.assertNotIn("Pending error while entering Stackless subsystem", msg)
         self.assertIn(str(exc), msg)
         #print(msg)
+
+    def test_oldcython_frame(self):
+        # A test for Stackless issue #168
+        self.assertEqual(self.call_PyEval_EvalFrameEx(47110816, oldcython=True), 47110816)
+
+    def test_oldcython_frame_code_is_1st_arg_good(self):
+        # A pathological test for Stackless issue #168
+        def f(code):
+            return code
+
+        def f2(code):
+            return code
+
+        self.assertIs(stackless.test_PyEval_EvalFrameEx(f.__code__, f.__globals__, (f.__code__,), oldcython=False), f.__code__)
+        self.assertIs(stackless.test_PyEval_EvalFrameEx(f.__code__, f.__globals__, (f2.__code__,), oldcython=True), f2.__code__)
+
+    @testcase_leaks_references("f->f_code get overwritten without Py_DECREF")
+    def test_oldcython_frame_code_is_1st_arg_bad(self):
+        # A pathological test for Stackless issue #168
+        def f(code):
+            return code
+
+        # we can't fix this particular case:
+        #  - running code object is its 1st arg and
+        #  - oldcython=True,
+        # because a fix would result in a segmentation fault, if the number of
+        # arguments is to low (test case test_0_args)
+        self.assertRaises(UnboundLocalError, stackless.test_PyEval_EvalFrameEx, f.__code__, f.__globals__, (f.__code__,), oldcython=True)
+
+    def test_other_code_object(self):
+        # A pathological test for Stackless issue #168
+        def f(arg):
+            return arg
+
+        def f2(arg):
+            return arg
+
+        self.assertIs(stackless.test_PyEval_EvalFrameEx(f.__code__, f.__globals__, (f2,), code2=f2.__code__), f2)
 
 
 if __name__ == "__main__":

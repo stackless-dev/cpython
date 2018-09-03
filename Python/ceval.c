@@ -745,16 +745,51 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
     if (f == NULL)
         return NULL;
 
+    /* The layout of PyFrameObject differs between Stackless and C-Python.
+     * Stackless f->f_execute is C-Python f->f_code. Stackless f->f_code is at
+     * the end, just before f_localsplus.
+     */
     if (PyFrame_Check(f) && f->f_execute == NULL) {
         /* A new frame returned from PyFrame_New() has f->f_execute == NULL.
+         * Set the usual execution function.
          */
         f->f_execute = PyEval_EvalFrameEx_slp;
+
+#if PY_VERSION_HEX < 0x03080000
+        /* Older versions of Cython used to create frames using C-Python layout
+         * of PyFrameObject. As a consequence f_code is overwritten by the first
+         * item of f_localsplus[]. To be able to fix it, we have a copy of
+         * f_code and a signature at the end of the block-stack.
+         * The Py_BUILD_ASSERT_EXPR checks,that our assumptions about the layout
+         * of PyFrameObject are true.
+         * See Stackless issue #168
+         */
+        (void) Py_BUILD_ASSERT_EXPR(offsetof(PyFrameObject, f_code) ==
+               offsetof(PyFrameObject, f_localsplus) - Py_MEMBER_SIZE(PyFrameObject, f_localsplus[0]));
+
+        /* Check for an old Cython frame */
+        if (f->f_iblock == 0 && f->f_lasti == -1 && /* blockstack is empty */
+            f->f_blockstack[0].b_type == -31683 && /* magic is present */
+            /* and f_code has been overwritten */
+            f->f_code != (&(f->f_code))[-1] &&
+            /* and (&(f->f_code))[-1] looks like a valid code object */
+            (&(f->f_code))[-1] && PyCode_Check((&(f->f_code))[-1]) &&
+            /* and there are arguments */
+            (&(f->f_code))[-1]->co_argcount > 0 &&
+            /* the last argument is NULL */
+            f->f_localsplus[(&(f->f_code))[-1]->co_argcount - 1] == NULL)
+        {
+            PyCodeObject * code = (&(f->f_code))[-1];
+            memmove(f->f_localsplus, f->f_localsplus-1, code->co_argcount * sizeof(f->f_localsplus[0]));
+            f->f_code = code;
+        } else
+#endif
+        if (!(f->f_code != NULL && PyCode_Check(f->f_code))) {
+            PyErr_BadInternalCall();
+            return NULL;
+        }
     } else {
-        /* The layout of PyFrameObject differs between Stackless and C-Python.
-         * Stackless f->f_execute is C-Python f->f_code. Stackless f->f_code is at
-         * the end, just before f_localsplus.
-         *
-         * In order to detect a C-Python frame, we must compare f->f_execute
+        /* In order to detect a broken C-Python frame, we must compare f->f_execute
          * with every valid frame function. Hard to implement completely.
          * Therefore I'll check only for relevant functions.
          * Amend the list as needed.
