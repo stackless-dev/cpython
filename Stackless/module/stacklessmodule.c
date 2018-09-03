@@ -1134,20 +1134,22 @@ by Stackless Python.\n\
 The function creates a frame from code, globals and args and executes the frame.");
 
 static PyObject* test_PyEval_EvalFrameEx(PyObject *self, PyObject *args, PyObject *kwds) {
-    static char *kwlist[] = {"code", "globals", "args", "alloca", "throw", NULL};
+    static char *kwlist[] = {"code", "globals", "args", "alloca", "throw", "oldcython",
+                             "code2", NULL};
     PyThreadState *tstate = PyThreadState_GET();
-    PyCodeObject *co;
+    PyCodeObject *co, *code2 = NULL;
     PyObject *globals, *co_args = NULL;
     Py_ssize_t alloca_size = 0;
     PyObject *exc = NULL;
+    PyObject *oldcython = NULL;
     PyFrameObject *f;
     PyObject *result = NULL;
     void *p;
     Py_ssize_t na;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!O!|O!nO:test_PyEval_EvalFrameEx", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!O!|O!nOO!O!:test_PyEval_EvalFrameEx", kwlist,
             &PyCode_Type, &co, &PyDict_Type, &globals, &PyTuple_Type, &co_args, &alloca_size,
-            &exc))
+            &exc, &PyBool_Type, &oldcython, &PyCode_Type, &code2))
         return NULL;
     if (exc && !PyExceptionInstance_Check(exc)) {
         PyErr_SetString(PyExc_TypeError, "exc must be an exception instance");
@@ -1178,6 +1180,13 @@ static PyObject* test_PyEval_EvalFrameEx(PyObject *self, PyObject *args, PyObjec
             goto exit;
         }
         fastlocals = f->f_localsplus;
+        if (oldcython == Py_True) {
+            /* Use the f_localsplus offset from regular C-Python. Old versions of cython used to
+             * access f_localplus directly. Current versions compute the field offset for
+             * f_localsplus at run-time.
+             */
+            fastlocals--;
+        }
         for (i = 0; i < na; i++) {
             PyObject *arg = PyTuple_GetItem(co_args, i);
             if (arg == NULL) {
@@ -1192,6 +1201,10 @@ static PyObject* test_PyEval_EvalFrameEx(PyObject *self, PyObject *args, PyObjec
     }
     if (exc) {
         PyErr_SetObject(PyExceptionInstance_Class(exc), exc);
+    }
+    if (code2) {
+        Py_INCREF(code2);
+        Py_SETREF(f->f_code, code2);
     }
     result = PyEval_EvalFrameEx(f, exc != NULL);
     /* result = Py_None; Py_INCREF(Py_None); */

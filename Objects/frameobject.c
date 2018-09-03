@@ -450,6 +450,13 @@ frame_dealloc(PyFrameObject *f)
 
     PyObject_GC_UnTrack(f);
     Py_TRASHCAN_SAFE_BEGIN(f)
+
+#if defined(STACKLESS) && PY_VERSION_HEX < 0x03080000
+    /* Clear the magic for the old Cython frame hack.
+     * See below in PyFrame_New() for a detailed explanation.
+     */
+    f->f_blockstack[0].b_type = 0;
+#endif
     /* Kill all local variables */
     valuestack = f->f_valuestack;
     for (p = f->f_localsplus; p < valuestack; p++)
@@ -762,6 +769,25 @@ PyFrame_New(PyThreadState *tstate, PyCodeObject *code, PyObject *globals,
 
 #ifdef STACKLESS
     f->f_execute = NULL;
+#if PY_VERSION_HEX < 0x03080000
+    if (code->co_argcount > 0) {
+        /*
+         * A hack for binary compatibility with Cython extension modules, which
+         * were created with an older Cythoncompiled with regular C-Python. These
+         * modules create frames using PyFrame_New then write to frame->f_localsplus
+         * to set the arguments. But C-Python f_localsplus is Stackless f_code.
+         * Therefore we add a copy of f_code and a magic number in the
+         * uninitialized f_blockstack array.
+         * If the blockstack is used, the magic is overwritten.
+         * To make sure, the pointer is aligned correctly, we address it relative to
+         * f_code.
+         * See Stackless issue #168
+         */
+        (&(f->f_code))[-1] = code;
+        /* an arbitrary negative number which is not an opcode */
+        f->f_blockstack[0].b_type = -31683;
+    }
+#endif
 #endif
     _PyObject_GC_TRACK(f);
     return f;
