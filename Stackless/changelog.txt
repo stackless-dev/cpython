@@ -4,16 +4,11 @@ Stackless-Python News
 This file documents user visible changes to the Stackless extension of C-Python.
 For other changes see Misc/NEWS.
 
-What's New in Stackless 3.X.X?
-==============================
+What's New in Stackless 3.4.8 and 3.4.9?
+========================================
 
-*Release date: 20XX-XX-XX*
-
-
-What's New in Stackless 3.4.8?
-==============================
-
-*Release date: 2018-02-25*
+*Release date: 2018-09-05* (3.4.9)
+*Release date: 2018-02-25* (3.4.8)
 
 - https://github.com/stackless-dev/stackless/issues/118
   Modify Tools/msi to use git instead of hg.
