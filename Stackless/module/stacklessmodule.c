@@ -966,7 +966,6 @@ test_cframe_nr_loop(PyFrameObject *f, int exc, PyObject *retval)
     }
 exit_test_cframe_nr_loop:
     SLP_STORE_NEXT_FRAME(ts, cf->f_back);
-    Py_DECREF(cf);
     return retval;
 }
 
@@ -987,6 +986,7 @@ test_cframe_nr(PyObject *self, PyObject *args, PyObject *kwds)
         return NULL;
     cf->n = switches;
     SLP_STORE_NEXT_FRAME(ts, (PyFrameObject *) cf);
+    Py_DECREF(cf);
     Py_INCREF(Py_None);
     return STACKLESS_PACK(ts, Py_None);
 }
