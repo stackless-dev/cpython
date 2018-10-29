@@ -1758,6 +1758,7 @@ _PyStackless_InitTypes(void)
         || slp_init_bombtype()
         || init_stackless_methods()
         || PyType_Ready(&PyTasklet_Type) /* need this early for the main tasklet */
+        || slp_init_cframetype()
         )
         return 0;
     return -1;
@@ -1784,7 +1785,6 @@ PyInit__stackless(void)
     };
 
     if (0
-        || slp_init_cframetype()
         || PyType_Ready(&PyChannel_Type)
         || PyType_Ready(&PyAtomic_Type)
         )

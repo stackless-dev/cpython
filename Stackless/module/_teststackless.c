@@ -22,7 +22,201 @@
 #include "malloc.h" /* for alloca */
 #endif
 
- /******************************************************
+/*
+ * Demo and test code for soft switchable C-functions
+ */
+
+typedef struct {
+    PyObject_HEAD
+} SoftSwitchableDemoObject;
+
+static PyTypeObject SoftSwitchableDemo_Type;
+
+#define SoftSwitchableDemoObject_Check(v)      (Py_TYPE(v) == &SoftSwitchableDemo_Type)
+
+/* SoftSwitchableDemo methods */
+
+
+static
+PyObject *
+demo_soft_switchable(PyObject *retval, long *step, PyObject **ob1, PyObject **ob2, PyObject **ob3, long *n, void **any)
+{
+    int do_schedule = *n;
+    struct {
+        /*
+         * If *ob1, *ob2, *ob3, *n and *any are insufficient for the state of this method,
+         * you can define state variables here and store this structure in *any.
+         */
+        int var1;
+    } *state = *any;
+
+    Py_INCREF(retval); /* we need our own reference */
+
+    switch(*step) {
+    case 0:
+        (*step)++;
+        /*
+         * Initialize state
+         */
+        *any = state = PyMem_Calloc(1, sizeof(*state));
+        if (state == NULL) {
+            Py_CLEAR(retval);
+            goto exit_func;
+        }
+
+        /*
+         * Add your business logic here
+         */
+        state->var1++;  /* This example is a bit simplistic */
+
+        /*
+         * Now eventually schedule.
+         */
+        if (do_schedule) {
+            Py_SETREF(retval, PyStackless_Schedule(retval, do_schedule > 1));
+            if (STACKLESS_UNWINDING(retval))
+                return retval;
+            else if (retval == NULL)
+                goto exit_func;
+        }
+        /* no break */
+    case 1:
+        (*step)++;
+        /*
+         * Add more business logic here
+         */
+
+        state->var1++;  /* This example is a bit simplistic */
+        /* now get rid of the state in *any, because it can't be pickled. */
+        *n = state->var1;
+        PyMem_Free(*any);
+        *any = NULL;    /* only if *any is NULL, the state can be pickled. */
+
+        /*
+         * Now eventually schedule.
+         */
+        if (do_schedule) {
+            Py_SETREF(retval, PyStackless_Schedule(retval, do_schedule > 1));
+            if (STACKLESS_UNWINDING(retval))
+                return retval;
+            else if (retval == NULL)
+                goto exit_func;
+        }
+
+        /*
+         * And so on ...
+         */
+        /* no break */
+    case 2:
+        break;
+    default:
+        PyErr_SetString(PyExc_SystemError, "invalid state");
+        Py_CLEAR(retval);
+        goto exit_func;
+    }
+
+    /*
+     * Prepare the result
+     */
+    Py_SETREF(retval, PyLong_FromLong(*n));
+
+exit_func:
+    PyMem_Free(*any);
+    *any = NULL;
+    return retval;
+}
+
+
+static PyStacklessFunctionDeclarationObject demo_soft_switchable_declaration = {
+        PyObject_HEAD_INIT(NULL)
+        demo_soft_switchable,
+        "demo_soft_switchable"
+};
+
+
+static PyObject *
+SoftSwitchableDemo_demo(SoftSwitchableDemoObject *self, PyObject *args)
+{
+    PyObject *result;
+    int action;
+    if (!PyArg_ParseTuple(args, "iO:demo", &action, &result))
+        return NULL;
+
+    return PyStackless_CallFunction(&demo_soft_switchable_declaration, result, NULL, NULL, NULL, action, NULL);
+}
+
+
+static PyMethodDef SoftSwitchableDemo_methods[] = {
+    {"demo",            (PyCFunction)SoftSwitchableDemo_demo,  METH_VARARGS | METH_STACKLESS,
+        PyDoc_STR("demo(action, result) -> result")},
+    {NULL,              NULL}           /* sentinel */
+};
+
+
+static PyTypeObject SoftSwitchableDemo_Type = {
+    /* The ob_type field must be initialized in the module init function
+     * to be portable to Windows without using C++. */
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "_teststackless.SoftSwitchableDemo",             /*tp_name*/
+    sizeof(SoftSwitchableDemoObject),          /*tp_basicsize*/
+    0,                          /*tp_itemsize*/
+    /* methods */
+    0,                          /*tp_dealloc*/
+    0,                          /*tp_print*/
+    0,                          /*tp_getattr*/
+    0,                          /*tp_setattr*/
+    0,                          /*tp_reserved*/
+    0,                          /*tp_repr*/
+    0,                          /*tp_as_number*/
+    0,                          /*tp_as_sequence*/
+    0,                          /*tp_as_mapping*/
+    0,                          /*tp_hash*/
+    0,                          /*tp_call*/
+    0,                          /*tp_str*/
+    0,                          /*tp_getattro*/
+    0,                          /*tp_setattro*/
+    0,                          /*tp_as_buffer*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,         /*tp_flags*/
+    0,                          /*tp_doc*/
+    0,                          /*tp_traverse*/
+    0,                          /*tp_clear*/
+    0,                          /*tp_richcompare*/
+    0,                          /*tp_weaklistoffset*/
+    0,                          /*tp_iter*/
+    0,                          /*tp_iternext*/
+    SoftSwitchableDemo_methods,                /*tp_methods*/
+    0,                          /*tp_members*/
+    0,                          /*tp_getset*/
+    0,                          /*tp_base*/
+    0,                          /*tp_dict*/
+    0,                          /*tp_descr_get*/
+    0,                          /*tp_descr_set*/
+    0,                          /*tp_dictoffset*/
+    0,                          /*tp_init*/
+    0,                          /*tp_alloc*/
+    PyType_GenericNew,          /*tp_new*/
+    0,                          /*tp_free*/
+    0,                          /*tp_is_gc*/
+};
+/* --------------------------------------------------------------------- */
+
+/* Function of two integers returning integer */
+
+PyDoc_STRVAR(_teststackless_softswitchabledemo_doc, "demo(action, result) -> result");
+
+static PyObject *
+_teststackless_softswitchabledemo(PyObject *self, PyObject *args)
+{
+    PyObject *result;
+    int action;
+    if (!PyArg_ParseTuple(args, "iO:demo", &action, &result))
+        return NULL;
+
+    return PyStackless_CallFunction(&demo_soft_switchable_declaration, result, NULL, NULL, NULL, action, NULL);
+}
+
+
+/******************************************************
 
  some test functions
 
@@ -186,6 +380,8 @@ exit:
 /* List of functions defined in the module */
 
 static PyMethodDef _teststackless_methods[] = {
+    {"softswitchablefunc",             _teststackless_softswitchabledemo,         METH_VARARGS | METH_STACKLESS,
+    _teststackless_softswitchabledemo_doc},
     { "test_cframe", (PyCFunction) test_cframe, METH_VARARGS | METH_KEYWORDS,
     test_cframe__doc__ },
     { "test_cstate", (PyCFunction) test_cstate, METH_O,
@@ -204,7 +400,9 @@ _teststackless_exec(PyObject *m)
 {
     /* Finalize the type object including setting type of the new type
      * object; doing it here is required for portability, too. */
-    if (0 /* add calls here */)
+    if (PyType_Ready(&SoftSwitchableDemo_Type) < 0 ||
+            PyModule_AddObject(m, "SoftSwitchableDemo", (PyObject *)&SoftSwitchableDemo_Type) < 0 ||
+            PyStackless_InitFunctionDeclaration(&demo_soft_switchable_declaration, m, &_teststacklessmodule) < 0 )
         goto fail;
 
     return 0;

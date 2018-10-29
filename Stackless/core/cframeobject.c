@@ -125,8 +125,10 @@ slp_cframe_new(PyFrame_ExecFunc *exec, unsigned int linked)
 /* pickling support for cframes */
 
 #define cframetuplefmt "iOOll"
-#define cframetuplenewfmt "iUO!ll:cframe"
+#define cframetuplenewfmt "iOO!ll:cframe"
 
+static PyObject * execute_soft_switchable_func(PyFrameObject *, int, PyObject *);
+SLP_DEF_INVALID_EXEC(execute_soft_switchable_func)
 
 static PyObject *
 cframe_reduce(PyCFrameObject *cf)
@@ -135,7 +137,13 @@ cframe_reduce(PyCFrameObject *cf)
     PyObject *params = NULL;
     int valid = 1;
 
-    if ((exec_name = slp_find_execname((PyFrameObject *) cf, &valid)) == NULL)
+    if (cf->f_execute == execute_soft_switchable_func) {
+        exec_name = (PyObject *) cf->any2;
+        assert(cf->any2);
+        assert(PyStacklessFunctionDeclarationType_CheckExact(exec_name));
+        Py_INCREF(exec_name);
+        valid = cf->any1 == NULL;
+    } else if ((exec_name = slp_find_execname((PyFrameObject *) cf, &valid)) == NULL)
         return NULL;
 
     params = slp_into_tuple_with_nulls(&cf->ob1, 3);
@@ -176,6 +184,7 @@ cframe_setstate(PyObject *self, PyObject *args)
     PyFrame_ExecFunc *good_func, *bad_func;
     PyObject *params;
     long i, n;
+    void *any2=NULL;
 
     if (!PyArg_ParseTuple (args, cframetuplenewfmt,
                            &valid,
@@ -185,7 +194,11 @@ cframe_setstate(PyObject *self, PyObject *args)
                            &n))
         return NULL;
 
-    if (slp_find_execfuncs(Py_TYPE(cf), exec_name, &good_func, &bad_func))
+    if (PyStacklessFunctionDeclarationType_CheckExact(exec_name)) {
+        good_func = execute_soft_switchable_func;
+        bad_func = cannot_execute_soft_switchable_func;
+        any2 = exec_name; /* not ref counted */
+    } else if (slp_find_execfuncs(Py_TYPE(cf), exec_name, &good_func, &bad_func))
         return NULL;
 
     if (PyTuple_GET_SIZE(params)-1 != 3)
@@ -198,7 +211,8 @@ cframe_setstate(PyObject *self, PyObject *args)
     slp_from_tuple_with_nulls(&cf->ob1, params);
     cf->i = i;
     cf->n = n;
-    cf->any1 = cf->any2 = NULL;
+    cf->any1 = NULL;
+    cf->any2 = any2;
     Py_INCREF(cf);
     return (PyObject *) cf;
 }
@@ -324,6 +338,8 @@ int slp_init_cframetype(void)
 {
     if (PyType_Ready(&PyCFrame_Type))
         return -1;
+    if (PyType_Ready(&PyStacklessFunctionDeclaration_Type))
+        return -1;
     /* register the cframe exec func */
     return slp_register_execute(&PyCFrame_Type, "run_cframe",
                                 run_cframe, SLP_REF_INVALID_EXEC(run_cframe));
@@ -341,6 +357,189 @@ slp_cframe_fini(void)
         --numfree;
     }
     assert(numfree == 0);
+}
+
+
+/*
+ *  API for soft switchable extension functions / methods
+ */
+
+static PyObject *
+function_declaration_reduce(PyStacklessFunctionDeclarationObject *self)
+{
+    if (self->name == NULL || *self->name == '\0') {
+        PyErr_SetString(PyExc_SystemError, "no function name");
+        return NULL;
+    }
+    return PyUnicode_FromString(self->name);
+}
+
+static PyMethodDef function_declaration_methods[] = {
+    {"__reduce__",    (PyCFunction)function_declaration_reduce, METH_NOARGS, NULL},
+    {"__reduce_ex__", (PyCFunction)function_declaration_reduce, METH_VARARGS, NULL},
+    {NULL, NULL}
+};
+
+static PyMemberDef function_declaration_memberlist[] = {
+    {"__module__", T_STRING, offsetof(PyStacklessFunctionDeclarationObject, module_name), READONLY},
+    {"name",       T_STRING,    offsetof(PyStacklessFunctionDeclarationObject, name),    READONLY},
+    {NULL}  /* Sentinel */
+};
+
+PyDoc_STRVAR(PyStacklessFunctionDeclaration_Type__doc__,
+"SoftSwitchableFunctionDeclaration objects represent a soft switchable\n\
+extension function written in C in a pickle.\n\
+");
+
+PyTypeObject PyStacklessFunctionDeclaration_Type = {
+    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    "_stackless.FunctionDeclaration",             /*tp_name*/
+    sizeof(PyStacklessFunctionDeclarationObject),          /*tp_basicsize*/
+    0,                          /*tp_itemsize*/
+    /* methods */
+    0,                                 /* tp_dealloc */
+    0,                                 /* tp_print */
+    0,                                 /* tp_getattr */
+    0,                                 /* tp_setattr */
+    0,                                 /* tp_compare */
+    0,                                 /* tp_repr */
+    0,                                 /* tp_as_number */
+    0,                                 /* tp_as_sequence */
+    0,                                 /* tp_as_mapping */
+    0,                                 /* tp_hash */
+    0,                                 /* tp_call */
+    0,                                 /* tp_str */
+    0,                                 /* tp_getattro */
+    0,                                 /* tp_setattro */
+    0,                                 /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                /* tp_flags */
+    PyStacklessFunctionDeclaration_Type__doc__, /* tp_doc */
+    0,                                 /* tp_traverse */
+    0,                                 /* tp_clear */
+    0,                                 /* tp_richcompare */
+    0,                                 /* tp_weaklistoffset */
+    0,                                 /* tp_iter */
+    0,                                 /* tp_iternext */
+    function_declaration_methods,    /* tp_methods */
+    function_declaration_memberlist, /* tp_members */
+};
+
+static
+PyObject *
+execute_soft_switchable_func(PyFrameObject *f, int exc, PyObject *retval)
+{
+    /*
+     * Special rule for frame execution functions: we now own a reference to retval!
+     */
+    PyCFrameObject *cf = (PyCFrameObject *)f;
+    PyThreadState *ts = PyThreadState_GET();
+    PyObject *ob1, *ob2, *ob3;
+    PyStacklessFunctionDeclarationObject *ssfd =
+            (PyStacklessFunctionDeclarationObject*)cf->any2;
+    if (retval == NULL) {
+        SLP_STORE_NEXT_FRAME(ts, cf->f_back);
+        return NULL;
+    }
+    assert(ssfd);
+    assert(ssfd->sfunc);
+
+    /* make sure we own refs to the arguments during the function call */
+    ob1 = cf->ob1;
+    ob2 = cf->ob2;
+    ob3 = cf->ob3;
+    Py_XINCREF(ob1);
+    Py_XINCREF(ob2);
+    Py_XINCREF(ob3);
+    STACKLESS_PROPOSE_ALL(ts);
+    /* use Py_SETREF, because we own a ref to retval. */
+    Py_SETREF(retval, ssfd->sfunc(retval, &cf->i, &cf->ob1, &cf->ob2, &cf->ob3, &cf->n, &cf->any1));
+    STACKLESS_RETRACT();
+    STACKLESS_ASSERT();
+    Py_XDECREF(ob1);
+    Py_XDECREF(ob2);
+    Py_XDECREF(ob3);
+    if (STACKLESS_UNWINDING(retval))
+        return retval;
+    SLP_STORE_NEXT_FRAME(ts, cf->f_back);
+    return retval;
+}
+
+PyAPI_FUNC(int)
+PyStackless_InitFunctionDeclaration(PyStacklessFunctionDeclarationObject *sfd, PyObject *module, PyModuleDef *module_def) {
+    assert(sfd != NULL);
+    Py_TYPE(sfd) = &PyStacklessFunctionDeclaration_Type;
+    if (module_def != NULL) {
+        assert(module_def->m_name);
+        sfd->module_name = module_def->m_name;
+    }
+    if (module == NULL)
+        return 0;
+    Py_INCREF(sfd); /* PyModule_AddObject steals a reference. */
+    return PyModule_AddObject(module, sfd->name, (PyObject *)sfd);
+}
+
+PyObject *
+PyStackless_CallFunction(PyStacklessFunctionDeclarationObject *ssfd, PyObject *arg,
+        PyObject *ob1, PyObject *ob2, PyObject *ob3, long n, void *any)
+{
+    STACKLESS_GETARG();
+    PyThreadState *ts = PyThreadState_GET();
+
+    assert(ssfd);
+    assert(ts->st.main != NULL);
+
+    if (stackless) {
+        /* Only soft-switch, if the caller can handle Py_UnwindToken.
+         * If called from Python-code, this is always the case,
+         * but if you call this method from a C-function, you don't know. */
+        PyCFrameObject *cf;
+        cf = slp_cframe_new(execute_soft_switchable_func, 1);
+        if (cf == NULL)
+            return NULL;
+        cf->any2 = ssfd;
+
+        Py_XINCREF(ob1);
+        Py_XINCREF(ob2);
+        Py_XINCREF(ob3);
+        cf->ob1 = ob1;
+        cf->ob2 = ob2;
+        cf->ob3 = ob3;
+        /* already set cf->i = 0 */
+        assert(cf->i == 0);
+        cf->n = n;
+        cf->any1 = any;
+        SLP_STORE_NEXT_FRAME(ts, (PyFrameObject *) cf);
+        Py_DECREF(cf);
+        if (arg == NULL)
+            arg = Py_None;
+        Py_INCREF(arg);
+        return STACKLESS_PACK(ts, arg);
+    } else {
+        /*
+         * Call the PySoftSwitchableFunc direct
+         */
+        PyObject *retval, *saved_ob1, *saved_ob2, *saved_ob3;
+        long step = 0;
+
+        if (arg == NULL)
+            arg = Py_None;
+        Py_INCREF(arg);
+
+        saved_ob1 = ob1;
+        saved_ob2 = ob2;
+        saved_ob3 = ob3;
+        Py_XINCREF(saved_ob1);
+        Py_XINCREF(saved_ob2);
+        Py_XINCREF(saved_ob3);
+        retval = ssfd->sfunc(arg, &step, &ob1, &ob2, &ob3, &n, &any);
+        STACKLESS_ASSERT();
+        assert(!STACKLESS_UNWINDING(retval));
+        Py_XDECREF(saved_ob1);
+        Py_XDECREF(saved_ob2);
+        Py_XDECREF(saved_ob3);
+        Py_DECREF(arg);
+        return retval;
+    }
 }
 
 #endif

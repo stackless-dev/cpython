@@ -361,6 +361,38 @@ PyAPI_FUNC(PyObject *) PyStackless_RunWatchdogEx(long timeout, int flags);
 
 /******************************************************
 
+  Support for soft switchable extension functions: SLFunction
+
+  These functions have been added on a provisional basis (See PEP 411).
+
+ ******************************************************/
+
+typedef PyObject *(slp_softswitchablefunc) (PyObject *retval,
+        long *step, PyObject **ob1, PyObject **ob2, PyObject **ob3,
+        long *n, void **any);
+
+typedef struct {
+    PyObject_HEAD
+    slp_softswitchablefunc * sfunc;
+    const char * name;
+    const char * module_name;
+} PyStacklessFunctionDeclarationObject;
+
+PyAPI_DATA(PyTypeObject) PyStacklessFunctionDeclaration_Type;
+
+#define PyStacklessFunctionDeclarationType_CheckExact(op) \
+		(Py_TYPE(op) == &PyStacklessFunctionDeclaration_Type)
+
+PyAPI_FUNC(PyObject *) PyStackless_CallFunction(
+        PyStacklessFunctionDeclarationObject *sfd, PyObject *arg,
+        PyObject *ob1, PyObject *ob2, PyObject *ob3, long n, void *any);
+
+PyAPI_FUNC(int) PyStackless_InitFunctionDeclaration(
+        PyStacklessFunctionDeclarationObject *sfd, PyObject *module, PyModuleDef *module_def);
+
+
+/******************************************************
+
   debugging and monitoring functions
 
  ******************************************************/

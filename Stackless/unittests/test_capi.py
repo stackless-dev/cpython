@@ -29,11 +29,17 @@ import sys
 import time
 import traceback
 import unittest
+import os
+import subprocess
+import glob
+import pickle
 import _teststackless
 
 from support import test_main  # @UnusedImport
 from support import (StacklessTestCase, withThreads, require_one_thread,
                      testcase_leaks_references)
+
+from test.support import args_from_interpreter_flags, temp_cwd
 
 if withThreads:
     try:
@@ -200,6 +206,134 @@ class Test_PyEval_EvalFrameEx(StacklessTestCase):
             return arg
 
         self.assertIs(_teststackless.test_PyEval_EvalFrameEx(f.__code__, f.__globals__, (f2,), code2=f2.__code__), f2)
+
+
+OBJ1 = object()
+OBJ2 = object()
+
+
+class Test_SoftSwitchableExtensionFunctions(StacklessTestCase):
+    # Tests for PyStackless_CallFunction()
+    def _test_func(self, func):
+
+        is_soft = stackless.enable_softswitch(None)
+        self.tasklet_result = None
+
+        def task(action, retval):
+            r = func(action, retval)
+            self.tasklet_result = r
+
+        t = stackless.tasklet(task)(2, OBJ1)
+        t.remove()
+        t.run()
+        self.assertTrue(t.alive)
+        self.assertFalse(t.scheduled)
+        self.assertEqual(t.restorable, is_soft)
+        self.assertIs(t.tempval, OBJ1)
+        # is_soft = False
+        if is_soft:
+            p1 = pickle.dumps(t)
+        t.tempval = OBJ2
+        t.insert()
+        stackless.run()
+        self.assertTrue(t.alive)
+        self.assertFalse(t.scheduled)
+        self.assertIs(t.tempval, OBJ2)
+        if is_soft:
+            p2 = pickle.dumps(t)
+
+        t.insert()
+        stackless.run()
+        self.assertEqual(self.tasklet_result, 2)
+        self.assertFalse(t.alive)
+
+        # the same for action == 1, schedule, but don't remove
+        self.tasklet_result = None
+        t = stackless.tasklet(task)(1, OBJ1)
+        stackless.run()
+        self.assertEqual(self.tasklet_result, 2)
+        self.assertFalse(t.alive)
+
+        # the same for action == 0, don't schedule
+        self.tasklet_result = None
+        t = stackless.tasklet(task)(0, OBJ1)
+        stackless.run()
+        self.assertEqual(self.tasklet_result, 2)
+        self.assertFalse(t.alive)
+
+        if not is_soft:
+            return
+
+        # the same for p2
+        self.tasklet_result = None
+        t = pickle.loads(p2)
+        self.assertTrue(t.alive)
+        t.insert()
+        stackless.run()
+        self.assertEqual(self.tasklet_result, 2)
+        self.assertFalse(t.alive)
+
+        # the same for p1. It is expected to raise
+        self.tasklet_result = None
+        t = pickle.loads(p1)
+        self.assertTrue(t.alive)
+        t.insert()
+        self.assertRaisesRegex(RuntimeError, 'execute_soft_switchable_func', stackless.run)
+        self.assertEqual(self.tasklet_result, None)
+        self.assertFalse(t.alive)
+
+    def test_softswitchablemethod(self):
+        f = _teststackless.SoftSwitchableDemo().demo
+        self._test_func(f)
+
+    def test_softswitchablefunc(self):
+        f = _teststackless.softswitchablefunc
+        self._test_func(f)
+
+
+class TestDemoExtensions(unittest.TestCase):
+    def setUp(self):
+        super(TestDemoExtensions, self).setUp()
+        demo_dir = os.path.normpath(os.path.join(os.path.abspath(__file__),
+                                                 os.pardir, os.pardir, "demo",
+                                                 self.id().rpartition('.')[2].partition('_')[2]))
+        if not os.path.isdir(demo_dir):
+            self.skipTest('Not a directory: ' + demo_dir)
+        self.demo_dir = demo_dir
+        self.verbose = True
+
+    def _test_soft_switchable_extension(self):
+        with temp_cwd(self.id()) as tmpdir:
+            args = [sys.executable]
+            args.extend(args_from_interpreter_flags())
+            args.extend(["setup.py", "build", "-b", tmpdir, "install_lib", "-d", tmpdir, "--no-compile"])
+            try:
+                output = subprocess.check_output(args, stdin=subprocess.DEVNULL, stderr=subprocess.STDOUT, cwd=self.demo_dir)
+            except subprocess.CalledProcessError as e:
+                if e.stdout:
+                    sys.stdout.buffer.write(e.stdout)
+                if e.stderr:
+                    sys.stderr.buffer.write(e.stderr)
+                raise
+            if self.verbose:
+                sys.stdout.buffer.write(output)
+            py = glob.glob("*.py")
+            self.assertEqual(len(py), 1)
+            py = py[0]
+
+            args = [sys.executable]
+            args.extend(args_from_interpreter_flags())
+            args.extend([py, '-v'])
+            try:
+                output = subprocess.check_output(args, stdin=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+            except subprocess.CalledProcessError as e:
+                if e.stdout:
+                    sys.stdout.buffer.write(e.stdout)
+                if e.stderr:
+                    sys.stderr.buffer.write(e.stderr)
+                raise
+            if self.verbose:
+                sys.stdout.buffer.write(output)
 
 
 if __name__ == "__main__":

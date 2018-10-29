@@ -9,6 +9,9 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/178
+  There is a new, provisional API to write soft switchable functions in C.
+
 - https://github.com/stackless-dev/stackless/issues/149
   The Stackless version is now "3.7".
 

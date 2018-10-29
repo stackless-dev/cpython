@@ -343,6 +343,88 @@ stackless module
      interrupt execution once this many total opcodes have
      been executed since the call was made.
 
+Soft-switchable extension functions
+-----------------------------------
+
+.. versionadded:: 3.7
+
+.. note::
+   The API for soft-switchable extension function has been added on a
+   provisional basis (see :pep:`411` for details.)
+
+A soft switchable extension function or method is a function or method defined
+by an extension module written in C. In contrast to an normal C-function you
+can soft-switch tasklets while this function executes. At the C-language level
+such a function or method is made from 3 C-definitions:
+
+1. A declaration object of type :c:type:`PyStacklessFunctionDeclaration_Type`.
+   It declares the soft-switchable function and must be declared as a global
+   variable.
+2. A conventional extension function, that uses
+   :c:func:`PyStackless_CallFunction` to call the soft switchable function.
+3. A C-function of type ``slp_softswitchablefunc``. This function provides the
+   implemantation of the soft switchable function.
+
+To create a soft switchable function declaration simply define it as a static
+variable and call :c:func:`PyStackless_InitFunctionDeclaration` from your
+module init code to initialise it. See the example code in the source
+of the extension module `_teststackless <https://github.com/stackless-dev/stackless/blob/master-slp/Stackless/module/_teststackless.c>`_.
+
+Typedef ``slp_softswitchablefunc``::
+
+   typedef PyObject *(slp_softswitchablefunc) (PyObject *retval,
+        long *step, PyObject **ob1, PyObject **ob2, PyObject **ob3,
+        long *n, void **any);
+
+.. c:type:: PyStacklessFunctionDeclarationObject
+
+   This subtype of :c:type:`PyObject` represents a Stackless soft switchable
+   extension function declaration object.
+
+   Here is the structure definition::
+
+      typedef struct {
+         PyObject_HEAD
+         slp_softswitchablefunc * sfunc;
+         const char * name;
+         const char * module_name;
+      } PyStacklessFunctionDeclarationObject;
+
+   .. c:member:: slp_softswitchablefunc PyStacklessFunctionDeclarationObject.sfunc
+
+      Pointer to implementation function.
+
+   .. c:member:: const char * PyStacklessFunctionDeclarationObject.name
+
+      Name of the function.
+
+   .. c:member:: const char * PyStacklessFunctionDeclarationObject.module_name
+
+      Name of the containing module.
+
+.. c:var:: PyTypeObject PyStacklessFunctionDeclaration_Type
+
+   This instance of :c:type:`PyTypeObject` represents the Stackless
+   soft switchable extension function declaration type.
+
+.. c:function:: int PyStacklessFunctionDeclarationType_CheckExact(PyObject *p)
+
+   Return true if *p* is a PyStacklessFunctionDeclarationObject object, but
+   not an instance of a subtype of this type.
+
+.. c:function:: PyObject* PyStackless_CallFunction(PyStacklessFunctionDeclarationObject *sfd, PyObject *arg, PyObject *ob1, PyObject *ob2, PyObject *ob3, long n, void *any)
+
+   Invoke the soft switchable extension, which is represented by *sfd*.
+   Pass *arg* as initial value for argument *retval* and *ob1*, *ob2*, *ob3*,
+   *n* and *any* as general purpose in-out-arguments.
+
+   Return the result of the function call or :c:data:`Py_UnwindToken`.
+
+.. c:function:: int PyStackless_InitFunctionDeclaration(PyStacklessFunctionDeclarationObject *sfd, PyObject *module, PyModuleDef *module_def)
+
+   Initialize the fields :c:member:`PyStacklessFunctionDeclarationObject.name` and
+   :c:member:`PyStacklessFunctionDeclarationObject.module_name` of *sfd*.
+
 debugging and monitoring functions
 ----------------------------------
 
@@ -367,6 +449,20 @@ debugging and monitoring functions
 .. c:function:: void PyStackless_SetScheduleFastcallback(slp_schedule_hook_func func)
 
   Scheduler monitoring with a faster interface.
+
+Other functions
+---------------
+
+Stack unwinding
+~~~~~~~~~~~~~~~
+
+.. c:var:: PyUnwindObject * Py_UnwindToken
+
+   A singleton that indicates C-stack unwinding
+
+.. c:function:: int STACKLESS_UNWINDING(obj)
+
+   Return 1, if *obj* is :c:data:`Py_UnwindToken` and 0 otherwise.
 
 Interface functions
 -------------------
