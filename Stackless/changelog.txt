@@ -10,6 +10,9 @@ What's New in Stackless 2.7.XX?
 
 *Release date: XXXX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/182
+  Fix "make teststackless" for out of tree builds
+
 - https://github.com/stackless-dev/stackless/issues/168
   Make Stackless compatible with old Cython extension modules compiled
   for regular C-Python.
