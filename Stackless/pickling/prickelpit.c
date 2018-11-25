@@ -839,6 +839,7 @@ SLP_DEF_INVALID_EXEC(eval_frame_noval)
 SLP_DEF_INVALID_EXEC(eval_frame_iter)
 SLP_DEF_INVALID_EXEC(eval_frame_setup_with)
 SLP_DEF_INVALID_EXEC(eval_frame_with_cleanup)
+SLP_DEF_INVALID_EXEC(eval_frame_yield_from)
 SLP_DEF_INVALID_EXEC(slp_channel_seq_callback)
 SLP_DEF_INVALID_EXEC(slp_restore_tracing)
 SLP_DEF_INVALID_EXEC(slp_tp_init_callback)
@@ -1202,6 +1203,8 @@ static int init_frametype(PyObject * mod)
                              slp_eval_frame_setup_with, SLP_REF_INVALID_EXEC(eval_frame_setup_with))
         || slp_register_execute(&PyFrame_Type, "eval_frame_with_cleanup",
                              slp_eval_frame_with_cleanup, SLP_REF_INVALID_EXEC(eval_frame_with_cleanup))
+        || slp_register_execute(&PyFrame_Type, "eval_frame_yield_from",
+                             slp_eval_frame_yield_from, SLP_REF_INVALID_EXEC(eval_frame_yield_from))
         || slp_register_execute(&PyCFrame_Type, "channel_seq_callback",
                              slp_channel_seq_callback, SLP_REF_INVALID_EXEC(slp_channel_seq_callback))
         || slp_register_execute(&PyCFrame_Type, "slp_restore_tracing",

@@ -378,6 +378,7 @@ PyObject * slp_eval_frame_noval(struct _frame *f,  int throwflag, PyObject *retv
 PyObject * slp_eval_frame_iter(struct _frame *f,  int throwflag, PyObject *retval);
 PyObject * slp_eval_frame_setup_with(struct _frame *f,  int throwflag, PyObject *retval);
 PyObject * slp_eval_frame_with_cleanup(struct _frame *f,  int throwflag, PyObject *retval);
+PyObject * slp_eval_frame_yield_from(struct _frame *f,  int throwflag, PyObject *retval);
 /* other eval_frame functions from module/scheduling.c */
 PyObject * slp_restore_tracing(PyFrameObject *f, int exc, PyObject *retval);
 /* other eval_frame functions from Objects/typeobject.c */

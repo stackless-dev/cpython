@@ -7,7 +7,7 @@
    */
 
 /* enable more aggressive intra-module optimizations, where available */
-#define PY_LOCAL_AGGRESSIVE
+#undef PY_LOCAL_AGGRESSIVE
 
 #include "Python.h"
 #include "internal/pystate.h"
@@ -1100,7 +1100,12 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
                 /*f->f_execute = PyEval_EvalFrame_value;
                 PREDICT(WITH_CLEANUP_FINISH); */
             }
-        } else
+        }
+        else if (f->f_execute == slp_eval_frame_yield_from) {
+            /* finalise the YIELD_FROM operation */
+            goto stackless_yield_from_return;
+        }
+        else
             Py_FatalError("invalid frame function");
         f->f_execute = slp_eval_frame_value;
     }
@@ -1972,15 +1977,30 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
             PyObject *receiver = TOP();
             int err;
             if (PyGen_CheckExact(receiver) || PyCoro_CheckExact(receiver)) {
+                STACKLESS_PROPOSE_ALL(tstate);
                 retval = _PyGen_Send((PyGenObject *)receiver, v);
+                STACKLESS_ASSERT();
             } else {
                 _Py_IDENTIFIER(send);
-                if (v == Py_None)
+                if (v == Py_None) {
+                    STACKLESS_PROPOSE_METHOD(tstate, receiver, tp_iternext);
                     retval = Py_TYPE(receiver)->tp_iternext(receiver);
-                else
+                    STACKLESS_ASSERT();
+                }
+                else {
+                    STACKLESS_PROPOSE_ALL(tstate);
                     retval = _PyObject_CallMethodIdObjArgs(receiver, &PyId_send, v, NULL);
+                    STACKLESS_ASSERT();
+                }
             }
             Py_DECREF(v);
+#ifdef STACKLESS
+            if (STACKLESS_UNWINDING(retval)) {
+                HANDLE_UNWINDING(slp_eval_frame_yield_from, 0, retval);
+stackless_yield_from_return:
+                receiver = TOP();
+            }
+#endif
             if (retval == NULL) {
                 PyObject *val;
                 if (tstate->c_tracefunc != NULL
@@ -3831,6 +3851,21 @@ slp_eval_frame_with_cleanup(PyFrameObject *f, int throwflag, PyObject *retval)
     return r;
 }
 
+PyObject *
+slp_eval_frame_yield_from(PyFrameObject *f, int throwflag, PyObject *retval)
+{
+    PyObject *r;
+    /*
+     * this function is identical to PyEval_EvalFrame_value.
+     * it serves as a marker whether we are inside of a
+     * WITH_CLEANUP operation.
+     * NOTE / XXX: see above.
+     */
+    SLP_DO_NOT_OPTIMIZE_AWAY((char *)5);
+    r = slp_eval_frame_value(f, throwflag, retval);
+    return r;
+}
+
 static PyObject *
 run_frame_dispatch(PyFrameObject *f, int exc, PyObject *retval)
 {
@@ -3948,7 +3983,8 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
                 f->f_execute != slp_eval_frame_noval &&
                 f->f_execute != slp_eval_frame_iter &&
                 f->f_execute != slp_eval_frame_setup_with &&
-                f->f_execute != slp_eval_frame_with_cleanup)  {
+                f->f_execute != slp_eval_frame_with_cleanup &&
+                f->f_execute != slp_eval_frame_yield_from)  {
             PyErr_BadInternalCall();
             return NULL;
         }
