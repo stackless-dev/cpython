@@ -11,9 +11,13 @@ What's New in Stackless 3.X.X?
 
 - https://github.com/stackless-dev/stackless/issues/192
   Use the PEP 442 mechanic to finalize a tasklet instead of a arcane logic in
-  tp_dealloc. The new code calls the finalizer only once. The finalizer tries
-  to kill the tasklet, as long as it has an unfinished C-state but at most 10-
-  times. This change brings the behavior more in line with generators.
+  tp_dealloc. The finalizer can be called from Python-code: tasklet.__del__().
+  Stackless calls the finalizer only once. The finalizer repeatedly kills the
+  tasklet until it is dead but at most 10-times.
+  If the finalizer can't kill the C-state it adds the tasklet to gc.garbage.
+  This change unifies the behavior of de-allocation caused by ref-counting and
+  de-allocation caused by GC. And it brings the behavior more in line with
+  generators.
 
 - https://github.com/stackless-dev/stackless/issues/193
   Fix the macros PyTasklet_CheckExact(op) and PyChannel_CheckExact(op).

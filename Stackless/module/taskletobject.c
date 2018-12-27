@@ -152,12 +152,6 @@ tasklet_has_c_stack_and_thread(PyTaskletObject *t)
 static int
 tasklet_traverse(PyTaskletObject *t, visitproc visit, void *arg)
 {
-    /* tasklets that need to be switched to for the kill, can't be collected.
-     * Only trivial decrefs are allowed during GC collect
-     */
-    if (tasklet_has_c_stack_and_thread(t))
-        PyObject_GC_Collectable((PyObject *)t, visit, arg, 0);
-
     Py_VISIT(t->f.frame);
     Py_VISIT(t->tempval);
     Py_VISIT(t->cstate);
@@ -174,20 +168,34 @@ tasklet_clear_frames(PyTaskletObject *t)
     Py_CLEAR(t->f.frame);
 }
 
+static inline void
+exc_state_clear(_PyErr_StackItem *exc_state)
+{
+    PyObject *t, *v, *tb;
+    t = exc_state->exc_type;
+    v = exc_state->exc_value;
+    tb = exc_state->exc_traceback;
+    exc_state->exc_type = NULL;
+    exc_state->exc_value = NULL;
+    exc_state->exc_traceback = NULL;
+    Py_XDECREF(t);
+    Py_XDECREF(v);
+    Py_XDECREF(tb);
+}
+
 static void
 tasklet_clear(PyTaskletObject *t)
 {
     tasklet_clear_frames(t);
-    TASKLET_SETVAL(t, Py_None); /* always non-zero */
+    Py_CLEAR(t->tempval);
+    Py_CLEAR(t->def_globals);
 
     /* unlink task from cstate */
     if (t->cstate != NULL && t->cstate->task == t)
         t->cstate->task = NULL;
     Py_CLEAR(t->cstate);
 
-    Py_CLEAR(t->exc_state.exc_type);
-    Py_CLEAR(t->exc_state.exc_value);
-    Py_CLEAR(t->exc_state.exc_traceback);
+    exc_state_clear(&t->exc_state);
 
     /* Assert that the tasklet is at the end of the chain. */
     assert(t->exc_state.previous_item == NULL);
@@ -234,21 +242,6 @@ kill_finally (PyObject *ob)
 
 
 /* destructing a tasklet without destroying it */
-static inline void
-exc_state_clear(_PyErr_StackItem *exc_state)
-{
-    PyObject *t, *v, *tb;
-    t = exc_state->exc_type;
-    v = exc_state->exc_value;
-    tb = exc_state->exc_traceback;
-    exc_state->exc_type = NULL;
-    exc_state->exc_value = NULL;
-    exc_state->exc_traceback = NULL;
-    Py_XDECREF(t);
-    Py_XDECREF(v);
-    Py_XDECREF(tb);
-}
-
 static void
 tasklet_finalize(PyObject *self)
 {
@@ -269,6 +262,25 @@ tasklet_finalize(PyObject *self)
         kill_finally(self);
     }
 
+    /* We must not free a C-stack, that is still somewhat alive. Instead we
+     * add the current tasklet to gc.garbage. That's perfectly OK, because the
+     * tasklet is still intact. Of course this grows a new reference to the
+     * tasklet.
+     */
+    if (t->f.frame && t->cstate && t->cstate->task == t && Py_SIZE(t->cstate) != 0) {
+        if (Py_VerboseFlag) {
+            PySys_WriteStderr("# tasklet_finalize: warning: tasklet %p has a non zero C-stack.\n", (void*)t);
+        }
+        if (_PyRuntime.gc.garbage == NULL) {
+            _PyRuntime.gc.garbage = PyList_New(0);
+            if (_PyRuntime.gc.garbage == NULL)
+                Py_FatalError("gc couldn't create gc.garbage list");
+        }
+        TASKLET_SETVAL(t, Py_None);  /* don't keep tempval alive */
+        if (PyList_Append(_PyRuntime.gc.garbage, self) < 0)
+            PyErr_WriteUnraisable(self);
+    }
+
     /* Restore the saved exception. */
     PyErr_Restore(error_type, error_value, error_traceback);
 }
@@ -287,29 +299,12 @@ tasklet_dealloc(PyTaskletObject *t)
     }
 
     PyObject_GC_UnTrack(t);
-    tasklet_clear_frames(t);
+
     if (t->tsk_weakreflist != NULL)
         PyObject_ClearWeakRefs((PyObject *)t);
-    if (t->cstate != NULL) {
-        assert(t->cstate->task != t || Py_SIZE(t->cstate) == 0 || t->cstate->tstate == NULL);
-        if (t->cstate->task == t) {
-            t->cstate->task = NULL;
-            if (Py_VerboseFlag && Py_SIZE(t->cstate) != 0) {
-                PySys_WriteStderr("# tasklet_dealloc: warning: tasklet %p has a non zero C-stack. \n", (void*)t);
-            }
-        }
-        Py_DECREF(t->cstate);
-    }
-    Py_DECREF(t->tempval);
-    Py_XDECREF(t->def_globals);
-    /* Assert that the tasklet is at the end of the chain. */
-    assert(t->exc_state.previous_item == NULL);
-    /* Unlink the exc_info chain. There is no guarantee, that
-     * the object t->exc_info points to still exists, because
-     * the order of calls to tp_clear is undefined.
-     */
-    t->exc_info = &t->exc_state;
-    exc_state_clear(&t->exc_state);
+
+    tasklet_clear(t);
+
     Py_TYPE(t)->tp_free((PyObject*)t);
 }
 
