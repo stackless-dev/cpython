@@ -204,7 +204,7 @@ tasklet_clear(PyTaskletObject *t)
  * afford that it will not be dead afterwards.
  * Reason: When clearing or resurrecting and killing, the
  * tasklet is in fact already dead, and the only case that
- * could revive it was that __del_ was defined.
+ * could revive it was that __del__ was defined.
  * But in the context of __del__, we can't do anything but rely
  * on proper destruction, since nobody will listen to an exception.
  */
@@ -215,6 +215,7 @@ kill_finally (PyObject *ob)
     PyThreadState *ts = PyThreadState_GET();
     PyTaskletObject *self = (PyTaskletObject *) ob;
     int is_mine = ts == self->cstate->tstate;
+    int i;
 
     /* this could happen if we have a refcount bug, so catch it here.
     assert(self != ts->st.current);
@@ -224,7 +225,7 @@ kill_finally (PyObject *ob)
     */
 
     self->flags.is_zombie = 1;
-    while (self->f.frame != NULL) {
+    for (i=0; i<10 && self->f.frame != NULL; i++) {
         PyTasklet_Kill(self);
         if (!is_mine)
             return; /* will be killed elsewhere */
