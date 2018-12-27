@@ -737,8 +737,6 @@ int slp_return_wrapper_hard(PyObject *retval);
 int slp_int_wrapper(PyObject *retval);
 int slp_current_wrapper(int(*func)(PyTaskletObject*),
                         PyTaskletObject *task);
-int slp_resurrect_and_kill(PyObject *self,
-                           void(*killer)(PyObject *));
 
 /* stackless pickling support */
 int slp_async_gen_init_hooks(PyAsyncGenObject *o);

@@ -249,24 +249,43 @@ exc_state_clear(_PyErr_StackItem *exc_state)
 }
 
 static void
-tasklet_dealloc(PyTaskletObject *t)
+tasklet_finalize(PyObject *self)
 {
-    PyObject_GC_UnTrack(t);
+    PyTaskletObject *t;
+    PyObject *error_type, *error_value, *error_traceback;
+
+    assert(PyTasklet_Check(self));
+    t = (PyTaskletObject *)self;
+
+    /* Save the current exception, if any. */
+    PyErr_Fetch(&error_type, &error_value, &error_traceback);
+
     if (tasklet_has_c_stack_and_thread(t)) {
         /*
          * we want to cleanly kill the tasklet in the case it
-         * was forgotten. One way would be to resurrect it,
-         * but this is quite ugly with many ifdefs, see
-         * classobject/typeobject.
-         * Well, we do it.
+         * was forgotten.
          */
-        if (slp_resurrect_and_kill((PyObject *) t, kill_finally)) {
-            /* the beast has grown new references */
-            PyObject_GC_Track(t);
+        kill_finally(self);
+    }
+
+    /* Restore the saved exception. */
+    PyErr_Restore(error_type, error_value, error_traceback);
+}
+
+static void
+tasklet_dealloc(PyTaskletObject *t)
+{
+    if (PyTasklet_CheckExact(t)) {
+        /* When ob is subclass of stackless.tasklet, finalizer is called from
+         * subtype_dealloc.
+         */
+        if (PyObject_CallFinalizerFromDealloc((PyObject *)t) < 0) {
+            // resurrected.
             return;
         }
     }
 
+    PyObject_GC_UnTrack(t);
     tasklet_clear_frames(t);
     if (t->tsk_weakreflist != NULL)
         PyObject_ClearWeakRefs((PyObject *)t);
@@ -2339,7 +2358,8 @@ PyTypeObject PyTasklet_Type = {
     PyObject_GenericSetAttr,            /* tp_setattro */
     0,                                  /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
-        Py_TPFLAGS_BASETYPE,            /* tp_flags */
+        Py_TPFLAGS_BASETYPE |
+        Py_TPFLAGS_HAVE_FINALIZE,       /* tp_flags */
     tasklet__doc__,                     /* tp_doc */
     (traverseproc)tasklet_traverse,     /* tp_traverse */
     (inquiry) tasklet_clear,            /* tp_clear */
@@ -2359,5 +2379,14 @@ PyTypeObject PyTasklet_Type = {
     0,                                  /* tp_alloc */
     tasklet_new,                        /* tp_new */
     PyObject_GC_Del,                    /* tp_free */
+    0,                                  /* tp_is_gc */
+    0,                                  /* tp_bases */
+    0,                                  /* tp_mro */
+    0,                                  /* tp_cache */
+    0,                                  /* tp_subclasses */
+    0,                                  /* tp_weaklist */
+    0,                                  /* tp_del */
+    0,                                  /* tp_version_tag */
+    tasklet_finalize,                   /* tp_finalize */
 };
 #endif
