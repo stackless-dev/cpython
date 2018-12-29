@@ -9,6 +9,11 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/190
+  Do not finalize running generators, coroutines or asynchronous generators
+  (without a custom finaliser), if they are deallocated as part of a paused,
+  restorable tasklet.
+
 - https://github.com/stackless-dev/stackless/issues/193
   Fix the macros PyTasklet_CheckExact(op) and PyChannel_CheckExact(op).
   Previously they contained a reference to a non existing variable.

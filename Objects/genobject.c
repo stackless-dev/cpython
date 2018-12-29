@@ -82,6 +82,15 @@ _PyGen_Finalize(PyObject *self)
     {
         _PyErr_WarnUnawaitedCoroutine((PyObject *)gen);
     }
+#ifdef STACKLESS
+    else if (gen->gi_running) {
+        /*
+         * Do not close a running generator.
+         * See Stackless issue 190.
+         */
+        res = NULL;
+    }
+#endif
     else {
         res = gen_close(gen, NULL);
     }

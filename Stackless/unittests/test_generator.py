@@ -8,7 +8,7 @@ import contextlib
 import sys
 
 from support import test_main  # @UnusedImport
-from support import StacklessTestCase
+from support import StacklessTestCase, captured_stderr
 
 
 def f():
@@ -36,6 +36,31 @@ class TestGarbageCollection(StacklessTestCase):
 
         if len(leakage):
             self.failUnless(len(leakage) == 0, "Leaked %s" % repr(leakage))
+
+    def testGCRunningGenerator(self):
+        def gen():
+            try:
+                stackless.schedule_remove()
+                yield 1
+            except:  # @IgnorePep8
+                # print("exception in gen:", sys.exc_info())
+                raise
+
+        def task(generator):
+            [i for i in generator]
+
+        t = stackless.tasklet(task)(gen())
+        stackless.run()
+        self.assertTrue(t.paused)
+        t.tempval = None
+        with captured_stderr() as stringio:
+            # must not throw or output
+            if t.restorable:
+                t.bind(None)
+            # make sure, that t=None kills the last reference
+            self.assertEqual(sys.getrefcount(t), 2)
+            t = None
+        self.assertEqual(stringio.getvalue(), "")
 
 
 class TestGeneratorWrapper(StacklessTestCase):
