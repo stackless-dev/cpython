@@ -82,15 +82,6 @@ _PyGen_Finalize(PyObject *self)
     {
         _PyErr_WarnUnawaitedCoroutine((PyObject *)gen);
     }
-#ifdef STACKLESS
-    else if (gen->gi_running) {
-        /*
-         * Do not close a running generator.
-         * See Stackless issue 190.
-         */
-        res = NULL;
-    }
-#endif
     else {
         res = gen_close(gen, NULL);
     }
@@ -182,6 +173,15 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc, int closing)
     PyFrameObject *f = gen->gi_frame;
     PyObject *result;
 
+#ifdef STACKLESS
+    if (gen->gi_running && exc && closing) {
+        /*
+         * Do not close a running generator.
+         * See Stackless issue 190.
+         */
+        return NULL;
+    }
+#endif
     if (gen->gi_running) {
         const char *msg = "generator already executing";
         if (PyCoro_CheckExact(gen)) {
