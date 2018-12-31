@@ -1103,7 +1103,27 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
         }
         else if (f->f_execute == slp_eval_frame_yield_from) {
             /* finalise the YIELD_FROM operation */
-            goto stackless_yield_from_return;
+            PyObject *receiver = TOP();
+            if (retval == NULL) {
+                int err;
+                if (tstate->c_tracefunc != NULL
+                    && PyErr_ExceptionMatches(PyExc_StopIteration))
+                    call_exc_trace(tstate->c_tracefunc, tstate->c_traceobj, tstate, f);
+                err = _PyGen_FetchStopIterationValue(&retval);
+                if (err < 0)
+                    goto error;
+                Py_DECREF(receiver);
+                SET_TOP(retval);
+            }
+            else {
+                /* receiver remains on stack, retval is value to be yielded */
+                f->f_stacktop = stack_pointer;
+                why = WHY_YIELD;
+                /* and repeat... */
+                assert(f->f_lasti >= (int)sizeof(_Py_CODEUNIT));
+                f->f_lasti -= sizeof(_Py_CODEUNIT);
+                goto fast_yield;
+            }
         }
         else
             Py_FatalError("invalid frame function");
@@ -1997,7 +2017,6 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
 #ifdef STACKLESS
             if (STACKLESS_UNWINDING(retval)) {
                 HANDLE_UNWINDING(slp_eval_frame_yield_from, 0, retval);
-stackless_yield_from_return:
                 receiver = TOP();
             }
 #endif
