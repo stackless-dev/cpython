@@ -7,7 +7,7 @@
    */
 
 /* enable more aggressive intra-module optimizations, where available */
-#undef PY_LOCAL_AGGRESSIVE
+#define PY_LOCAL_AGGRESSIVE
 
 #include "Python.h"
 #include "internal/pystate.h"
