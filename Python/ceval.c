@@ -1110,10 +1110,13 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
                     && PyErr_ExceptionMatches(PyExc_StopIteration))
                     call_exc_trace(tstate->c_tracefunc, tstate->c_traceobj, tstate, f);
                 err = _PyGen_FetchStopIterationValue(&retval);
-                if (err < 0)
-                    goto error;
-                Py_DECREF(receiver);
-                SET_TOP(retval);
+                if (err < 0) {
+                    retval = NULL;
+                }
+                else {
+                    Py_DECREF(receiver);
+                    SET_TOP(retval);
+                }
             }
             else {
                 /* receiver remains on stack, retval is value to be yielded */
