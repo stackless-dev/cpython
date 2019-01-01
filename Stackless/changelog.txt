@@ -9,7 +9,7 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
-- https://github.com/stackless-dev/stackless/issues/195
+- https://github.com/stackless-dev/stackless/issues/196
   Stackless can now pickle coroutine_wrapper objects.
 
 - https://github.com/stackless-dev/stackless/issues/190
