@@ -741,6 +741,9 @@ int slp_resurrect_and_kill(PyObject *self,
                            void(*killer)(PyObject *));
 
 /* stackless pickling support */
+PyObject * slp_coro_wrapper_reduce(PyObject *o, PyTypeObject * wrapper_type);
+PyObject * slp_coro_wrapper_new(PyCoroObject *gen);
+PyObject * slp_coro_wrapper_setstate(PyObject *self, PyObject *args);
 int slp_async_gen_init_hooks(PyAsyncGenObject *o);
 PyObject * slp_async_gen_asend_reduce(PyObject *o, PyTypeObject * wrapper_type);
 PyObject * slp_async_gen_asend_new(PyAsyncGenObject *gen);

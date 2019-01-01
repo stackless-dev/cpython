@@ -2158,6 +2158,55 @@ async_gen_athrow_new(PyAsyncGenObject *gen, PyObject *args)
 
 
 #ifdef STACKLESS
+PyObject *
+slp_coro_wrapper_reduce(PyObject *o, PyTypeObject * wrapper_type)
+{
+    PyCoroWrapper *cw;
+    PyObject *tup;
+
+    assert(o != NULL);
+    assert(Py_TYPE(o) == &_PyCoroWrapper_Type);
+    assert(wrapper_type != NULL);
+
+    cw = (PyCoroWrapper *)o;
+    tup = Py_BuildValue("(O()(O))",
+        wrapper_type,
+        cw->cw_coroutine);
+    return tup;
+}
+
+PyObject *
+slp_coro_wrapper_new(PyCoroObject *co)
+{
+    return coro_await(co);
+}
+
+PyObject *
+slp_coro_wrapper_setstate(PyObject *self, PyObject *args)
+{
+    PyCoroWrapper *cw;
+    PyObject *co;
+
+    assert(self != NULL);
+    cw = (PyCoroWrapper *)self;
+
+    assert(args != NULL);
+    if (!PyArg_ParseTuple(args, "O!:coro_wrapper_setstate",
+        &PyCoro_Type,
+        &co)) {
+        return NULL;
+    }
+
+    assert(PyCoro_CheckExact(co));
+    Py_INCREF(co);
+    Py_SETREF(cw->cw_coroutine, (PyCoroObject*)co);
+
+    Py_TYPE(self) = Py_TYPE(self)->tp_base;
+    Py_INCREF(self);
+    return self;
+}
+
+
 int
 slp_async_gen_init_hooks(PyAsyncGenObject *o)
 {
