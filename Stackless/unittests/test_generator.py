@@ -6,6 +6,8 @@ import types
 import pickle
 import contextlib
 import sys
+import contextvars
+import asyncio
 
 from support import test_main  # @UnusedImport
 from support import StacklessTestCase, captured_stderr
@@ -240,6 +242,47 @@ class TestAsyncGenPickling(StacklessTestCase):
             for pf_load in (0, 2, 4):
                 with self.subTest(pf_dump=pf_dump, pf_load=pf_load):
                     self._test_finalizer(pf_dump, pf_load)
+
+
+class TestStacklessOperations(StacklessTestCase):
+    def assertLevel(self, expected=0):
+        self.assertTrue(stackless.current.alive)
+        if stackless.enable_softswitch(None):
+            self.assertEqual(stackless.current.nesting_level, expected)
+        else:
+            self.assertGreater(stackless.current.nesting_level, expected)
+
+    @types.coroutine
+    def coro1yield(self):
+        yield
+
+    async def coro(self):
+        self.assertLevel()
+        await self.coro1yield()
+        self.assertLevel()
+        await self.coro1yield()
+        self.assertLevel()
+
+    def test_context_run(self):
+        contextvars.Context().run(self.assertLevel)
+
+    #  needs Stackless pull request #188
+    def xx_test_asyncio(self):
+        async def test():
+            try:
+                await self.coro()
+            finally:
+                loop.stop()
+
+        asyncio.set_event_loop(asyncio.new_event_loop())
+        self.addCleanup(asyncio.set_event_loop, None)
+        loop = asyncio.get_event_loop()
+        task = asyncio.tasks._PyTask(test())
+        asyncio.ensure_future(task)
+        try:
+            loop.run_forever()
+        finally:
+            loop.close()
 
 
 if __name__ == '__main__':
