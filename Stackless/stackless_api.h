@@ -390,6 +390,111 @@ PyAPI_FUNC(PyObject *) PyStackless_CallFunction(
 PyAPI_FUNC(int) PyStackless_InitFunctionDeclaration(
         PyStacklessFunctionDeclarationObject *sfd, PyObject *module, PyModuleDef *module_def);
 
+/*
+
+Macros for the "stackless protocol"
+===================================
+
+How to does Stackless Python decide, if a function may return an unwind-token.
+
+There is one global variable _PyStackless_TRY_STACKLESS which is used
+like an implicit parameter. Since we don't have a real parameter,
+the flag is copied into the local variable "stackless" and cleared.
+This is done by the STACKLESS_GETARG() macro, which should be added to
+the top of the function's declarations.
+The idea is to keep the chances to introduce error to the minimum.
+A function can safely do some tests and return before calling
+anything, since the flag is in a local variable.
+Depending on context, this flag is propagated to other called
+functions. They *must* obey the protocol. To make this sure,
+the STACKLESS_ASSERT() macro has to be called after every such call.
+
+Many internal functions have been patched to support this protocol.
+
+STACKLESS_GETARG()
+
+  Move the _PyStackless_TRY_STACKLESS flag into the local variable "stackless".
+
+STACKLESS_PROMOTE_ALL()
+
+  is used for cases where we know that the called function will take
+  care of our object, and we need no test. For example, PyObject_Call
+  and all other Py{Object,Function,CFunction}_*Call* functions use
+  STACKLESS_PROMOTE_xxx, itself, so we don't need to check further.
+
+STACKLESS_PROMOTE(func)
+
+  If stackless was set and the function's type has set
+  Py_TPFLAGS_HAVE_STACKLESS_CALL, then this flag will be
+  put back into _PyStackless_TRY_STACKLESS, and we expect that the
+  function handles it correctly.
+
+STACKLESS_PROMOTE_FLAG(flag)
+
+  is used for special cases, like PyCFunction objects. PyCFunction_Type
+  says that it supports a stackless call, but the final action depends
+  on the METH_STACKLESS flag in the object to be called. Therefore,
+  PyCFunction_Call uses PROMOTE_FLAG(flags & METH_STACKLESS) to
+  take care of PyCFunctions which don't care about it.
+
+  Another example is the "next" method of iterators. To support this,
+  the wrapperobject's type has the Py_TPFLAGS_HAVE_STACKLESS_CALL
+  flag set, but wrapper_call then examines the wrapper descriptors
+  flags if PyWrapperFlag_STACKLESS is set. "next" has it set.
+  It also checks whether Py_TPFLAGS_HAVE_STACKLESS_CALL is set
+  for the iterator's type.
+
+STACKLESS_ASSERT()
+
+  Make sure that _PyStackless_TRY_STACKLESS was cleared. This debug feature
+  tries to ensure that no unexpected nonrecursive call can happen.
+
+STACKLESS_RETRACT()
+
+  Reset _PyStackless_TRY_STACKLESS. Rarely needed.
+
+*/
+
+#define STACKLESS_GETARG() \
+    int stackless = (STACKLESS__GETARG_ASSERT, \
+                     stackless = _PyStackless_TRY_STACKLESS, \
+                     _PyStackless_TRY_STACKLESS = 0, \
+                     stackless)
+
+#define STACKLESS_PROMOTE(func) \
+    (stackless ? _PyStackless_TRY_STACKLESS = \
+     Py_TYPE(func)->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_CALL : 0)
+
+#define STACKLESS_PROMOTE_FLAG(flag) \
+    (stackless ? _PyStackless_TRY_STACKLESS = (flag) : 0)
+
+#define STACKLESS_PROMOTE_METHOD(obj, meth) do { \
+    if ((Py_TYPE(obj)->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_EXTENSION) && \
+     Py_TYPE(obj)->tp_as_mapping) \
+        _PyStackless_TRY_STACKLESS = stackless && Py_TYPE(obj)->tp_as_mapping->slpflags.meth; \
+} while (0)
+
+#define STACKLESS_PROMOTE_WRAPPER(descr) \
+    (_PyStackless_TRY_STACKLESS = stackless && (descr)->d_slpmask)
+
+#define STACKLESS_PROMOTE_ALL() ((void)(_PyStackless_TRY_STACKLESS = stackless, NULL))
+
+#define STACKLESS_RETRACT() (_PyStackless_TRY_STACKLESS = 0)
+
+#define STACKLESS_ASSERT() assert(!_PyStackless_TRY_STACKLESS)
+
+#else /* STACKLESS */
+/* turn the stackless flag macros into dummies */
+#define STACKLESS_GETARG() int stackless = 0
+#define STACKLESS_PROMOTE(func) stackless = 0
+#define STACKLESS_PROMOTE_FLAG(flag) stackless = 0
+#define STACKLESS_PROMOTE_METHOD(obj, meth) stackless = 0
+#define STACKLESS_PROMOTE_WRAPPER(descr) stackless = 0
+#define STACKLESS_PROMOTE_ALL() stackless = 0
+#define STACKLESS_RETRACT() assert(1)
+#define STACKLESS_ASSERT() assert(1)
+#endif
+#ifdef STACKLESS
 
 /******************************************************
 
@@ -475,6 +580,7 @@ PyAPI_FUNC(PyObject *) PyStackless_CallMethod_Main(PyObject *o, char *name,
  */
 PyAPI_FUNC(PyObject *) PyStackless_CallCMethod_Main(
                     PyMethodDef *meth, PyObject *self, char *format, ...);
+
 
 #endif /* STACKLESS */
 
