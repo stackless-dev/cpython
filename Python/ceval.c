@@ -3432,7 +3432,7 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
             if (STACKLESS_UNWINDING(result)) {
                 (void) POP();  /* top of stack causes a GC related assertion error */
                 HANDLE_UNWINDING(NULL, 0, result);
-                PUSH(result)
+                PUSH(result);
             } else
 #endif
             SET_TOP(result);

@@ -8,7 +8,7 @@ import contextlib
 import sys
 
 from support import test_main  # @UnusedImport
-from support import StacklessTestCase
+from support import StacklessTestCase, captured_stderr
 
 
 def f():
@@ -36,6 +36,74 @@ class TestGarbageCollection(StacklessTestCase):
 
         if len(leakage):
             self.failUnless(len(leakage) == 0, "Leaked %s" % repr(leakage))
+
+    def run_GC_test(self, task, arg):
+        tasklet = stackless.tasklet(task)(arg)
+        tasklet.run()
+        if False:  # To test the generator / coroutine / async gen
+            tasklet.run()
+            self.assertFalse(tasklet.alive)
+            return
+        self.assertTrue(tasklet.paused)
+        tasklet.tempval = None
+        with captured_stderr() as stringio:
+            # must not throw or output
+            if tasklet.restorable:
+                tasklet.bind(None)
+            # make sure, that t=None kills the last reference
+            self.assertEqual(sys.getrefcount(tasklet), 2)
+            tasklet = None
+        self.assertEqual(stringio.getvalue(), "")
+
+    def testGCRunningGenerator(self):
+        def gen():
+            try:
+                # print("gen nesting level: ", stackless.current.nesting_level)
+                stackless.schedule_remove()
+                yield 1
+            except:  # @IgnorePep8
+                # print("exception in gen:", sys.exc_info())
+                raise
+
+        def task(generator):
+            l = [i for i in generator]
+            self.assertListEqual(l, [1])
+
+        self.run_GC_test(task,gen())
+
+    def testGCRunningCoroutine(self):
+        async def coro():
+            try:
+                # print("coro nesting level: ", stackless.current.nesting_level)
+                stackless.schedule_remove()
+            except:  # @IgnorePep8
+                # print("exception in coro:", sys.exc_info())
+                raise
+
+        def task(c):
+            self.assertRaises(StopIteration, c.send, None)
+
+        self.run_GC_test(task, coro())
+
+    def testGCRunningAsyncGen(self):
+        async def asyncgen():
+            try:
+                # print("asyncgen nesting level: ", stackless.current.nesting_level)
+                stackless.schedule_remove()
+            except:  # @IgnorePep8
+                # print("exception in asyncgen:", sys.exc_info())
+                raise
+            yield 100
+
+        def task(ag):
+            c = ag.__anext__()
+            with self.assertRaises(StopIteration) as cm:
+                c.send(None)
+            self.assertEqual(cm.exception.value, 100)
+            c = ag.__anext__()
+            self.assertRaises(StopAsyncIteration, c.send, None)
+
+        self.run_GC_test(task, asyncgen())
 
 
 class TestGeneratorWrapper(StacklessTestCase):

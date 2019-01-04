@@ -19,6 +19,11 @@ What's New in Stackless 3.X.X?
   de-allocation caused by GC. And it brings the behavior more in line with
   generators.
 
+- https://github.com/stackless-dev/stackless/issues/190
+  Silently ignore attempts to close a running generator, coroutine or
+  asynchronous generator. This avoids spurious error messages, if such an
+  object is deallocated as part of a paused, restorable tasklet.
+
 - https://github.com/stackless-dev/stackless/issues/193
   Fix the macros PyTasklet_CheckExact(op) and PyChannel_CheckExact(op).
   Previously they contained a reference to a non existing variable.
@@ -609,7 +614,8 @@ What's New in Stackless 3.3.5?
 
 
 Here is a break. Nobody wrote a change log. If you are interested
-in software archaeology look at http://svn.python.org/view/stackless.
+in software archaeology look at
+https://github.com/stackless-dev/stackless_historic.
 
 
 The very beginning of Stackless
