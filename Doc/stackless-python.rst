@@ -2,7 +2,7 @@
 |SLP|
 *****
 
-:Author: Richard Tew (richard.m.tew@gmail.com)
+:Author: Richard Tew (richard.m.tew@gmail.com) and Anselm Kruis
 :Release: |release|
 :Date: |today|
 

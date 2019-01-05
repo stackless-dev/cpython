@@ -19,6 +19,9 @@ What's New in Stackless 3.X.X?
   de-allocation caused by GC. And it brings the behavior more in line with
   generators.
 
+- https://github.com/stackless-dev/stackless/issues/196
+  Stackless can now pickle coroutine_wrapper objects.
+
 - https://github.com/stackless-dev/stackless/issues/190
   Silently ignore attempts to close a running generator, coroutine or
   asynchronous generator. This avoids spurious error messages, if such an

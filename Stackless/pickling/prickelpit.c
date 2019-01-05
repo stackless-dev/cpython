@@ -1520,12 +1520,14 @@ static int init_dictitemsviewtype(PyObject * mod)
 
 static PyTypeObject wrap_PyGen_Type;
 static PyTypeObject wrap_PyCoro_Type;
+static PyTypeObject wrap__PyCoroWrapper_Type;
 static PyTypeObject wrap_PyAsyncGen_Type;
 static PyTypeObject wrap__PyAsyncGenASend_Type;
 static PyTypeObject wrap__PyAsyncGenAThrow_Type;
 
 /* Used to initialize a generator created by gen_new. */
 static PyFrameObject *gen_exhausted_frame = NULL;
+static PyCoroObject *gen_exhausted_coro = NULL;
 static PyAsyncGenObject *gen_exhausted_asyncgen = NULL;
 
 /* A helper for pickling the _PyErr_StackItem* members of generator-like and tasklet
@@ -1850,8 +1852,11 @@ static int init_generatortype(PyObject * mod)
         /* A reference to frame is stolen by PyGen_New. */
         Py_INCREF(gen_exhausted_frame);
         gen_exhausted_asyncgen = (PyAsyncGenObject *)PyAsyncGen_New(gen_exhausted_frame, NULL, NULL);
+        /* A reference to frame is stolen by PyCoro_New. */
+        Py_INCREF(gen_exhausted_frame);
+        gen_exhausted_coro = (PyCoroObject *)PyCoro_New(gen_exhausted_frame, NULL, NULL);
     }
-    if (gen_exhausted_asyncgen == NULL) {
+    if (gen_exhausted_asyncgen == NULL || gen_exhausted_coro == NULL) {
         res = -1;
     }
 
@@ -2194,6 +2199,41 @@ init_async_generator_athrow_type(PyObject * mod)
 #undef initchain
 #define initchain init_async_generator_athrow_type
 
+static PyObject *
+coro_wrapper_reduce(PyObject *o)
+{
+    return slp_coro_wrapper_reduce(o, &wrap__PyCoroWrapper_Type);
+}
+
+static PyObject *
+coro_wrapper_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    PyObject * o;
+    if (is_wrong_type(type)) return NULL;
+    assert(type == &wrap__PyCoroWrapper_Type);
+    assert(gen_exhausted_coro != NULL);
+    o = slp_coro_wrapper_new(gen_exhausted_coro);
+    if (o != NULL)
+        Py_TYPE(o) = type;
+    return o;
+}
+
+static PyObject *
+coro_wrapper_setstate(PyObject *self, PyObject *args)
+{
+    if (is_wrong_type(Py_TYPE(self))) return NULL;
+    return slp_coro_wrapper_setstate(self, args);
+}
+
+MAKE_WRAPPERTYPE(_PyCoroWrapper_Type, coro_wrapper, "coroutine_wrapper", coro_wrapper_reduce,
+    coro_wrapper_new, coro_wrapper_setstate)
+
+static int init_coroutine_wrapper_type(PyObject * mod)
+{
+    return init_type(&wrap__PyCoroWrapper_Type, initchain, mod);
+}
+#undef initchain
+#define initchain init_coroutine_wrapper_type
 
 /******************************************************
 
