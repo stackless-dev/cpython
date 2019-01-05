@@ -19,18 +19,20 @@ extern "C" {
   All three different cases must be treated.
 
   Ternary return from an integer function:
-    value	   meaning	     action
-     -1 	   failure	     return NULL
-      1 	   soft switched     return Py_UnwindToken
-      0 	   hard switched     return Py_None
+    value          meaning           action
+     -1            failure           return NULL
+      1            soft switched     return Py_UnwindToken
+      0            hard switched     return Py_None
 
   Ternary return from a PyObject * function:
-    value	   meaning	     action
-    NULL	   failure	     return NULL
+    value          meaning           action
+    NULL           failure           return NULL
     Py_UnwindToken soft switched     return Py_UnwindToken
-    other	   hard switched     return value
+    other          hard switched     return value
 
-  Note: Py_UnwindToken is *never* inc/decref'ed.
+  Note: Py_UnwindToken is *never* inc/decref'ed. Use the
+        macro STACKLESS_UNWINDING(retval) to test for
+        Py_UnwindToken
 
  ******************************************************/
 
@@ -44,7 +46,7 @@ extern "C" {
  * func must (yet) be a callable object (normal usecase)
  */
 PyAPI_FUNC(PyTaskletObject *) PyTasklet_New(PyTypeObject *type, PyObject *func);
-/* 0 = success	-1 = failure */
+/* 0 = success  -1 = failure */
 
 /*
  * bind a tasklet function to parameters, making it ready to run,
@@ -66,7 +68,7 @@ PyAPI_FUNC(int) PyTasklet_BindThread(PyTaskletObject *task, unsigned long thread
  * forces the tasklet to run immediately.
  */
 PyAPI_FUNC(int) PyTasklet_Run(PyTaskletObject *task);
-/* 0 = success	-1 = failure */
+/* 0 = success  -1 = failure */
 PyAPI_FUNC(int) PyTasklet_Run_nr(PyTaskletObject *task);
 /* 1 = soft switched  0 = hard switched  -1 = failure */
 
@@ -74,7 +76,7 @@ PyAPI_FUNC(int) PyTasklet_Run_nr(PyTaskletObject *task);
  * raw switching.  The previous tasklet is paused.
  */
 PyAPI_FUNC(int) PyTasklet_Switch(PyTaskletObject *task);
-/* 0 = success	-1 = failure */
+/* 0 = success  -1 = failure */
 PyAPI_FUNC(int) PyTasklet_Switch_nr(PyTaskletObject *task);
 /* 1 = soft switched  0 = hard switched  -1 = failure */
 
@@ -85,7 +87,7 @@ PyAPI_FUNC(int) PyTasklet_Switch_nr(PyTaskletObject *task);
  * might give an inconsistent system state.
  */
 PyAPI_FUNC(int) PyTasklet_Remove(PyTaskletObject *task);
-/* 0 = success	-1 = failure */
+/* 0 = success  -1 = failure */
 
 /*
  * insert a tasklet into the runnables queue, if it isn't
@@ -93,7 +95,7 @@ PyAPI_FUNC(int) PyTasklet_Remove(PyTaskletObject *task);
  * blocked or dead.
  */
 PyAPI_FUNC(int) PyTasklet_Insert(PyTaskletObject *task);
-/* 0 = success	-1 = failure */
+/* 0 = success  -1 = failure */
 
 /*
  * raising an exception for a tasklet.
@@ -105,8 +107,8 @@ PyAPI_FUNC(int) PyTasklet_Insert(PyTaskletObject *task);
  */
 
 PyAPI_FUNC(int) PyTasklet_RaiseException(PyTaskletObject *self,
-					 PyObject *klass, PyObject *args);
-/* 0 = success	-1 = failure.
+                                         PyObject *klass, PyObject *args);
+/* 0 = success  -1 = failure.
  * Note that this call always ends in some exception, so the
  * caller always should return NULL.
  */
@@ -125,7 +127,7 @@ PyAPI_FUNC(int) PyTasklet_Throw(PyTaskletObject *self,
 
 PyAPI_FUNC(int) PyTasklet_Kill(PyTaskletObject *self);
 PyAPI_FUNC(int) PyTasklet_KillEx(PyTaskletObject *self, int pending);
-/* 0 = success	-1 = failure.
+/* 0 = success  -1 = failure.
  * Note that this call always ends in some exception, so the
  * caller always should return NULL.
  */
@@ -210,7 +212,7 @@ PyAPI_FUNC(PyChannelObject *) PyChannel_New(PyTypeObject *type);
  * if nobody is listening, you will get blocked and scheduled.
  */
 PyAPI_FUNC(int) PyChannel_Send(PyChannelObject *self, PyObject *arg);
-/* 0 = success	-1 = failure */
+/* 0 = success  -1 = failure */
 
 PyAPI_FUNC(int) PyChannel_Send_nr(PyChannelObject *self, PyObject *arg);
 /* 1 = soft switched  0 = hard switched  -1 = failure */
@@ -381,7 +383,7 @@ typedef struct {
 PyAPI_DATA(PyTypeObject) PyStacklessFunctionDeclaration_Type;
 
 #define PyStacklessFunctionDeclarationType_CheckExact(op) \
-		(Py_TYPE(op) == &PyStacklessFunctionDeclaration_Type)
+                (Py_TYPE(op) == &PyStacklessFunctionDeclaration_Type)
 
 PyAPI_FUNC(PyObject *) PyStackless_CallFunction(
         PyStacklessFunctionDeclarationObject *sfd, PyObject *arg,
@@ -461,23 +463,20 @@ STACKLESS_RETRACT()
                      _PyStackless_TRY_STACKLESS = 0, \
                      stackless)
 
-#define STACKLESS_PROMOTE(func) \
-    (stackless ? _PyStackless_TRY_STACKLESS = \
-     Py_TYPE(func)->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_CALL : 0)
+#define STACKLESS_PROMOTE_ALL() ((void)(_PyStackless_TRY_STACKLESS = stackless, NULL))
 
 #define STACKLESS_PROMOTE_FLAG(flag) \
-    (stackless ? _PyStackless_TRY_STACKLESS = (flag) : 0)
+    (stackless ? (_PyStackless_TRY_STACKLESS = (flag)) : 0)
 
-#define STACKLESS_PROMOTE_METHOD(obj, meth) do { \
-    if ((Py_TYPE(obj)->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_EXTENSION) && \
-     Py_TYPE(obj)->tp_as_mapping) \
-        _PyStackless_TRY_STACKLESS = stackless && Py_TYPE(obj)->tp_as_mapping->slpflags.meth; \
-} while (0)
+#define STACKLESS_PROMOTE_METHOD(obj, slot_name) \
+    STACKLESS_PROMOTE_FLAG( \
+        (Py_TYPE(obj)->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_EXTENSION) && \
+        Py_TYPE(obj)->tp_as_mapping && \
+                Py_TYPE(obj)->tp_as_mapping->slpflags.slot_name)
 
-#define STACKLESS_PROMOTE_WRAPPER(descr) \
-    (_PyStackless_TRY_STACKLESS = stackless && (descr)->d_slpmask)
-
-#define STACKLESS_PROMOTE_ALL() ((void)(_PyStackless_TRY_STACKLESS = stackless, NULL))
+#define STACKLESS_PROMOTE(obj) \
+    STACKLESS_PROMOTE_FLAG( \
+        Py_TYPE(obj)->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_CALL)
 
 #define STACKLESS_RETRACT() (_PyStackless_TRY_STACKLESS = 0)
 
@@ -486,11 +485,8 @@ STACKLESS_RETRACT()
 #else /* STACKLESS */
 /* turn the stackless flag macros into dummies */
 #define STACKLESS_GETARG() int stackless = 0
-#define STACKLESS_PROMOTE(func) stackless = 0
-#define STACKLESS_PROMOTE_FLAG(flag) stackless = 0
-#define STACKLESS_PROMOTE_METHOD(obj, meth) stackless = 0
-#define STACKLESS_PROMOTE_WRAPPER(descr) stackless = 0
-#define STACKLESS_PROMOTE_ALL() stackless = 0
+#define STACKLESS_PROMOTE_ALL() (stackless = 0)
+#define STACKLESS_PROMOTE_FLAG(flag) (stackless = 0)
 #define STACKLESS_RETRACT() assert(1)
 #define STACKLESS_ASSERT() assert(1)
 #endif
@@ -567,13 +563,13 @@ PyAPI_DATA(PyUnwindObject *) Py_UnwindToken;
  * Run any callable as the "main" Python(r) function.
  */
 PyAPI_FUNC(PyObject *) PyStackless_Call_Main(PyObject *func,
-					     PyObject *args, PyObject *kwds);
+                                             PyObject *args, PyObject *kwds);
 
 /*
  * Convenience: Run any method as the "main" Python(r) function.
  */
 PyAPI_FUNC(PyObject *) PyStackless_CallMethod_Main(PyObject *o, char *name,
-						   char *format, ...);
+                                                   char *format, ...);
 
 /*
  *convenience: Run any cmethod as the "main" Python(r) function.

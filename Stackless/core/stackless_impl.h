@@ -437,6 +437,12 @@ PyTaskletObject * slp_get_watchdog(PyThreadState *ts, int interrupt);
 #define STACKLESS__GETARG_ASSERT \
     assert(SLP_CURRENT_FRAME_IS_VALID(PyThreadState_GET()))
 
+/* descr must be of type PyWrapperDescrObject, but this type is undocumented.
+ * Therefore this macro is in stackless_impl.h and not in stackless_api.h
+ */
+#define STACKLESS_PROMOTE_WRAPPER(descr) \
+    STACKLESS_PROMOTE_FLAG((descr)->d_slpmask)
+
 #define STACKLESS_PROPOSE(tstate, func) {int stackless = STACKLESS_POSSIBLE(tstate); \
                  STACKLESS_PROMOTE(func);}
 
