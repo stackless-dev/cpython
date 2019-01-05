@@ -500,6 +500,7 @@ Py_UnwindToken
 # justification: constant singleton
 gen_exhausted_frame
 gen_exhausted_asyncgen
+gen_exhausted_coro
 
 # justification: constant
 _new_methoddef
