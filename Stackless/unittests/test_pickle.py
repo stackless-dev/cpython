@@ -707,6 +707,21 @@ class TestCoroutinePickling(StacklessPickleTestCase):
         self.assertTupleEqual(orig_origin, origin)
         self.assertRaises(StopIteration, c.send, None)
 
+    def test_coro_wrapper_pickling(self):
+        c = self.c()
+        cw = c.__await__()
+        cw_type = type(cw)
+        self.assertEqual(cw_type.__name__, "coroutine_wrapper")
+        p = self.dumps(cw)
+        self.assertEqual(c.send(None), 1)
+        self.assertRaises(StopIteration, c.send, None)
+
+        cw = self.loads(p)
+        self.assertIsInstance(cw, cw_type)
+        self.assertEqual(cw.send(None), 1)
+        self.assertRaises(StopIteration, cw.send, None)
+        self.assertRaisesRegex(RuntimeError, "cannot reuse already awaited coroutine", cw.send, None)
+
 
 async_gen_finalize_counter = 0
 
@@ -1010,6 +1025,14 @@ class TestCopy(StacklessTestCase):
         c = self._test(obj, 'cr_running', 'cr_code', '__name__', '__qualname__', 'cr_origin')
         self.assertRaises(StopIteration, obj.send, None)
         self.assertRaises(StopIteration, c.send, None)
+
+    def test_coro_wrapper(self):
+        async def c():
+            return 1
+        obj = c().__await__()
+        cw = self._test(obj)
+        self.assertRaises(StopIteration, cw.send, None)
+        self.assertRaisesRegex(RuntimeError, "cannot reuse already awaited coroutine", obj.send, None)
 
     def test_async_generator(self):
         async def ag():

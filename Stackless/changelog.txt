@@ -20,6 +20,9 @@ What's New in Stackless 3.X.X?
   With this change it is possible to soft switch into/from the compound
   statements "async for" and "async with".
 
+- https://github.com/stackless-dev/stackless/issues/196
+  Stackless can now pickle coroutine_wrapper objects.
+
 - https://github.com/stackless-dev/stackless/issues/190
   Silently ignore attempts to close a running generator, coroutine or
   asynchronous generator. This avoids spurious error messages, if such an
@@ -615,7 +618,8 @@ What's New in Stackless 3.3.5?
 
 
 Here is a break. Nobody wrote a change log. If you are interested
-in software archaeology look at http://svn.python.org/view/stackless.
+in software archaeology look at
+https://github.com/stackless-dev/stackless_historic.
 
 
 The very beginning of Stackless
