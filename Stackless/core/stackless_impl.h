@@ -378,6 +378,7 @@ PyObject * slp_eval_frame_noval(struct _frame *f,  int throwflag, PyObject *retv
 PyObject * slp_eval_frame_iter(struct _frame *f,  int throwflag, PyObject *retval);
 PyObject * slp_eval_frame_setup_with(struct _frame *f,  int throwflag, PyObject *retval);
 PyObject * slp_eval_frame_with_cleanup(struct _frame *f,  int throwflag, PyObject *retval);
+PyObject * slp_eval_frame_yield_from(struct _frame *f,  int throwflag, PyObject *retval);
 /* other eval_frame functions from module/scheduling.c */
 PyObject * slp_restore_tracing(PyFrameObject *f, int exc, PyObject *retval);
 /* other eval_frame functions from Objects/typeobject.c */
@@ -730,6 +731,9 @@ int slp_resurrect_and_kill(PyObject *self,
                            void(*killer)(PyObject *));
 
 /* stackless pickling support */
+PyObject * slp_coro_wrapper_reduce(PyObject *o, PyTypeObject * wrapper_type);
+PyObject * slp_coro_wrapper_new(PyCoroObject *gen);
+PyObject * slp_coro_wrapper_setstate(PyObject *self, PyObject *args);
 int slp_async_gen_init_hooks(PyAsyncGenObject *o);
 PyObject * slp_async_gen_asend_reduce(PyObject *o, PyTypeObject * wrapper_type);
 PyObject * slp_async_gen_asend_new(PyAsyncGenObject *gen);

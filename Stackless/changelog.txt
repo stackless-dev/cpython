@@ -9,6 +9,20 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/188
+  Enable stackless calls of sub-iterators and coroutines (technically: the
+  YIELD_FROM opcode) and of the following methods, if soft-switching is
+  enabled:
+    - generator.send() (generator.__next__() was already stackless);
+    - coroutine.send();
+    - coroutine_wrapper.__next__() and coroutine_wrapper.send();
+    - async_generator_asend.__next__() and async_generator_asend.send().
+  With this change it is possible to soft switch into/from the compound
+  statements "async for" and "async with".
+
+- https://github.com/stackless-dev/stackless/issues/196
+  Stackless can now pickle coroutine_wrapper objects.
+
 - https://github.com/stackless-dev/stackless/issues/190
   Silently ignore attempts to close a running generator, coroutine or
   asynchronous generator. This avoids spurious error messages, if such an

@@ -503,15 +503,11 @@ Py_UnwindToken
 # Stackless/pickling/prickelpit.c
 # justification: constant singleton
 gen_exhausted_frame
+gen_exhausted_asyncgen
+gen_exhausted_coro
+
 # justification: constant
 _new_methoddef
-
-# hacks
-# Stackless/core/slp_transfer.c (write only, prevent optimization)
-_dont_optimise_away_goobledigoobs
-# Stackless/module/scheduling.c
-_dont_optimise_away_saved_tstat_with_magic
-
 
 
 #######################################
