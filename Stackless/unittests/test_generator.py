@@ -6,6 +6,8 @@ import types
 import pickle
 import contextlib
 import sys
+import contextvars
+import asyncio
 
 from support import test_main  # @UnusedImport
 from support import StacklessTestCase, captured_stderr
@@ -360,6 +362,27 @@ class TestStacklessOperations(StacklessTestCase):
         t = test()
         n = self.run_until_complete(t)
         self.assertEqual(n, 0)
+
+    def test_context_run(self):
+        contextvars.Context().run(self.assertLevel)
+
+    #  needs Stackless pull request #188
+    def xx_test_asyncio(self):
+        async def test():
+            try:
+                await self.coro()
+            finally:
+                loop.stop()
+
+        asyncio.set_event_loop(asyncio.new_event_loop())
+        self.addCleanup(asyncio.set_event_loop, None)
+        loop = asyncio.get_event_loop()
+        task = asyncio.tasks._PyTask(test())
+        asyncio.ensure_future(task)
+        try:
+            loop.run_forever()
+        finally:
+            loop.close()
 
 
 if __name__ == '__main__':

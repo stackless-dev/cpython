@@ -9,6 +9,10 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/197
+  Enable stackless calls of method "contextvars.Context.run", if soft-switching
+  is enabled.
+
 - https://github.com/stackless-dev/stackless/issues/188
   Enable stackless calls of sub-iterators and coroutines (technically: the
   YIELD_FROM opcode) and of the following methods, if soft-switching is
