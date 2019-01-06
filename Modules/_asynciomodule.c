@@ -2542,21 +2542,17 @@ static PyStacklessFunctionDeclarationObject task_step_impl_declaration = {
         task_step_impl_stackless,
         "task_step_impl_stackless"
 };
-#endif
-
-static PyObject *
-task_step_impl(TaskObj *task, PyObject *exc)
-{
-#ifdef STACKLESS
-    return PyStackless_CallFunction(&task_step_impl_declaration, Py_None,
-        (PyObject *)task, exc, NULL, 0, NULL);
-}
 
 static PyObject *
 task_step_impl_part1(TaskObj *task, PyObject *exc, int *failed)
 {
-#endif
     STACKLESS_GETARG();
+#else  /* #ifdef STACKLESS */
+
+static PyObject *
+task_step_impl(TaskObj *task, PyObject *exc)
+{
+#endif  /* #ifdef STACKLESS */
     int res;
     int clear_exc = 0;
     PyObject *result = NULL;

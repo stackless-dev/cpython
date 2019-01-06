@@ -366,8 +366,7 @@ class TestStacklessOperations(StacklessTestCase):
     def test_context_run(self):
         contextvars.Context().run(self.assertLevel)
 
-    #  needs Stackless pull request #188
-    def xx_test_asyncio(self):
+    def _test_asyncio(self, task_class):
         async def test():
             try:
                 await self.coro()
@@ -377,12 +376,18 @@ class TestStacklessOperations(StacklessTestCase):
         asyncio.set_event_loop(asyncio.new_event_loop())
         self.addCleanup(asyncio.set_event_loop, None)
         loop = asyncio.get_event_loop()
-        task = asyncio.tasks._PyTask(test())
+        task = task_class(test())
         asyncio.ensure_future(task)
         try:
             loop.run_forever()
         finally:
             loop.close()
+
+    def test_asyncio_PyTask(self):
+        self._test_asyncio(asyncio.tasks._PyTask)
+
+    def test_asyncio_CTask(self):
+        self._test_asyncio(asyncio.tasks._CTask)
 
 
 if __name__ == '__main__':
