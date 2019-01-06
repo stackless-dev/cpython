@@ -746,7 +746,7 @@ PyTypeObject PyWrapperDescr_Type = {
     0,                                          /* tp_descr_set */
 };
 
-/* STACKLESS_DECLARE_METHOD(&PyWrapperDescr_Type, tp_call) */
+STACKLESS_DECLARE_METHOD(&PyWrapperDescr_Type, tp_call)
 
 static PyDescrObject *
 descr_new(PyTypeObject *descrtype, PyTypeObject *type, const char *name)
