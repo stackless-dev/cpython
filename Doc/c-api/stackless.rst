@@ -553,6 +553,9 @@ To call it use
    :start-after: /*DO-NOT-REMOVE-OR-MODIFY-THIS-MARKER:ssf-example-start*/
    :end-before: /*DO-NOT-REMOVE-OR-MODIFY-THIS-MARKER:ssf-example-end*/
 
+Another, more realistic example is :py:const:`_asyncio._task_step_impl_stackless`, defined in
+"Modules/_asynciomodules.c".
+
 
 .. [#] Actually "_PyStackless_TRY_STACKLESS" is a macro that expands to a C L-value. As long as
        |CPY| uses the GIL, this L-value is a global variable.

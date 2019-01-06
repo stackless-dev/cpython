@@ -2540,7 +2540,7 @@ task_step_impl_stackless(PyObject *retval, long *step, PyObject **ob1, PyObject 
 static PyStacklessFunctionDeclarationObject task_step_impl_declaration = {
         PyObject_HEAD_INIT(NULL)
         task_step_impl_stackless,
-        "task_step_impl_stackless"
+        "_task_step_impl_stackless"
 };
 
 static PyObject *
