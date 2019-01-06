@@ -455,14 +455,17 @@ PyTaskletObject * slp_get_watchdog(PyThreadState *ts, int interrupt);
 
 #define STACKLESS_PROPOSE_ALL(tstate) _PyStackless_TRY_STACKLESS = STACKLESS_POSSIBLE(tstate)
 
-/* this is just a tag to denote which methods are stackless */
-
-#define STACKLESS_DECLARE_METHOD(type, meth)
-
 /* This can be set to 1 to completely disable the augmentation of
  * type info with stackless property.  For debugging.
  */
 #define STACKLESS_NO_TYPEINFO 0
+
+#if !STACKLESS_NO_TYPEINFO
+/* This macro changes to NULL, if STACKLESS is not defined. */
+#define SLP_TP_AS_MAPPING(tp_as_mapping) (&(tp_as_mapping))
+#else
+#define SLP_TP_AS_MAPPING(tp_as_mapping) 0
+#endif
 
 /*
 
@@ -786,7 +789,7 @@ long slp_parse_thread_id(PyObject *thread_id, unsigned long *id);
 #define STACKLESS_RETVAL(tstate, obj) (obj)
 #define STACKLESS_ASSERT_UNWINDING_VALUE_IS_NOT(tstate, obj, val) assert(1)
 
-#define STACKLESS_DECLARE_METHOD(type, meth)
+#define SLP_TP_AS_MAPPING(tp_as_mapping) 0
 
 #define slp_initialize(s) /* empty */
 

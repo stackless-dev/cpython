@@ -10,8 +10,7 @@
 #include "platf/slp_platformselect.h"
 #include "core/cframeobject.h"
 #include "pickling/prickelpit.h"
-#include <stddef.h>  /* for offsetof(), required by core/stackless_methods.h */
-#include "core/stackless_methods.h"
+#include <stddef.h>  /* for offsetof() */
 
 /*[clinic input]
 module _stackless
@@ -1708,39 +1707,12 @@ slp_prepare_slots(PyTypeObject * type)
     return 0;
 }
 
-/* initial seeding of the stackless slot information into the types.
- * it will then be propagated using slot copying
- */
-static int init_stackless_methods(void)
-{
-#if !STACKLESS_NO_TYPEINFO
-    _stackless_method *p = _stackless_methtable;
-
-    for (; p->type != NULL; p++) {
-        PyTypeObject *t = p->type;
-        size_t ind = p->offset & MFLAG_IND;
-        size_t ofs = p->offset - ind;
-
-        if (ind)
-            t = *((PyTypeObject **)t);
-        /* this type has stackless slot methods.  Set the flag */
-        if (slp_prepare_slots(t))
-            return -1;
-        ((signed char *) t->tp_as_mapping)[ofs] = -1;
-        if (t->tp_as_mapping->slpflags.tp_call)
-            t->tp_flags |= Py_TPFLAGS_HAVE_STACKLESS_CALL;  /* shortcut flag */
-    }
-#endif
-    return 0;
-}
-
 /* this one must be called very early, before modules are used */
 int
 _PyStackless_InitTypes(void)
 {
     if (0
         || slp_init_bombtype()
-        || init_stackless_methods()
         || PyType_Ready(&PyTasklet_Type) /* need this early for the main tasklet */
         || slp_init_cframetype()
         )

@@ -63,7 +63,7 @@
             <?endforeach ?>
 
             <!-- Stackless\core\*.h -->
-            <?foreach header in cframeobject.h;slp_exttype.h;stackless_impl.h;stackless_methods.h;stackless_structs.h;stackless_tstate.h;stackless_pystate.h?>
+            <?foreach header in cframeobject.h;slp_exttype.h;stackless_impl.h;stackless_structs.h;stackless_tstate.h;stackless_pystate.h?>
                 <Component Id="include_Stackless_core_$(var.header)" Directory="include_Stackless_core" Guid="*">
                     <File Id="include_Stackless_core_$(var.header)" Name="$(var.header)" Source="!(bindpath.src)Stackless\core\$(var.header)" />
                 </Component>

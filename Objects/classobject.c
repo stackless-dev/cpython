@@ -332,6 +332,12 @@ method_descr_get(PyObject *meth, PyObject *obj, PyObject *cls)
     return PyMethod_New(PyMethod_GET_FUNCTION(meth), obj);
 }
 
+#ifdef STACKLESS
+static PyMappingMethods method_as_mapping = {
+    .slpflags.tp_call = -1,
+};
+#endif
+
 PyTypeObject PyMethod_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
     "method",
@@ -345,14 +351,15 @@ PyTypeObject PyMethod_Type = {
     (reprfunc)method_repr,                      /* tp_repr */
     0,                                          /* tp_as_number */
     0,                                          /* tp_as_sequence */
-    0,                                          /* tp_as_mapping */
+    SLP_TP_AS_MAPPING(method_as_mapping),       /* tp_as_mapping */
     (hashfunc)method_hash,                      /* tp_hash */
     method_call,                                /* tp_call */
     0,                                          /* tp_str */
     method_getattro,                            /* tp_getattro */
     PyObject_GenericSetAttr,                    /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC, /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_HAVE_STACKLESS_EXTENSION,        /* tp_flags */
     method_doc,                                 /* tp_doc */
     (traverseproc)method_traverse,              /* tp_traverse */
     0,                                          /* tp_clear */
@@ -372,8 +379,6 @@ PyTypeObject PyMethod_Type = {
     0,                                          /* tp_alloc */
     method_new,                                 /* tp_new */
 };
-
-STACKLESS_DECLARE_METHOD(&PyMethod_Type, tp_call)
 
 /* Clear out the free list */
 

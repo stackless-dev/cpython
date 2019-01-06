@@ -9,6 +9,10 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/202
+  The private include file "stackless_methods.h" is obsolete and has been
+  removed.  
+
 - https://github.com/stackless-dev/stackless/issues/201
   Enable stackless calls of "wrapper_descriptor" objects, if soft-switching is
   enabled. The code has been in Stackless forever, but was disabled for some

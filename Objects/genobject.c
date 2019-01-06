@@ -872,6 +872,12 @@ static PyMethodDef gen_methods[] = {
     {NULL, NULL}        /* Sentinel */
 };
 
+#ifdef STACKLESS
+static PyMappingMethods gen_as_mapping = {
+    .slpflags.tp_iternext = -1,
+};
+#endif
+
 PyTypeObject PyGen_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
     "generator",                                /* tp_name */
@@ -886,7 +892,7 @@ PyTypeObject PyGen_Type = {
     (reprfunc)gen_repr,                         /* tp_repr */
     0,                                          /* tp_as_number */
     0,                                          /* tp_as_sequence */
-    0,                                          /* tp_as_mapping */
+    SLP_TP_AS_MAPPING(gen_as_mapping),          /* tp_as_mapping */
     0,                                          /* tp_hash */
     0,                                          /* tp_call */
     0,                                          /* tp_str */
@@ -894,7 +900,8 @@ PyTypeObject PyGen_Type = {
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
-        Py_TPFLAGS_HAVE_FINALIZE,               /* tp_flags */
+        Py_TPFLAGS_HAVE_FINALIZE |
+        Py_TPFLAGS_HAVE_STACKLESS_EXTENSION,    /* tp_flags */
     0,                                          /* tp_doc */
     (traverseproc)gen_traverse,                 /* tp_traverse */
     0,                                          /* tp_clear */
@@ -925,8 +932,6 @@ PyTypeObject PyGen_Type = {
     0,                                          /* tp_version_tag */
     _PyGen_Finalize,                            /* tp_finalize */
 };
-
-STACKLESS_DECLARE_METHOD(&PyGen_Type, tp_iternext);
 
 static PyObject *
 gen_new_with_qualname(PyTypeObject *type, PyFrameObject *f,
@@ -1243,14 +1248,15 @@ PyTypeObject _PyCoroWrapper_Type = {
     0,                                          /* tp_repr */
     0,                                          /* tp_as_number */
     0,                                          /* tp_as_sequence */
-    0,                                          /* tp_as_mapping */
+    SLP_TP_AS_MAPPING(gen_as_mapping),          /* tp_as_mapping */
     0,                                          /* tp_hash */
     0,                                          /* tp_call */
     0,                                          /* tp_str */
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_HAVE_STACKLESS_EXTENSION,        /* tp_flags */
     "A wrapper object implementing __await__ for coroutines.",
     (traverseproc)coro_wrapper_traverse,        /* tp_traverse */
     0,                                          /* tp_clear */
@@ -1271,8 +1277,6 @@ PyTypeObject _PyCoroWrapper_Type = {
     0,                                          /* tp_new */
     0,                                          /* tp_free */
 };
-
-STACKLESS_DECLARE_METHOD(&_PyCoroWrapper_Type, tp_iternext);
 
 static PyObject *
 compute_cr_origin(int origin_depth)
@@ -1812,14 +1816,15 @@ PyTypeObject _PyAsyncGenASend_Type = {
     0,                                          /* tp_repr */
     0,                                          /* tp_as_number */
     0,                                          /* tp_as_sequence */
-    0,                                          /* tp_as_mapping */
+    SLP_TP_AS_MAPPING(gen_as_mapping),          /* tp_as_mapping */
     0,                                          /* tp_hash */
     0,                                          /* tp_call */
     0,                                          /* tp_str */
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_HAVE_STACKLESS_EXTENSION,        /* tp_flags */
     0,                                          /* tp_doc */
     (traverseproc)async_gen_asend_traverse,     /* tp_traverse */
     0,                                          /* tp_clear */
@@ -1839,8 +1844,6 @@ PyTypeObject _PyAsyncGenASend_Type = {
     0,                                          /* tp_alloc */
     0,                                          /* tp_new */
 };
-
-STACKLESS_DECLARE_METHOD(&_PyAsyncGenASend_Type, tp_iternext);
 
 
 static PyObject *

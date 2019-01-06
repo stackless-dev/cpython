@@ -216,7 +216,6 @@
     <ClInclude Include="..\Stackless\core\cframeobject.h" />
     <ClInclude Include="..\Stackless\core\slp_exttype.h" />
     <ClInclude Include="..\Stackless\core\stackless_impl.h" />
-    <ClInclude Include="..\Stackless\core\stackless_methods.h" />
     <ClInclude Include="..\Stackless\core\stackless_structs.h" />
     <ClInclude Include="..\Stackless\core\stackless_tstate.h" />
     <ClInclude Include="..\Stackless\core\stackless_pystate.h" />

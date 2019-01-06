@@ -465,9 +465,6 @@
     <ClInclude Include="..\Stackless\core\stackless_impl.h">
       <Filter>Stackless\core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Stackless\core\stackless_methods.h">
-      <Filter>Stackless\core</Filter>
-    </ClInclude>
     <ClInclude Include="..\Stackless\core\stackless_structs.h">
       <Filter>Stackless\core</Filter>
     </ClInclude>

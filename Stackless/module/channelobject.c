@@ -1197,6 +1197,12 @@ By receiving from a channel, a tasklet that is waiting to send\n\
 is resumed. If there is no waiting sender, the receiver is suspended.\
 ");
 
+#ifdef STACKLESS
+static PyMappingMethods channel_as_mapping = {
+    .slpflags.tp_iternext = -1,
+};
+#endif
+
 PyTypeObject PyChannel_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
     "_stackless.channel",
@@ -1210,7 +1216,7 @@ PyTypeObject PyChannel_Type = {
     0,                                          /* tp_repr */
     0,                                          /* tp_as_number */
     0,                                          /* tp_as_sequence */
-    0,                                          /* tp_as_mapping */
+    SLP_TP_AS_MAPPING(channel_as_mapping),      /* tp_as_mapping */
     0,                                          /* tp_hash */
     0,                                          /* tp_call */
     0,                                          /* tp_str */
@@ -1218,7 +1224,8 @@ PyTypeObject PyChannel_Type = {
     PyObject_GenericSetAttr,                    /* tp_setattro */
     0,                                          /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
-        Py_TPFLAGS_BASETYPE,                    /* tp_flags */
+        Py_TPFLAGS_BASETYPE |
+        Py_TPFLAGS_HAVE_STACKLESS_EXTENSION,    /* tp_flags */
     channel__doc__,                             /* tp_doc */
     (traverseproc)channel_traverse,             /* tp_traverse */
     (inquiry) channel_clear,                    /* tp_clear */
@@ -1241,5 +1248,4 @@ PyTypeObject PyChannel_Type = {
     PyObject_GC_Del,                            /* tp_free */
 };
 
-STACKLESS_DECLARE_METHOD(&PyChannel_Type, tp_iternext)
 #endif

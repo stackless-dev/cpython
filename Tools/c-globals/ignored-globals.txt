@@ -491,10 +491,6 @@ _PyStackless__TryStacklessPtr
 _PyExc_TaskletExit
 PyExc_TaskletExit
 
-# Stackless/core/stackless_methods.h
-# justification: constant
-_stackless_methtable
-
 # Stackless/core/stacklesseval.c
 # justification: constant singleton
 unwind_token

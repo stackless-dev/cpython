@@ -601,6 +601,12 @@ func_descr_get(PyObject *func, PyObject *obj, PyObject *type)
     return PyMethod_New(func, obj);
 }
 
+#ifdef STACKLESS
+static PyMappingMethods func_as_mapping = {
+    .slpflags.tp_call = -1,
+};
+#endif
+
 PyTypeObject PyFunction_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
     "function",
@@ -614,14 +620,15 @@ PyTypeObject PyFunction_Type = {
     (reprfunc)func_repr,                        /* tp_repr */
     0,                                          /* tp_as_number */
     0,                                          /* tp_as_sequence */
-    0,                                          /* tp_as_mapping */
+    SLP_TP_AS_MAPPING(func_as_mapping),         /* tp_as_mapping */
     0,                                          /* tp_hash */
     function_call,                              /* tp_call */
     0,                                          /* tp_str */
     0,                                          /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_HAVE_STACKLESS_EXTENSION,        /* tp_flags */
     func_new__doc__,                            /* tp_doc */
     (traverseproc)func_traverse,                /* tp_traverse */
     0,                                          /* tp_clear */
@@ -642,7 +649,6 @@ PyTypeObject PyFunction_Type = {
     func_new,                                   /* tp_new */
 };
 
-STACKLESS_DECLARE_METHOD(&PyFunction_Type, tp_call)
 
 /* Class method object */
 

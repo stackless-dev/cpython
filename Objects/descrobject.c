@@ -556,6 +556,12 @@ descr_traverse(PyObject *self, visitproc visit, void *arg)
     return 0;
 }
 
+#ifdef STACKLESS
+static PyMappingMethods descr_as_mapping = {
+    .slpflags.tp_call = -1,
+};
+#endif
+
 PyTypeObject PyMethodDescr_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
     "method_descriptor",
@@ -569,14 +575,15 @@ PyTypeObject PyMethodDescr_Type = {
     (reprfunc)method_repr,                      /* tp_repr */
     0,                                          /* tp_as_number */
     0,                                          /* tp_as_sequence */
-    0,                                          /* tp_as_mapping */
+    SLP_TP_AS_MAPPING(descr_as_mapping),        /* tp_as_mapping */
     0,                                          /* tp_hash */
     (ternaryfunc)methoddescr_call,              /* tp_call */
     0,                                          /* tp_str */
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC, /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_HAVE_STACKLESS_EXTENSION,        /* tp_flags */
     0,                                          /* tp_doc */
     descr_traverse,                             /* tp_traverse */
     0,                                          /* tp_clear */
@@ -593,7 +600,6 @@ PyTypeObject PyMethodDescr_Type = {
     0,                                          /* tp_descr_set */
 };
 
-STACKLESS_DECLARE_METHOD(&PyMethodDescr_Type, tp_call)
 
 /* This is for METH_CLASS in C, not for "f = classmethod(f)" in Python! */
 PyTypeObject PyClassMethodDescr_Type = {
@@ -609,14 +615,15 @@ PyTypeObject PyClassMethodDescr_Type = {
     (reprfunc)method_repr,                      /* tp_repr */
     0,                                          /* tp_as_number */
     0,                                          /* tp_as_sequence */
-    0,                                          /* tp_as_mapping */
+    SLP_TP_AS_MAPPING(descr_as_mapping),        /* tp_as_mapping */
     0,                                          /* tp_hash */
     (ternaryfunc)classmethoddescr_call,         /* tp_call */
     0,                                          /* tp_str */
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC, /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_HAVE_STACKLESS_EXTENSION,        /* tp_flags */
     0,                                          /* tp_doc */
     descr_traverse,                             /* tp_traverse */
     0,                                          /* tp_clear */
@@ -633,7 +640,6 @@ PyTypeObject PyClassMethodDescr_Type = {
     0,                                          /* tp_descr_set */
 };
 
-STACKLESS_DECLARE_METHOD(&PyClassMethodDescr_Type, tp_call)
 
 PyTypeObject PyMemberDescr_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
@@ -722,14 +728,15 @@ PyTypeObject PyWrapperDescr_Type = {
     (reprfunc)wrapperdescr_repr,                /* tp_repr */
     0,                                          /* tp_as_number */
     0,                                          /* tp_as_sequence */
-    0,                                          /* tp_as_mapping */
+    SLP_TP_AS_MAPPING(descr_as_mapping),        /* tp_as_mapping */
     0,                                          /* tp_hash */
     (ternaryfunc)wrapperdescr_call,             /* tp_call */
     0,                                          /* tp_str */
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC, /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_HAVE_STACKLESS_EXTENSION,        /* tp_flags */
     0,                                          /* tp_doc */
     descr_traverse,                             /* tp_traverse */
     0,                                          /* tp_clear */
@@ -746,7 +753,6 @@ PyTypeObject PyWrapperDescr_Type = {
     0,                                          /* tp_descr_set */
 };
 
-STACKLESS_DECLARE_METHOD(&PyWrapperDescr_Type, tp_call)
 
 static PyDescrObject *
 descr_new(PyTypeObject *descrtype, PyTypeObject *type, const char *name)
@@ -1210,14 +1216,15 @@ PyTypeObject _PyMethodWrapper_Type = {
     (reprfunc)wrapper_repr,                     /* tp_repr */
     0,                                          /* tp_as_number */
     0,                                          /* tp_as_sequence */
-    0,                                          /* tp_as_mapping */
+    SLP_TP_AS_MAPPING(descr_as_mapping),        /* tp_as_mapping */
     (hashfunc)wrapper_hash,                     /* tp_hash */
     (ternaryfunc)wrapper_call,                  /* tp_call */
     0,                                          /* tp_str */
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC, /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_HAVE_STACKLESS_EXTENSION,        /* tp_flags */
     0,                                          /* tp_doc */
     wrapper_traverse,                           /* tp_traverse */
     0,                                          /* tp_clear */
@@ -1234,7 +1241,6 @@ PyTypeObject _PyMethodWrapper_Type = {
     0,                                          /* tp_descr_set */
 };
 
-STACKLESS_DECLARE_METHOD(&_PyMethodWrapper_Type, tp_call)
 
 PyObject *
 PyWrapper_New(PyObject *d, PyObject *self)

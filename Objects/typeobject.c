@@ -3590,6 +3590,12 @@ type_is_gc(PyTypeObject *type)
     return type->tp_flags & Py_TPFLAGS_HEAPTYPE;
 }
 
+#ifdef STACKLESS
+static PyMappingMethods type_as_mapping = {
+    .slpflags.tp_call = -1,
+};
+#endif
+
 PyTypeObject PyType_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
     "type",                                     /* tp_name */
@@ -3603,7 +3609,7 @@ PyTypeObject PyType_Type = {
     (reprfunc)type_repr,                        /* tp_repr */
     0,                                          /* tp_as_number */
     0,                                          /* tp_as_sequence */
-    0,                                          /* tp_as_mapping */
+    SLP_TP_AS_MAPPING(type_as_mapping),         /* tp_as_mapping */
     0,                                          /* tp_hash */
     (ternaryfunc)type_call,                     /* tp_call */
     0,                                          /* tp_str */
@@ -3611,7 +3617,8 @@ PyTypeObject PyType_Type = {
     (setattrofunc)type_setattro,                /* tp_setattro */
     0,                                          /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
-        Py_TPFLAGS_BASETYPE | Py_TPFLAGS_TYPE_SUBCLASS,         /* tp_flags */
+        Py_TPFLAGS_BASETYPE | Py_TPFLAGS_TYPE_SUBCLASS |
+        Py_TPFLAGS_HAVE_STACKLESS_EXTENSION,    /* tp_flags */
     type_doc,                                   /* tp_doc */
     (traverseproc)type_traverse,                /* tp_traverse */
     (inquiry)type_clear,                        /* tp_clear */
@@ -3633,8 +3640,6 @@ PyTypeObject PyType_Type = {
     PyObject_GC_Del,                            /* tp_free */
     (inquiry)type_is_gc,                        /* tp_is_gc */
 };
-
-STACKLESS_DECLARE_METHOD(&PyType_Type, tp_call)
 
 /* The base type of all types (eventually)... except itself. */
 

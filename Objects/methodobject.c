@@ -269,6 +269,12 @@ meth_hash(PyCFunctionObject *a)
 }
 
 
+#ifdef STACKLESS
+static PyMappingMethods meth_as_mapping = {
+    .slpflags.tp_call = -1,
+};
+#endif
+
 PyTypeObject PyCFunction_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
     "builtin_function_or_method",
@@ -282,14 +288,15 @@ PyTypeObject PyCFunction_Type = {
     (reprfunc)meth_repr,                        /* tp_repr */
     0,                                          /* tp_as_number */
     0,                                          /* tp_as_sequence */
-    0,                                          /* tp_as_mapping */
+    SLP_TP_AS_MAPPING(meth_as_mapping),         /* tp_as_mapping */
     (hashfunc)meth_hash,                        /* tp_hash */
     PyCFunction_Call,                           /* tp_call */
     0,                                          /* tp_str */
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,/* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_HAVE_STACKLESS_EXTENSION,        /* tp_flags */
     0,                                          /* tp_doc */
     (traverseproc)meth_traverse,                /* tp_traverse */
     0,                                          /* tp_clear */
@@ -303,8 +310,6 @@ PyTypeObject PyCFunction_Type = {
     0,                                          /* tp_base */
     0,                                          /* tp_dict */
 };
-
-STACKLESS_DECLARE_METHOD(&PyCFunction_Type, tp_call)
 
 /* Clear out the free list */
 
