@@ -957,7 +957,7 @@ type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
         int is_stackless;
         if (tp_init == slot_tp_init)
             STACKLESS_PROMOTE_ALL();
-        is_stackless = (_PyRuntime.st.try_stackless);
+        is_stackless = _PyStackless_TRY_STACKLESS;
 #endif
         res = tp_init(obj, args, kwds);
 #ifdef STACKLESS

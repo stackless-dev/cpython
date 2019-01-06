@@ -1038,7 +1038,7 @@ test_nostacklesscall_call(PyObject *f, PyObject *arg, PyObject *kw)
     PyObject * callback1;
     PyObject * callback2 = NULL;
     PyObject * rest;
-    int stackless = (_PyRuntime.st.try_stackless);
+    int stackless = _PyStackless_TRY_STACKLESS;
 
     callback1 = PyTuple_GetItem(arg, 0);
     if (callback1 == NULL)
@@ -1062,7 +1062,7 @@ test_nostacklesscall_call(PyObject *f, PyObject *arg, PyObject *kw)
             l = PyObject_IsTrue(setTryStackless);
             Py_DECREF(setTryStackless);
             if (-1 != l)
-                (_PyRuntime.st.try_stackless) = l;
+                _PyStackless_TRY_STACKLESS = l;
             else
                 return NULL;
         }
@@ -1092,14 +1092,14 @@ test_nostacklesscall_call(PyObject *f, PyObject *arg, PyObject *kw)
         return NULL;
     }
 
-    rest = Py_BuildValue("Oii", result, stackless, (_PyRuntime.st.try_stackless));
+    rest = Py_BuildValue("Oii", result, stackless, _PyStackless_TRY_STACKLESS);
     Py_DECREF(result);
     if (rest == NULL) {
         Py_DECREF(callback2);
         return NULL;
     }
 
-    (_PyRuntime.st.try_stackless) = 0;
+    _PyStackless_TRY_STACKLESS = 0;
     result = PyObject_Call(callback2, rest, kw);
     Py_DECREF(callback2);
     Py_DECREF(rest);
