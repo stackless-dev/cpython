@@ -10,6 +10,11 @@ What's New in Stackless 2.7.XX?
 
 *Release date: XXXX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/200
+  Fix a bug in the C-API functions PyTasklet_Run_nr() and
+  PyTasklet_Switch_nr(). Under exotic conditions the functions could
+  cause undefined behavior.
+
 - https://github.com/stackless-dev/stackless/issues/182
   Fix "make teststackless" for out of tree builds
 

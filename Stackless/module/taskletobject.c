@@ -793,7 +793,7 @@ impl_tasklet_run_remove(PyTaskletObject *task, int remove);
 int
 PyTasklet_Run_nr(PyTaskletObject *task)
 {
-    slp_try_stackless = 1;
+    STACKLESS_PROPOSE_ALL();
     return slp_return_wrapper(impl_tasklet_run_remove(task, 0));
 }
 
@@ -922,7 +922,7 @@ PyTasklet_Switch_M(PyTaskletObject *task)
 int
 PyTasklet_Switch_nr(PyTaskletObject *task)
 {
-    slp_try_stackless = 1;
+    STACKLESS_PROPOSE_ALL();
     return slp_return_wrapper(impl_tasklet_run_remove(task, 1));
 }
 
