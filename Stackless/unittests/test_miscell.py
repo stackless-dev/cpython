@@ -11,6 +11,7 @@ import contextlib
 import time
 import os
 import struct
+import gc
 from stackless import _test_nostacklesscall as apply_not_stackless
 import _teststackless
 
@@ -22,7 +23,8 @@ except:
     withThreads = False
 
 from support import test_main  # @UnusedImport
-from support import StacklessTestCase, AsTaskletTestCase, require_one_thread, testcase_leaks_references
+from support import (StacklessTestCase, AsTaskletTestCase, require_one_thread,
+                     testcase_leaks_references, is_zombie)
 
 
 def is_soft():
@@ -1160,6 +1162,7 @@ class TestBind(StacklessTestCase):
         self.assertFalse(tlet.restorable)
         self.assertGreater(tlet.nesting_level, 0)
         self.assertRaisesRegex(RuntimeError, "tasklet has C state on its stack", tlet.bind, None)
+        self.tasklet_is_uncollectable(tlet)  # mark this tasklet as uncollectable
 
     def test_setup_fail_alive(self):
         # make sure, that you can't bind a tasklet, which is alive
@@ -1303,6 +1306,28 @@ class TestCstate(StacklessTestCase):
             self.assertIsInstance(c, stackless.cstack)
             self.assertIs(c.prev.next, c)
             c = c.next
+
+
+class TestTaskletFinalizer(StacklessTestCase):
+    def test_zombie(self):
+        loop = True
+
+        def task():
+            while loop:
+                try:
+                    stackless.schedule_remove()
+                except TaskletExit:
+                    pass
+        t = stackless.tasklet(apply_not_stackless)(task,)
+        t.run()
+        self.assertTrue(t.paused)
+        t.__del__()
+        self.assertTrue(is_zombie(t))
+        self.assertIn(t, gc.garbage)
+        gc.garbage.remove(t)
+        # clean up
+        loop = False
+        t.kill()
 
 
 #///////////////////////////////////////////////////////////////////////////////

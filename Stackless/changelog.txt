@@ -9,6 +9,16 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/192
+  Use the PEP 442 mechanic to finalize a tasklet instead of a arcane logic in
+  tp_dealloc. The finalizer can be called from Python-code: tasklet.__del__().
+  Stackless calls the finalizer only once. The finalizer repeatedly kills the
+  tasklet until it is dead but at most 10-times.
+  If the finalizer can't kill the C-state it adds the tasklet to gc.garbage.
+  This change unifies the behavior of de-allocation caused by ref-counting and
+  de-allocation caused by GC. And it brings the behavior more in line with
+  generators.
+
 - https://github.com/stackless-dev/stackless/issues/199
   Enable stackless calls of coroutines wrapped in "asyncio._CTask", if
   soft-switching is enabled. Now asyncio runs coroutines stackless.

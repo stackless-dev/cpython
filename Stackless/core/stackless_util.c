@@ -124,67 +124,6 @@ slp_current_wrapper( int(*func)(PyTaskletObject*), PyTaskletObject *task )
     return ret;
 }
 
-int
-slp_resurrect_and_kill(PyObject *self, void(*killer)(PyObject *))
-{
-    /* modelled after typeobject.c's slot_tp_del */
-
-    PyObject *error_type, *error_value, *error_traceback;
-
-    /* this is different from typeobject.c's slot_tp_del: our callers already 
-       called PyObject_GC_UnTrack(self) */
-    assert(PyObject_IS_GC(self) && ! _PyObject_GC_IS_TRACKED(self));
-
-    /* Temporarily resurrect the object. */
-    assert(Py_REFCNT(self) == 0);
-    Py_REFCNT(self) = 1;
-
-    /* Save the current exception, if any. */
-    PyErr_Fetch(&error_type, &error_value, &error_traceback);
-
-    killer(self);
-
-    /* Restore the saved exception. */
-    PyErr_Restore(error_type, error_value, error_traceback);
-
-    /* Undo the temporary resurrection; can't use DECREF here, it would
-     * cause a recursive call.
-     */
-    assert(Py_REFCNT(self) > 0);
-    if (--Py_REFCNT(self) == 0)
-        return 0;    /* this is the normal path out */
-
-    /* __del__ resurrected it!  Make it look like the original Py_DECREF
-     * never happened.
-     */
-    {
-        Py_ssize_t refcnt = Py_REFCNT(self);
-        _Py_NewReference(self);
-        Py_REFCNT(self) = refcnt;
-    }
-    /* If Py_REF_DEBUG, _Py_NewReference bumped _Py_RefTotal, so
-     * we need to undo that. */
-    _Py_DEC_REFTOTAL;
-    /* If Py_TRACE_REFS, _Py_NewReference re-added self to the object
-     * chain, so no more to do there.
-     * If COUNT_ALLOCS, the original decref bumped tp_frees, and
-     * _Py_NewReference bumped tp_allocs:  both of those need to be
-     * undone.
-     */
-#ifdef COUNT_ALLOCS
-    --Py_TYPE(self)->tp_frees;
-    --Py_TYPE(self)->tp_allocs;
-#endif
-    /* This code copied from iobase_dealloc() (in 3.0) */
-    /* When called from a heap type's dealloc, the type will be
-       decref'ed on return (see e.g. subtype_dealloc in typeobject.c).
-       This will undo that, thus preventing a crash.  But such a type
-       _will_ have had its dict and slots cleared. */
-    if (PyType_HasFeature(Py_TYPE(self), Py_TPFLAGS_HEAPTYPE))
-        Py_INCREF(Py_TYPE(self));
-
-    return -1;
-}
 
 /*
  * A thread id is either an unsigned long or the special value -1.

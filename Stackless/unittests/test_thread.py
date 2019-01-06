@@ -440,6 +440,7 @@ class DeadThreadTest(RemoteTaskletTests):
             raise
         # the tasklet has no thread
         self.assertEqual(tlet.thread_id, -1)
+        self.tasklet_is_uncollectable(tlet)
 
     def test_methods_on_dead(self):
         """test that tasklet methods on a dead tasklet behave well"""

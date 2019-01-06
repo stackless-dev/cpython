@@ -152,12 +152,6 @@ tasklet_has_c_stack_and_thread(PyTaskletObject *t)
 static int
 tasklet_traverse(PyTaskletObject *t, visitproc visit, void *arg)
 {
-    /* tasklets that need to be switched to for the kill, can't be collected.
-     * Only trivial decrefs are allowed during GC collect
-     */
-    if (tasklet_has_c_stack_and_thread(t))
-        PyObject_GC_Collectable((PyObject *)t, visit, arg, 0);
-
     Py_VISIT(t->f.frame);
     Py_VISIT(t->tempval);
     Py_VISIT(t->cstate);
@@ -174,65 +168,6 @@ tasklet_clear_frames(PyTaskletObject *t)
     Py_CLEAR(t->f.frame);
 }
 
-static void
-tasklet_clear(PyTaskletObject *t)
-{
-    tasklet_clear_frames(t);
-    TASKLET_SETVAL(t, Py_None); /* always non-zero */
-
-    /* unlink task from cstate */
-    if (t->cstate != NULL && t->cstate->task == t)
-        t->cstate->task = NULL;
-    Py_CLEAR(t->cstate);
-
-    Py_CLEAR(t->exc_state.exc_type);
-    Py_CLEAR(t->exc_state.exc_value);
-    Py_CLEAR(t->exc_state.exc_traceback);
-
-    /* Assert that the tasklet is at the end of the chain. */
-    assert(t->exc_state.previous_item == NULL);
-    /* Unlink the exc_info chain. There is no guarantee, that
-     * the object t->exc_info points to still exists, because
-     * the order of calls to tp_clear is undefined.
-     */
-    t->exc_info = &t->exc_state;
-}
-
-/*
- * the following function tries to ensure that a tasklet is
- * really killed. It is called in a context where we can't
- * afford that it will not be dead afterwards.
- * Reason: When clearing or resurrecting and killing, the
- * tasklet is in fact already dead, and the only case that
- * could revive it was that __del_ was defined.
- * But in the context of __del__, we can't do anything but rely
- * on proper destruction, since nobody will listen to an exception.
- */
-
-static void
-kill_finally (PyObject *ob)
-{
-    PyThreadState *ts = PyThreadState_GET();
-    PyTaskletObject *self = (PyTaskletObject *) ob;
-    int is_mine = ts == self->cstate->tstate;
-
-    /* this could happen if we have a refcount bug, so catch it here.
-    assert(self != ts->st.current);
-    It also gets triggered on interpreter exit when we kill the tasks
-    with stacks (PyStackless_kill_tasks_with_stacks) and there is no
-    way to differentiate that case.. so it just gets commented out.
-    */
-
-    self->flags.is_zombie = 1;
-    while (self->f.frame != NULL) {
-        PyTasklet_Kill(self);
-        if (!is_mine)
-            return; /* will be killed elsewhere */
-    }
-}
-
-
-/* destructing a tasklet without destroying it */
 static inline void
 exc_state_clear(_PyErr_StackItem *exc_state)
 {
@@ -249,39 +184,19 @@ exc_state_clear(_PyErr_StackItem *exc_state)
 }
 
 static void
-tasklet_dealloc(PyTaskletObject *t)
+tasklet_clear(PyTaskletObject *t)
 {
-    PyObject_GC_UnTrack(t);
-    if (tasklet_has_c_stack_and_thread(t)) {
-        /*
-         * we want to cleanly kill the tasklet in the case it
-         * was forgotten. One way would be to resurrect it,
-         * but this is quite ugly with many ifdefs, see
-         * classobject/typeobject.
-         * Well, we do it.
-         */
-        if (slp_resurrect_and_kill((PyObject *) t, kill_finally)) {
-            /* the beast has grown new references */
-            PyObject_GC_Track(t);
-            return;
-        }
-    }
-
     tasklet_clear_frames(t);
-    if (t->tsk_weakreflist != NULL)
-        PyObject_ClearWeakRefs((PyObject *)t);
-    if (t->cstate != NULL) {
-        assert(t->cstate->task != t || Py_SIZE(t->cstate) == 0 || t->cstate->tstate == NULL);
-        if (t->cstate->task == t) {
-            t->cstate->task = NULL;
-            if (Py_VerboseFlag && Py_SIZE(t->cstate) != 0) {
-                PySys_WriteStderr("# tasklet_dealloc: warning: tasklet %p has a non zero C-stack. \n", (void*)t);
-            }
-        }
-        Py_DECREF(t->cstate);
-    }
-    Py_DECREF(t->tempval);
-    Py_XDECREF(t->def_globals);
+    Py_CLEAR(t->tempval);
+    Py_CLEAR(t->def_globals);
+
+    /* unlink task from cstate */
+    if (t->cstate != NULL && t->cstate->task == t)
+        t->cstate->task = NULL;
+    Py_CLEAR(t->cstate);
+
+    exc_state_clear(&t->exc_state);
+
     /* Assert that the tasklet is at the end of the chain. */
     assert(t->exc_state.previous_item == NULL);
     /* Unlink the exc_info chain. There is no guarantee, that
@@ -289,7 +204,107 @@ tasklet_dealloc(PyTaskletObject *t)
      * the order of calls to tp_clear is undefined.
      */
     t->exc_info = &t->exc_state;
-    exc_state_clear(&t->exc_state);
+}
+
+/*
+ * the following function tries to ensure that a tasklet is
+ * really killed. It is called in a context where we can't
+ * afford that it will not be dead afterwards.
+ * Reason: When clearing or resurrecting and killing, the
+ * tasklet is in fact already dead, and the only case that
+ * could revive it was that __del__ was defined.
+ * But in the context of __del__, we can't do anything but rely
+ * on proper destruction, since nobody will listen to an exception.
+ */
+
+static void
+kill_finally (PyObject *ob)
+{
+    PyThreadState *ts = PyThreadState_GET();
+    PyTaskletObject *self = (PyTaskletObject *) ob;
+    int is_mine = ts == self->cstate->tstate;
+    int i;
+
+    /* this could happen if we have a refcount bug, so catch it here.
+    assert(self != ts->st.current);
+    It also gets triggered on interpreter exit when we kill the tasks
+    with stacks (PyStackless_kill_tasks_with_stacks) and there is no
+    way to differentiate that case.. so it just gets commented out.
+    */
+
+    self->flags.is_zombie = 1;
+    for (i=0; i<10 && self->f.frame != NULL; i++) {
+        PyTasklet_Kill(self);
+        if (!is_mine)
+            return; /* will be killed elsewhere */
+    }
+}
+
+
+/* destructing a tasklet without destroying it */
+static void
+tasklet_finalize(PyObject *self)
+{
+    PyTaskletObject *t;
+    PyObject *error_type, *error_value, *error_traceback;
+
+    assert(PyTasklet_Check(self));
+    t = (PyTaskletObject *)self;
+
+    /* Save the current exception, if any. */
+    PyErr_Fetch(&error_type, &error_value, &error_traceback);
+
+    if (tasklet_has_c_stack_and_thread(t)) {
+        /*
+         * we want to cleanly kill the tasklet in the case it
+         * was forgotten.
+         */
+        kill_finally(self);
+    }
+
+    /* We must not free a C-stack, that is still somewhat alive. Instead we
+     * add the current tasklet to gc.garbage. That's perfectly OK, because the
+     * tasklet is still intact. Of course this grows a new reference to the
+     * tasklet.
+     */
+    if (t->f.frame && t->cstate && t->cstate->task == t && Py_SIZE(t->cstate) != 0) {
+        if (Py_VerboseFlag) {
+            PySys_WriteStderr("# tasklet_finalize: warning: tasklet %p has a non zero C-stack.\n", (void*)t);
+        }
+        if (_PyRuntime.gc.garbage == NULL) {
+            _PyRuntime.gc.garbage = PyList_New(0);
+            if (_PyRuntime.gc.garbage == NULL)
+                Py_FatalError("gc couldn't create gc.garbage list");
+        }
+        TASKLET_SETVAL(t, Py_None);  /* don't keep tempval alive */
+        if (PyList_Append(_PyRuntime.gc.garbage, self) < 0)
+            PyErr_WriteUnraisable(self);
+    }
+
+    /* Restore the saved exception. */
+    PyErr_Restore(error_type, error_value, error_traceback);
+}
+
+static void
+tasklet_dealloc(PyTaskletObject *t)
+{
+    if (PyTasklet_CheckExact(t)) {
+        /* When ob is subclass of stackless.tasklet, finalizer is called from
+         * subtype_dealloc.
+         */
+        if (PyObject_CallFinalizerFromDealloc((PyObject *)t) < 0) {
+            // resurrected.
+            return;
+        }
+    }
+
+    PyObject_GC_UnTrack(t);
+
+    if (t->tsk_weakreflist != NULL)
+        PyObject_ClearWeakRefs((PyObject *)t);
+
+    tasklet_clear(t);
+
     Py_TYPE(t)->tp_free((PyObject*)t);
 }
 
@@ -2339,7 +2354,8 @@ PyTypeObject PyTasklet_Type = {
     PyObject_GenericSetAttr,            /* tp_setattro */
     0,                                  /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
-        Py_TPFLAGS_BASETYPE,            /* tp_flags */
+        Py_TPFLAGS_BASETYPE |
+        Py_TPFLAGS_HAVE_FINALIZE,       /* tp_flags */
     tasklet__doc__,                     /* tp_doc */
     (traverseproc)tasklet_traverse,     /* tp_traverse */
     (inquiry) tasklet_clear,            /* tp_clear */
@@ -2359,5 +2375,14 @@ PyTypeObject PyTasklet_Type = {
     0,                                  /* tp_alloc */
     tasklet_new,                        /* tp_new */
     PyObject_GC_Del,                    /* tp_free */
+    0,                                  /* tp_is_gc */
+    0,                                  /* tp_bases */
+    0,                                  /* tp_mro */
+    0,                                  /* tp_cache */
+    0,                                  /* tp_subclasses */
+    0,                                  /* tp_weaklist */
+    0,                                  /* tp_del */
+    0,                                  /* tp_version_tag */
+    tasklet_finalize,                   /* tp_finalize */
 };
 #endif

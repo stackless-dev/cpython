@@ -342,6 +342,19 @@ The ``tasklet`` class
      # Implement unsafe logic here.
      t.set_ignore_nesting(old_value)
 
+.. method:: tasklet.__del__()
+
+   .. versionadded:: 3.7
+
+   Finalize the tasklet. This is a :pep:`442` finalizer. If this tasklet is
+   alive and has a non-trivial C-state attached, the finalizer repeatedly
+   kills the tasklet for upmost 10 times until it is dead. Then, if this
+   tasklet still has non-trivial C-state attached, the finalizer appends the
+   tasklet to :data:`gc.garbage`. This is done, because releasing the C-state
+   could cause undefined behavior.
+
+   You should not call this method from |PY|-code.
+
 The following (read-only) attributes allow tasklet state to be checked:
 
 .. attribute:: tasklet.alive
