@@ -20,6 +20,11 @@ What's New in Stackless 3.X.X?
   With this change it is possible to soft switch into/from the compound
   statements "async for" and "async with".
 
+- https://github.com/stackless-dev/stackless/issues/200
+  Fix a bug in the C-API functions PyTasklet_Run_nr() and
+  PyTasklet_Switch_nr(). Under exotic conditions the functions could
+  cause undefined behavior.
+
 - https://github.com/stackless-dev/stackless/issues/196
   Stackless can now pickle coroutine_wrapper objects.
 
@@ -33,7 +38,10 @@ What's New in Stackless 3.X.X?
   Previously they contained a reference to a non existing variable.
 
 - https://github.com/stackless-dev/stackless/issues/178
+- https://github.com/stackless-dev/stackless/issues/198
   There is a new, provisional API to write soft switchable functions in C.
+  You can also use this API to convert existing extension functions to 
+  the stackless-protocol.
 
 - https://github.com/stackless-dev/stackless/issues/149
   The Stackless version is now "3.7".

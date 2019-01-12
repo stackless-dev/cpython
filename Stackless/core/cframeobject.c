@@ -436,7 +436,8 @@ execute_soft_switchable_func(PyFrameObject *f, int exc, PyObject *retval)
     PyObject *ob1, *ob2, *ob3;
     PyStacklessFunctionDeclarationObject *ssfd =
             (PyStacklessFunctionDeclarationObject*)cf->any2;
-    if (retval == NULL) {
+    if (retval == NULL && !PyErr_Occurred()) {
+        PyErr_SetString(PyExc_SystemError, "retval is NULL, but no error occurred");
         SLP_STORE_NEXT_FRAME(ts, cf->f_back);
         return NULL;
     }
@@ -452,7 +453,7 @@ execute_soft_switchable_func(PyFrameObject *f, int exc, PyObject *retval)
     Py_XINCREF(ob3);
     STACKLESS_PROPOSE_ALL(ts);
     /* use Py_SETREF, because we own a ref to retval. */
-    Py_SETREF(retval, ssfd->sfunc(retval, &cf->i, &cf->ob1, &cf->ob2, &cf->ob3, &cf->n, &cf->any1));
+    Py_XSETREF(retval, ssfd->sfunc(retval, &cf->i, &cf->ob1, &cf->ob2, &cf->ob3, &cf->n, &cf->any1));
     STACKLESS_RETRACT();
     STACKLESS_ASSERT();
     Py_XDECREF(ob1);
@@ -484,9 +485,18 @@ PyStackless_CallFunction(PyStacklessFunctionDeclarationObject *ssfd, PyObject *a
 {
     STACKLESS_GETARG();
     PyThreadState *ts = PyThreadState_GET();
+    PyObject *et=NULL, *ev=NULL, *tb=NULL;
 
     assert(ssfd);
     assert(ts->st.main != NULL);
+
+    if (arg == NULL) {
+        if (!PyErr_Occurred()) {
+            PyErr_SetString(PyExc_SystemError, "No error occurred, but arg is NULL");
+            return NULL;
+        }
+        PyErr_Fetch(&et, &ev, &tb);
+    }
 
     if (stackless) {
         /* Only soft-switch, if the caller can handle Py_UnwindToken.
@@ -494,8 +504,10 @@ PyStackless_CallFunction(PyStacklessFunctionDeclarationObject *ssfd, PyObject *a
          * but if you call this method from a C-function, you don't know. */
         PyCFrameObject *cf;
         cf = slp_cframe_new(execute_soft_switchable_func, 1);
-        if (cf == NULL)
+        if (cf == NULL) {
+            _PyErr_ChainExceptions(et, ev, tb);
             return NULL;
+        }
         cf->any2 = ssfd;
 
         Py_XINCREF(ob1);
@@ -510,9 +522,9 @@ PyStackless_CallFunction(PyStacklessFunctionDeclarationObject *ssfd, PyObject *a
         cf->any1 = any;
         SLP_STORE_NEXT_FRAME(ts, (PyFrameObject *) cf);
         Py_DECREF(cf);
+        Py_XINCREF(arg);
         if (arg == NULL)
-            arg = Py_None;
-        Py_INCREF(arg);
+            PyErr_Restore(et, ev, tb);
         return STACKLESS_PACK(ts, arg);
     } else {
         /*
@@ -521,9 +533,7 @@ PyStackless_CallFunction(PyStacklessFunctionDeclarationObject *ssfd, PyObject *a
         PyObject *retval, *saved_ob1, *saved_ob2, *saved_ob3;
         long step = 0;
 
-        if (arg == NULL)
-            arg = Py_None;
-        Py_INCREF(arg);
+        Py_XINCREF(arg);
 
         saved_ob1 = ob1;
         saved_ob2 = ob2;
@@ -531,13 +541,15 @@ PyStackless_CallFunction(PyStacklessFunctionDeclarationObject *ssfd, PyObject *a
         Py_XINCREF(saved_ob1);
         Py_XINCREF(saved_ob2);
         Py_XINCREF(saved_ob3);
+        if (arg == NULL)
+            PyErr_Restore(et, ev, tb);
         retval = ssfd->sfunc(arg, &step, &ob1, &ob2, &ob3, &n, &any);
         STACKLESS_ASSERT();
         assert(!STACKLESS_UNWINDING(retval));
         Py_XDECREF(saved_ob1);
         Py_XDECREF(saved_ob2);
         Py_XDECREF(saved_ob3);
-        Py_DECREF(arg);
+        Py_XDECREF(arg);
         return retval;
     }
 }

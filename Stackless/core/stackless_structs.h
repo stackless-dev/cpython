@@ -289,6 +289,18 @@ PyAPI_DATA(PyTypeObject) PyChannel_Type;
 #define PyChannel_Check(op) PyObject_TypeCheck(op, &PyChannel_Type)
 #define PyChannel_CheckExact(op) (Py_TYPE(op) == &PyChannel_Type)
 
+/******************************************************
+  Macros for the stackless protocol
+ ******************************************************/
+
+#ifndef _PyStackless_TRY_STACKLESS
+PyAPI_DATA(int * const) _PyStackless__TryStacklessPtr;
+#define _PyStackless_TRY_STACKLESS (*_PyStackless__TryStacklessPtr)
+#endif
+#ifndef STACKLESS__GETARG_ASSERT
+#define STACKLESS__GETARG_ASSERT ((void)0)
+#endif
+
 #endif /* #ifdef STACKLESS */
 
 #ifdef __cplusplus
