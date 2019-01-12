@@ -378,6 +378,7 @@ PyObject * slp_eval_frame_noval(struct _frame *f,  int throwflag, PyObject *retv
 PyObject * slp_eval_frame_iter(struct _frame *f,  int throwflag, PyObject *retval);
 PyObject * slp_eval_frame_setup_with(struct _frame *f,  int throwflag, PyObject *retval);
 PyObject * slp_eval_frame_with_cleanup(struct _frame *f,  int throwflag, PyObject *retval);
+PyObject * slp_eval_frame_yield_from(struct _frame *f,  int throwflag, PyObject *retval);
 /* other eval_frame functions from module/scheduling.c */
 PyObject * slp_restore_tracing(PyFrameObject *f, int exc, PyObject *retval);
 /* other eval_frame functions from Objects/typeobject.c */
@@ -423,32 +424,25 @@ PyTaskletObject * slp_get_watchdog(PyThreadState *ts, int interrupt);
 
 /* macros for setting/resetting the stackless flag */
 
+#ifdef _PyStackless_TRY_STACKLESS
+#undef _PyStackless_TRY_STACKLESS
+#endif
+#define _PyStackless_TRY_STACKLESS (_PyRuntime.st.try_stackless)
+
 #define STACKLESS_POSSIBLE(tstate) \
     ((tstate)->interp->st.enable_softswitch && (tstate)->st.unwinding_retval == NULL)
 
-#define STACKLESS_GETARG() \
-    int stackless = (assert(SLP_CURRENT_FRAME_IS_VALID(PyThreadState_GET())), \
-                     stackless = (_PyRuntime.st.try_stackless), \
-                     (_PyRuntime.st.try_stackless) = 0, \
-                     stackless)
+#ifdef STACKLESS__GETARG_ASSERT
+#undef STACKLESS__GETARG_ASSERT
+#endif
+#define STACKLESS__GETARG_ASSERT \
+    assert(SLP_CURRENT_FRAME_IS_VALID(PyThreadState_GET()))
 
-#define STACKLESS_PROMOTE(func) \
-    (stackless ? (_PyRuntime.st.try_stackless) = \
-     Py_TYPE(func)->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_CALL : 0)
-
-#define STACKLESS_PROMOTE_FLAG(flag) \
-    (stackless ? (_PyRuntime.st.try_stackless) = (flag) : 0)
-
-#define STACKLESS_PROMOTE_METHOD(obj, meth) do { \
-    if ((Py_TYPE(obj)->tp_flags & Py_TPFLAGS_HAVE_STACKLESS_EXTENSION) && \
-     Py_TYPE(obj)->tp_as_mapping) \
-        (_PyRuntime.st.try_stackless) = stackless && Py_TYPE(obj)->tp_as_mapping->slpflags.meth; \
-} while (0)
-
+/* descr must be of type PyWrapperDescrObject, but this type is undocumented.
+ * Therefore this macro is in stackless_impl.h and not in stackless_api.h
+ */
 #define STACKLESS_PROMOTE_WRAPPER(descr) \
-    ((_PyRuntime.st.try_stackless) = stackless && (descr)->d_slpmask)
-
-#define STACKLESS_PROMOTE_ALL() ((void)((_PyRuntime.st.try_stackless) = stackless, NULL))
+    STACKLESS_PROMOTE_FLAG((descr)->d_slpmask)
 
 #define STACKLESS_PROPOSE(tstate, func) {int stackless = STACKLESS_POSSIBLE(tstate); \
                  STACKLESS_PROMOTE(func);}
@@ -459,11 +453,7 @@ PyTaskletObject * slp_get_watchdog(PyThreadState *ts, int interrupt);
 #define STACKLESS_PROPOSE_METHOD(tstate, obj, meth) {int stackless = STACKLESS_POSSIBLE(tstate); \
                  STACKLESS_PROMOTE_METHOD(obj, meth);}
 
-#define STACKLESS_PROPOSE_ALL(tstate) (_PyRuntime.st.try_stackless) = STACKLESS_POSSIBLE(tstate)
-
-#define STACKLESS_RETRACT() (_PyRuntime.st.try_stackless) = 0;
-
-#define STACKLESS_ASSERT() assert(!(_PyRuntime.st.try_stackless))
+#define STACKLESS_PROPOSE_ALL(tstate) _PyStackless_TRY_STACKLESS = STACKLESS_POSSIBLE(tstate)
 
 /* this is just a tag to denote which methods are stackless */
 
@@ -477,7 +467,7 @@ PyTaskletObject * slp_get_watchdog(PyThreadState *ts, int interrupt);
 /*
 
   How this works:
-  There is one global variable (_PyRuntime.st.try_stackless) which is used
+  There is one global variable _PyStackless_TRY_STACKLESS which is used
   like an implicit parameter. Since we don't have a real parameter,
   the flag is copied into the local variable "stackless" and cleared.
   This is done by the STACKLESS_GETARG() macro, which should be added to
@@ -493,7 +483,7 @@ PyTaskletObject * slp_get_watchdog(PyThreadState *ts, int interrupt);
 
   STACKLESS_GETARG()
 
-    move the (_PyRuntime.st.try_stackless) flag into the local variable "stackless".
+    move the _PyStackless_TRY_STACKLESS flag into the local variable "stackless".
 
   STACKLESS_PROMOTE_ALL()
 
@@ -506,7 +496,7 @@ PyTaskletObject * slp_get_watchdog(PyThreadState *ts, int interrupt);
 
     if stackless was set and the function's type has set
     Py_TPFLAGS_HAVE_STACKLESS_CALL, then this flag will be
-    put back into (_PyRuntime.st.try_stackless), and we expect that the
+    put back into _PyStackless_TRY_STACKLESS, and we expect that the
     function handles it correctly.
 
   STACKLESS_PROMOTE_FLAG(flag)
@@ -526,7 +516,7 @@ PyTaskletObject * slp_get_watchdog(PyThreadState *ts, int interrupt);
 
   STACKLESS_ASSERT()
 
-    make sure that (_PyRuntime.st.try_stackless) was cleared. This debug feature
+    make sure that _PyStackless_TRY_STACKLESS was cleared. This debug feature
     tries to ensure that no unexpected nonrecursive call can happen.
 
   Some functions which are known to be stackless by nature
@@ -737,8 +727,6 @@ int slp_return_wrapper_hard(PyObject *retval);
 int slp_int_wrapper(PyObject *retval);
 int slp_current_wrapper(int(*func)(PyTaskletObject*),
                         PyTaskletObject *task);
-int slp_resurrect_and_kill(PyObject *self,
-                           void(*killer)(PyObject *));
 
 /* stackless pickling support */
 PyObject * slp_coro_wrapper_reduce(PyObject *o, PyTypeObject * wrapper_type);
@@ -790,18 +778,10 @@ long slp_parse_thread_id(PyObject *thread_id, unsigned long *id);
 #define SLP_PEEK_NEXT_FRAME(tstate) \
     ((tstate)->frame)
 
-#define STACKLESS_GETARG() int stackless = 0
-#define STACKLESS_PROMOTE(func) stackless = 0
-#define STACKLESS_PROMOTE_FLAG(flag) stackless = 0
-#define STACKLESS_PROMOTE_METHOD(obj, meth) stackless = 0
-#define STACKLESS_PROMOTE_WRAPPER(descr) stackless = 0
-#define STACKLESS_PROMOTE_ALL() stackless = 0
 #define STACKLESS_PROPOSE(tstate, func) assert(1)
 #define STACKLESS_PROPOSE_FLAG(tstate, flag) assert(1)
 #define STACKLESS_PROPOSE_ALL(tstate) assert(1)
 #define STACKLESS_PROPOSE_METHOD(tstate, obj, meth) assert(1)
-#define STACKLESS_RETRACT() assert(1)
-#define STACKLESS_ASSERT() assert(1)
 
 #define STACKLESS_RETVAL(tstate, obj) (obj)
 #define STACKLESS_ASSERT_UNWINDING_VALUE_IS_NOT(tstate, obj, val) assert(1)

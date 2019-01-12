@@ -1,5 +1,7 @@
+//#define STACKLESS_OFF
 #include "Python.h"
 #include "structmember.h"
+#include "stackless_api.h"
 
 
 /*[clinic input]
@@ -1685,6 +1687,8 @@ static PyObject *
 TaskStepMethWrapper_call(TaskStepMethWrapper *o,
                          PyObject *args, PyObject *kwds)
 {
+    STACKLESS_GETARG();
+
     if (kwds != NULL && PyDict_GET_SIZE(kwds) != 0) {
         PyErr_SetString(PyExc_TypeError, "function takes no keyword arguments");
         return NULL;
@@ -1693,7 +1697,10 @@ TaskStepMethWrapper_call(TaskStepMethWrapper *o,
         PyErr_SetString(PyExc_TypeError, "function takes no positional arguments");
         return NULL;
     }
-    return task_step(o->sw_task, o->sw_arg);
+    STACKLESS_PROMOTE_ALL();
+    PyObject * result = task_step(o->sw_task, o->sw_arg);
+    STACKLESS_ASSERT();
+    return result;
 }
 
 static int
@@ -1720,6 +1727,12 @@ static PyGetSetDef TaskStepMethWrapper_getsetlist[] = {
     {NULL} /* Sentinel */
 };
 
+#ifdef STACKLESS
+static PyMappingMethods TaskStepMethWrapper_as_mapping = {
+    .slpflags.tp_call = -1,
+};
+#endif
+
 PyTypeObject TaskStepMethWrapper_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "TaskStepMethWrapper",
@@ -1729,9 +1742,12 @@ PyTypeObject TaskStepMethWrapper_Type = {
     .tp_dealloc = (destructor)TaskStepMethWrapper_dealloc,
     .tp_call = (ternaryfunc)TaskStepMethWrapper_call,
     .tp_getattro = PyObject_GenericGetAttr,
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_HAVE_STACKLESS_EXTENSION,
     .tp_traverse = (traverseproc)TaskStepMethWrapper_traverse,
     .tp_clear = (inquiry)TaskStepMethWrapper_clear,
+#ifdef STACKLESS
+    .tp_as_mapping = &TaskStepMethWrapper_as_mapping,
+#endif
 };
 
 static PyObject *
@@ -1759,6 +1775,7 @@ static PyObject *
 TaskWakeupMethWrapper_call(TaskWakeupMethWrapper *o,
                            PyObject *args, PyObject *kwds)
 {
+    STACKLESS_GETARG();
     PyObject *fut;
 
     if (kwds != NULL && PyDict_GET_SIZE(kwds) != 0) {
@@ -1769,7 +1786,10 @@ TaskWakeupMethWrapper_call(TaskWakeupMethWrapper *o,
         return NULL;
     }
 
-    return task_wakeup(o->ww_task, fut);
+    STACKLESS_PROMOTE_ALL();
+    PyObject * result = task_wakeup(o->ww_task, fut);
+    STACKLESS_ASSERT();
+    return result;
 }
 
 static int
@@ -1795,6 +1815,12 @@ TaskWakeupMethWrapper_dealloc(TaskWakeupMethWrapper *o)
     Py_TYPE(o)->tp_free(o);
 }
 
+#ifdef STACKLESS
+static PyMappingMethods TaskWakeupMethWrapper_as_mapping = {
+    .slpflags.tp_call = -1,
+};
+#endif
+
 PyTypeObject TaskWakeupMethWrapper_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "TaskWakeupMethWrapper",
@@ -1803,9 +1829,12 @@ PyTypeObject TaskWakeupMethWrapper_Type = {
     .tp_dealloc = (destructor)TaskWakeupMethWrapper_dealloc,
     .tp_call = (ternaryfunc)TaskWakeupMethWrapper_call,
     .tp_getattro = PyObject_GenericGetAttr,
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_HAVE_STACKLESS_EXTENSION,
     .tp_traverse = (traverseproc)TaskWakeupMethWrapper_traverse,
     .tp_clear = (inquiry)TaskWakeupMethWrapper_clear,
+#ifdef STACKLESS
+    .tp_as_mapping = &TaskWakeupMethWrapper_as_mapping,
+#endif
 };
 
 static PyObject *
@@ -2468,14 +2497,66 @@ task_set_error_soon(TaskObj *task, PyObject *et, const char *format, ...)
     Py_RETURN_NONE;
 }
 
+#ifdef STACKLESS
+static PyObject *
+task_step_impl_part1(TaskObj *task, PyObject *exc, int *failed);
+static PyObject *
+task_step_impl_part2(TaskObj *task, PyObject *result);
+static PyObject *
+task_step_tail(TaskObj *task, PyObject *res);
+
+static PyObject *
+task_step_impl_stackless(PyObject *retval, long *step, PyObject **ob1, PyObject **ob2, PyObject **ob3, long *n, void **any)
+{
+    Py_XINCREF(retval);
+    assert(*ob1);
+    assert(PyObject_TypeCheck(*ob1, &TaskType));
+    TaskObj *task = (TaskObj *)(*ob1);
+    int failed = 0;
+
+    switch (*step) {
+    case 0:
+        (*step)++;
+        Py_XSETREF(retval, task_step_impl_part1(task, *ob2, &failed));
+        if (STACKLESS_UNWINDING(retval))
+            return retval;
+        /* no break */
+    case 1:
+        break;
+    default:
+        PyErr_SetString(PyExc_SystemError, "invalid state");
+        Py_XDECREF(retval);
+        return NULL;
+    }
+
+    STACKLESS_RETRACT();
+    if (!failed)
+        retval = task_step_impl_part2(task, retval);
+    if (n)
+        retval = task_step_tail(task, retval);
+    return retval;
+}
+
+static PyStacklessFunctionDeclarationObject task_step_impl_declaration = {
+        PyObject_HEAD_INIT(NULL)
+        task_step_impl_stackless,
+        "_task_step_impl_stackless"
+};
+
+static PyObject *
+task_step_impl_part1(TaskObj *task, PyObject *exc, int *failed)
+{
+    STACKLESS_GETARG();
+#else  /* #ifdef STACKLESS */
+
 static PyObject *
 task_step_impl(TaskObj *task, PyObject *exc)
 {
+#endif  /* #ifdef STACKLESS */
     int res;
     int clear_exc = 0;
     PyObject *result = NULL;
     PyObject *coro;
-    PyObject *o;
 
     if (task->task_state != STATE_PENDING) {
         PyErr_Format(asyncio_InvalidStateError,
@@ -2523,14 +2604,17 @@ task_step_impl(TaskObj *task, PyObject *exc)
 
     if (exc == NULL) {
         if (PyGen_CheckExact(coro) || PyCoro_CheckExact(coro)) {
+            STACKLESS_PROMOTE_ALL();
             result = _PyGen_Send((PyGenObject*)coro, Py_None);
         }
         else {
+            STACKLESS_PROMOTE_ALL();
             result = _PyObject_CallMethodIdObjArgs(coro, &PyId_send,
                                                    Py_None, NULL);
         }
     }
     else {
+        STACKLESS_PROMOTE_ALL();
         result = _PyObject_CallMethodIdObjArgs(coro, &PyId_throw,
                                                exc, NULL);
         if (clear_exc) {
@@ -2538,6 +2622,24 @@ task_step_impl(TaskObj *task, PyObject *exc)
             Py_DECREF(exc);
         }
     }
+    STACKLESS_ASSERT();
+
+#ifdef STACKLESS
+    return result;
+
+fail:
+    *failed = 1;
+    Py_XDECREF(result);
+    return NULL;
+}
+
+
+static PyObject *
+task_step_impl_part2(TaskObj *task, PyObject *result)
+{
+    int res;
+#endif
+    PyObject *o;
 
     if (result == NULL) {
         PyObject *et, *ev, *tb;
@@ -2830,8 +2932,18 @@ task_step(TaskObj *task, PyObject *exc)
         return NULL;
     }
 
+#ifndef STACKLESS
     res = task_step_impl(task, exc);
+#else
+    res = PyStackless_CallFunction(&task_step_impl_declaration, Py_None,
+        (PyObject *)task, exc, NULL, 1, NULL);
+    return res;
+}
 
+static PyObject *
+task_step_tail(TaskObj *task, PyObject *res)
+{
+#endif
     if (res == NULL) {
         PyObject *et, *ev, *tb;
         PyErr_Fetch(&et, &ev, &tb);
@@ -2853,6 +2965,7 @@ task_step(TaskObj *task, PyObject *exc)
 static PyObject *
 task_wakeup(TaskObj *task, PyObject *o)
 {
+    STACKLESS_GETARG();
     PyObject *et, *ev, *tb;
     PyObject *result;
     assert(o);
@@ -2867,7 +2980,10 @@ task_wakeup(TaskObj *task, PyObject *o)
             break; /* exception raised */
         case 0:
             Py_DECREF(fut_result);
-            return task_step(task, NULL);
+            STACKLESS_PROMOTE_ALL();
+            result = task_step(task, NULL);
+            STACKLESS_ASSERT();
+            return result;
         default:
             assert(res == 1);
             result = task_step(task, fut_result);
@@ -2879,7 +2995,10 @@ task_wakeup(TaskObj *task, PyObject *o)
         PyObject *fut_result = PyObject_CallMethod(o, "result", NULL);
         if (fut_result != NULL) {
             Py_DECREF(fut_result);
-            return task_step(task, NULL);
+            STACKLESS_PROMOTE_ALL();
+            result = task_step(task, NULL);
+            STACKLESS_ASSERT();
+            return result;
         }
         /* exception raised */
     }
@@ -3342,6 +3461,12 @@ PyInit__asyncio(void)
         Py_DECREF(current_tasks);
         return NULL;
     }
+
+#ifdef STACKLESS
+    if (PyStackless_InitFunctionDeclaration(&task_step_impl_declaration, m, &_asynciomodule) < 0) {
+        return NULL;
+    }
+#endif
 
     return m;
 }

@@ -11,9 +11,6 @@
 #include "core/stackless_impl.h"
 #include "channelobject.h"
 
-static void
-channel_remove_all(PyObject *ob);
-
 Py_LOCAL_INLINE(PyChannelFlagStruc)
 channel_flags_from_integer(int flags) {
 #if defined(SLP_USE_NATIVE_BITFIELD_LAYOUT) && SLP_USE_NATIVE_BITFIELD_LAYOUT
@@ -63,14 +60,8 @@ channel_traverse(PyChannelObject *ch, visitproc visit, void *arg)
 static void
 channel_clear(PyObject *ob)
 {
-    /* this function does nothing but decref, so it's safe to use */
-    channel_remove_all(ob);
-}
-
-static void
-channel_remove_all(PyObject *ob)
-{
     PyChannelObject *ch = (PyChannelObject *) ob;
+    assert(PyChannel_Check(ob));
 
     /*
      * remove all tasklets and hope they will die.
@@ -78,7 +69,9 @@ channel_remove_all(PyObject *ob)
      * during tasklet deallocation, so we don't even know
      * if it will have the same direction. :-/
      */
+    ch->flags.closing = 1;
     while (ch->balance) {
+        /* this function does nothing but setting task->flags.blocked = 0, so it's safe to use */
         ob = (PyObject *) slp_channel_remove(ch, NULL, NULL, NULL);
         Py_DECREF(ob);
     }
@@ -88,15 +81,10 @@ static void
 channel_dealloc(PyObject *ob)
 {
     PyChannelObject *ch = (PyChannelObject *) ob;
-    PyObject_GC_UnTrack(ob);
 
-    if (ch->balance) {
-        if (slp_resurrect_and_kill(ob, channel_remove_all)) {
-            /* the beast has grown new references */
-            PyObject_GC_Track(ob);
-            return;
-        }
-    }
+
+    PyObject_GC_UnTrack(ob);
+    channel_clear(ob);
     if (ch->chan_weakreflist != NULL)
         PyObject_ClearWeakRefs((PyObject *)ch);
     Py_TYPE(ob)->tp_free(ob);
@@ -1152,7 +1140,7 @@ channel_setstate(PyObject *self, PyObject *args)
                           &PyList_Type, &lis))
         return NULL;
 
-    channel_remove_all((PyObject *) ch);
+    channel_clear((PyObject *) ch);
     n = PyList_GET_SIZE(lis);
     ch->flags = channel_flags_from_integer(flags);
     dir = balance > 0 ? 1 : -1;

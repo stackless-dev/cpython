@@ -50,6 +50,16 @@ except:
     withThreads = False
 
 
+def is_zombie(tasklet):
+    """Returns True, if tasklet is a zombie."""
+    if not isinstance(tasklet, stackless.tasklet):
+        raise TypeError("not a tasklet")
+    if tasklet is stackless.current:
+        return False
+    flags = tasklet.__reduce__()[2][0]
+    return (flags & (1 << 6)) != 0
+
+
 @contextlib.contextmanager
 def captured_stderr():
     old = sys.stderr
@@ -522,6 +532,7 @@ class StacklessTestCase(unittest.TestCase, StacklessTestCaseMixin, metaclass=Sta
     __setup_called = False
     __preexisting_threads = None
     __active_test_cases = weakref.WeakValueDictionary()
+    __expected_garbage = []
 
     def __init__(self, methodName='runTest'):
         # set the __enable_softswitch flag based on methodName
@@ -549,6 +560,10 @@ class StacklessTestCase(unittest.TestCase, StacklessTestCaseMixin, metaclass=Sta
         self.addCleanup(stackless.enable_softswitch, stackless.enable_softswitch(self.__enable_softswitch))
 
         self.__active_test_cases[id(self)] = self
+        self.__uncollectable_tasklets = []
+        self.assertListEqual([t for t in gc.garbage if isinstance(t, stackless.tasklet)], [],
+                             "Leakage from other tests, with tasklets in gc.garbage")
+
         watchdog_list = get_watchdog_list(-1)
         if watchdog_list is not None:
             self.assertListEqual(watchdog_list, [None], "Watchdog list is not empty: " + repr(watchdog_list))
@@ -634,6 +649,19 @@ class StacklessTestCase(unittest.TestCase, StacklessTestCaseMixin, metaclass=Sta
                              "Leakage from other threads, with %d threads running (%d expected)" %
                              (active_count, expected_thread_count))
         gc.collect()  # emits warnings about uncollectable objects after each test
+        unexpected_uncollectable = []
+        for t in [t for t in gc.garbage if isinstance(t, stackless.tasklet)]:
+            if id(t) not in self.__uncollectable_tasklets:
+                unexpected_uncollectable.append(t)
+            # clean up
+            gc.garbage.remove(t)
+            self.__expected_garbage.append(t)
+
+        self.assertListEqual(unexpected_uncollectable, [], "New uncollectable tasklets: %r" % unexpected_uncollectable)
+
+    def tasklet_is_uncollectable(self, tlet):
+        self.assertIsInstance(tlet, stackless.tasklet)
+        self.__uncollectable_tasklets.append(id(tlet))
 
     def dumps(self, obj, protocol=None, *, fix_imports=True):
         if protocol is None:

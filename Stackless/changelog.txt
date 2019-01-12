@@ -14,6 +14,35 @@ What's New in Stackless 3.X.X?
   enabled. The code has been in Stackless forever, but was disabled for some
   unknown reason.
 
+- https://github.com/stackless-dev/stackless/issues/192
+  Use the PEP 442 mechanic to finalize a tasklet instead of a arcane logic in
+  tp_dealloc. The finalizer can be called from Python-code: tasklet.__del__().
+  Stackless calls the finalizer only once. The finalizer repeatedly kills the
+  tasklet until it is dead but at most 10-times.
+  If the finalizer can't kill the C-state it adds the tasklet to gc.garbage.
+  This change unifies the behavior of de-allocation caused by ref-counting and
+  de-allocation caused by GC. And it brings the behavior more in line with
+  generators.
+
+- https://github.com/stackless-dev/stackless/issues/199
+  Enable stackless calls of coroutines wrapped in "asyncio._CTask", if
+  soft-switching is enabled. Now asyncio runs coroutines stackless.
+
+- https://github.com/stackless-dev/stackless/issues/197
+  Enable stackless calls of method "contextvars.Context.run", if soft-switching
+  is enabled.
+
+- https://github.com/stackless-dev/stackless/issues/188
+  Enable stackless calls of sub-iterators and coroutines (technically: the
+  YIELD_FROM opcode) and of the following methods, if soft-switching is
+  enabled:
+    - generator.send() (generator.__next__() was already stackless);
+    - coroutine.send();
+    - coroutine_wrapper.__next__() and coroutine_wrapper.send();
+    - async_generator_asend.__next__() and async_generator_asend.send().
+  With this change it is possible to soft switch into/from the compound
+  statements "async for" and "async with".
+
 - https://github.com/stackless-dev/stackless/issues/200
   Fix a bug in the C-API functions PyTasklet_Run_nr() and
   PyTasklet_Switch_nr(). Under exotic conditions the functions could
@@ -32,7 +61,10 @@ What's New in Stackless 3.X.X?
   Previously they contained a reference to a non existing variable.
 
 - https://github.com/stackless-dev/stackless/issues/178
+- https://github.com/stackless-dev/stackless/issues/198
   There is a new, provisional API to write soft switchable functions in C.
+  You can also use this API to convert existing extension functions to 
+  the stackless-protocol.
 
 - https://github.com/stackless-dev/stackless/issues/149
   The Stackless version is now "3.7".
