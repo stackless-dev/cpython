@@ -34,29 +34,69 @@ static PyTypeObject SoftSwitchableDemo_Type;
 
 #define SoftSwitchableDemoObject_Check(v)      (Py_TYPE(v) == &SoftSwitchableDemo_Type)
 
-/* SoftSwitchableDemo methods */
+/* The documentation includes the following code as an example and needs
+ * the next comment as marker.
+ */
+/*DO-NOT-REMOVE-OR-MODIFY-THIS-MARKER:ssf-example-start*/
 
+/*
+ * SoftSwitchableDemo methods
+ *
+ * The purpose of this demo is to test soft switchable extension methods and
+ * give an example of their usage. Otherwise the demo code is very simplistic.
+ */
 
 static
 PyObject *
-demo_soft_switchable(PyObject *retval, long *step, PyObject **ob1, PyObject **ob2, PyObject **ob3, long *n, void **any)
+demo_soft_switchable(PyObject *retval, long *step, PyObject **ob1,
+        PyObject **ob2, PyObject **ob3, long *n, void **any)
 {
-    int do_schedule = *n;
+    /*
+     *  Boiler plate code for soft switchable functions
+     */
+
+    /* Every function, that supports the stackless-protocol starts with this
+     * macro. It defines the local variable "int stackless" and moves the value
+     * of the global variable "_PyStackless_TRY_STACKLESS" to "stackless".
+     */
+    STACKLESS_GETARG();
+
+    /* This function returns a new reference.
+     * If retval is NULL, then PyErr_Occurred() is true.
+     */
+    Py_XINCREF(retval);
+
+    /*
+     * Optional: define a struct for additional state
+     */
     struct {
         /*
          * If *ob1, *ob2, *ob3, *n and *any are insufficient for the state of this method,
          * you can define state variables here and store this structure in *any.
          */
-        int var1;
+        int var1;  // Minimal example
     } *state = *any;
 
-    Py_INCREF(retval); /* we need our own reference */
+    /*
+     * Specific vars for this example.
+     */
+    int do_schedule = *n;
+    if (*step == 0 && *n >= 100)
+        *step = *n; // n==100: demo for calling back to Python
 
+    /*
+     * Always present: the switch, that is used to jump to the next step.
+     *
+     * Of course you are not limited to a linear sequence of steps, but
+     * this is simplest use case. If you think of a state machine, the variable
+     * (*step) is the number of the next state to enter.
+     * The initial value of (*step) is 0.
+     */
     switch(*step) {
     case 0:
-        (*step)++;
+        (*step)++;  // set to the next step
         /*
-         * Initialize state
+         * Optional: initialize the state structure.
          */
         *any = state = PyMem_Calloc(1, sizeof(*state));
         if (state == NULL) {
@@ -65,7 +105,7 @@ demo_soft_switchable(PyObject *retval, long *step, PyObject **ob1, PyObject **ob
         }
 
         /*
-         * Add your business logic here
+         * Code specific for this example
          */
         state->var1++;  /* This example is a bit simplistic */
 
@@ -73,7 +113,21 @@ demo_soft_switchable(PyObject *retval, long *step, PyObject **ob1, PyObject **ob
          * Now eventually schedule.
          */
         if (do_schedule) {
+            /*
+             * The function PyStackless_Schedule() supports the stackless-protocol.
+             * Therefore we may call TACKLESS_PROMOTE_ALL(). This macro copies the
+             * local variable "stackless" into "_PyStackless_TRY_STACKLESS".
+             */
+            STACKLESS_PROMOTE_ALL();  // enable a stackless call
             Py_SETREF(retval, PyStackless_Schedule(retval, do_schedule > 1));
+            /*
+             * In debug builds STACKLESS_ASSERT asserts, that the previously called
+             * function did reset "_PyStackless_TRY_STACKLESS". If you call
+             * STACKLESS_PROMOTE_ALL() (or one of its variants) prior to calling
+             * a function that does not support the stackless protocol, the
+             * assertion fails.
+             */
+            STACKLESS_ASSERT();       // sanity check in debug builds
             if (STACKLESS_UNWINDING(retval))
                 return retval;
             else if (retval == NULL)
@@ -96,7 +150,9 @@ demo_soft_switchable(PyObject *retval, long *step, PyObject **ob1, PyObject **ob
          * Now eventually schedule.
          */
         if (do_schedule) {
+            STACKLESS_PROMOTE_ALL();  // enable a stackless call
             Py_SETREF(retval, PyStackless_Schedule(retval, do_schedule > 1));
+            STACKLESS_ASSERT();       // sanity check in debug builds
             if (STACKLESS_UNWINDING(retval))
                 return retval;
             else if (retval == NULL)
@@ -108,17 +164,67 @@ demo_soft_switchable(PyObject *retval, long *step, PyObject **ob1, PyObject **ob
          */
         /* no break */
     case 2:
+        /*
+         * Prepare the result
+         */
+        Py_SETREF(retval, PyLong_FromLong(*n));
         break;
-    default:
-        PyErr_SetString(PyExc_SystemError, "invalid state");
-        Py_CLEAR(retval);
-        goto exit_func;
-    }
 
     /*
-     * Prepare the result
+     * Demo code for calling back to Python.
      */
-    Py_SETREF(retval, PyLong_FromLong(*n));
+    case 100:
+        (*step)++;  // set to the next step
+        /*
+         * Here we demonstrate a stackless callback into Python code.
+         * This test assumes, that result is a callable object.
+         *
+         * The API function PyObject_Call supports the stackless protocoll.
+         * Therefore we may call STACKLESS_PROMOTE_ALL();
+         */
+        PyObject * args = PyTuple_New(0);
+        STACKLESS_PROMOTE_ALL();
+        Py_SETREF(retval, PyObject_Call(retval, args, NULL));
+        STACKLESS_ASSERT();
+        if (STACKLESS_UNWINDING(retval))
+            return retval;
+        /* no break */
+
+    case 101:
+        (*step)++;  // set to the next step
+
+        /*
+         * Error handling for the callback.
+         *
+         * This needs a step of its own, if the callback supports the
+         * stackless-protocol and fails.
+         */
+        if (retval == NULL) {
+            assert(PyErr_Occurred());
+
+            if (! PyErr_ExceptionMatches(PyExc_Exception))
+                // it is a BaseException, don't handle it
+                return NULL;
+
+            /*
+             * A very simple error handling: fetch the exception set it as
+             * context of a new RuntimeError.
+             */
+            PyObject *et, *ev, *tb;
+            PyErr_Fetch(&et, &ev, &tb);
+            PyErr_SetString(PyExc_RuntimeError, "demo_soft_switchable callback failed");
+            _PyErr_ChainExceptions(et, ev, tb);
+        }
+
+        break;
+
+    default:
+        /*
+         * Boiler plate code: error handling
+         */
+        PyErr_SetString(PyExc_SystemError, "invalid state");
+        Py_CLEAR(retval);
+    }
 
 exit_func:
     PyMem_Free(*any);
@@ -133,6 +239,7 @@ static PyStacklessFunctionDeclarationObject demo_soft_switchable_declaration = {
         "demo_soft_switchable"
 };
 
+/*DO-NOT-REMOVE-OR-MODIFY-THIS-MARKER:ssf-example-end*/
 
 static PyObject *
 SoftSwitchableDemo_demo(SoftSwitchableDemoObject *self, PyObject *args)

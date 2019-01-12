@@ -3,6 +3,8 @@
 #ifdef STACKLESS
 #include "stackless_impl.h"
 
+int * const _PyStackless__TryStacklessPtr = &_PyStackless_TRY_STACKLESS;
+
 /* Initialize the Stackless runtime state */
 void
 slp_initialize(struct _stackless_runtime_state * state) {

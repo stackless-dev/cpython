@@ -290,6 +290,38 @@ class Test_SoftSwitchableExtensionFunctions(StacklessTestCase):
         f = _teststackless.softswitchablefunc
         self._test_func(f)
 
+    def callback_ok(self):
+        if stackless.enable_softswitch(None):
+            self.assertEqual(stackless.current.nesting_level, 0)
+        else:
+            self.assertGreaterEqual(stackless.current.nesting_level, 1)
+        return self
+
+    def test_softswitchablefunc_callback_ok(self):
+        def task():
+            self.assertIs(self, _teststackless.softswitchablefunc(100, self.callback_ok))
+
+        t = stackless.tasklet(task)()
+        stackless.run()
+        self.assertFalse(t.alive)
+
+    def callback_fail(self):
+        if stackless.enable_softswitch(None):
+            self.assertEqual(stackless.current.nesting_level, 0)
+        else:
+            self.assertGreaterEqual(stackless.current.nesting_level, 1)
+        1 / 0
+
+    def test_softswitchablefunc_callback_fail(self):
+        def task():
+            with self.assertRaisesRegex(RuntimeError, "demo_soft_switchable callback failed") as cm:
+                _teststackless.softswitchablefunc(100, self.callback_fail)
+            self.assertIsInstance(cm.exception.__context__, ZeroDivisionError)
+
+        t = stackless.tasklet(task)()
+        stackless.run()
+        self.assertFalse(t.alive)
+
 
 class TestDemoExtensions(unittest.TestCase):
     def setUp(self):

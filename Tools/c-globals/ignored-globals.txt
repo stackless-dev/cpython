@@ -482,6 +482,10 @@ whatstrings
 #######################################
 # Stackless
 
+# Stackless/core/stackless_util.c
+# justification: the Stackless API needs it
+_PyStackless__TryStacklessPtr
+
 # Objects/exceptions.c
 # justification: other exceptions are globals too
 _PyExc_TaskletExit
