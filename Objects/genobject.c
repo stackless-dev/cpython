@@ -159,13 +159,30 @@ gen_dealloc(PyGenObject *gen)
  * was not faster, but considerably slower than this solution.
  */
 
-static PyObject* gen_iternext_callback(PyFrameObject *f, int exc, PyObject *result);
+/* Like gen_send_ex, additionally pass ob3 into the callback function. */
+static PyObject *
+gen_send_ex2(PyGenObject *gen, PyObject *arg, int exc, int closing, PyObject* ob3);
+
+/* callback for (async) generators and coroutines. */
+static PyObject *
+gen_iternext_callback(PyFrameObject *f, int exc, PyObject *result);
+
+/* Additional callback-code for async generators. */
+static PyObject *
+async_gen_asend_send_end(PyAsyncGenObject *gen, PyObject *asend, PyObject *result);
 #endif
+
 
 static PyObject *
 gen_send_ex(PyGenObject *gen, PyObject *arg, int exc, int closing)
 {
 #ifdef STACKLESS
+    return gen_send_ex2(gen, arg, exc, closing, NULL);
+}
+
+static PyObject *
+gen_send_ex2(PyGenObject *gen, PyObject *arg, int exc, int closing, PyObject * ob3)
+{
     STACKLESS_GETARG();
     PyFrameObject *stopframe;
 #endif
@@ -249,6 +266,7 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc, int closing)
     assert(f->f_back->f_back == NULL);
     assert(((PyCFrameObject *)f->f_back)->ob1 == NULL);
     assert(((PyCFrameObject *)f->f_back)->ob2 == NULL);
+    assert(((PyCFrameObject *)f->f_back)->ob3 == NULL);
 
     if (f->f_lasti != -1)
 #else
@@ -295,8 +313,10 @@ gen_send_ex(PyGenObject *gen, PyObject *arg, int exc, int closing)
 
     Py_INCREF(gen);
     Py_XINCREF(arg);
+    Py_XINCREF(ob3);
     ((PyCFrameObject *) f->f_back)->ob1 = (PyObject *) gen;
     ((PyCFrameObject *) f->f_back)->ob2 = arg;
+    ((PyCFrameObject *) f->f_back)->ob3 = ob3;
 
     if (exc)
         result = NULL;
@@ -326,12 +346,14 @@ gen_iternext_callback(PyFrameObject *f, int exc, PyObject *result)
     PyCFrameObject *cf = (PyCFrameObject *) f;
     PyGenObject *gen = (PyGenObject *) cf->ob1;
     PyObject *arg = cf->ob2;
+    PyObject *ob3 = cf->ob3;
 
     /* We hold references to things in the cframe, if we release it
        before we clear the references, they get incorrectly and
        prematurely freed. */
     cf->ob1 = NULL;
     cf->ob2 = NULL;
+    cf->ob3 = NULL;
 
     f = gen->gi_frame;
     /* Check, that this cframe belongs to gen */
@@ -400,8 +422,13 @@ gen_iternext_callback(PyFrameObject *f, int exc, PyObject *result)
         Py_DECREF(f);
     }
 #ifdef STACKLESS
+    if (ob3 && PyAsyncGen_CheckExact(gen)) {
+        result = async_gen_asend_send_end((PyAsyncGenObject *)gen, ob3, result);
+    }
+
     Py_DECREF(gen);
     Py_XDECREF(arg);
+    Py_XDECREF(ob3);
 #endif
     return result;
 }
@@ -839,7 +866,7 @@ static PyMemberDef gen_memberlist[] = {
 };
 
 static PyMethodDef gen_methods[] = {
-    {"send",(PyCFunction)_PyGen_Send, METH_O, send_doc},
+    {"send",(PyCFunction)_PyGen_Send, METH_O | METH_STACKLESS, send_doc},
     {"throw",(PyCFunction)gen_throw, METH_VARARGS, throw_doc},
     {"close",(PyCFunction)gen_close, METH_NOARGS, close_doc},
     {NULL, NULL}        /* Sentinel */
@@ -1092,7 +1119,7 @@ PyDoc_STRVAR(coro_close_doc,
 "close() -> raise GeneratorExit inside coroutine.");
 
 static PyMethodDef coro_methods[] = {
-    {"send",(PyCFunction)_PyGen_Send, METH_O, coro_send_doc},
+    {"send",(PyCFunction)_PyGen_Send, METH_O | METH_STACKLESS, coro_send_doc},
     {"throw",(PyCFunction)gen_throw, METH_VARARGS, coro_throw_doc},
     {"close",(PyCFunction)gen_close, METH_NOARGS, coro_close_doc},
     {NULL, NULL}        /* Sentinel */
@@ -1197,7 +1224,7 @@ coro_wrapper_traverse(PyCoroWrapper *cw, visitproc visit, void *arg)
 }
 
 static PyMethodDef coro_wrapper_methods[] = {
-    {"send",(PyCFunction)coro_wrapper_send, METH_O, coro_send_doc},
+    {"send",(PyCFunction)coro_wrapper_send, METH_O | METH_STACKLESS, coro_send_doc},
     {"throw",(PyCFunction)coro_wrapper_throw, METH_VARARGS, coro_throw_doc},
     {"close",(PyCFunction)coro_wrapper_close, METH_NOARGS, coro_close_doc},
     {NULL, NULL}        /* Sentinel */
@@ -1244,6 +1271,8 @@ PyTypeObject _PyCoroWrapper_Type = {
     0,                                          /* tp_new */
     0,                                          /* tp_free */
 };
+
+STACKLESS_DECLARE_METHOD(&_PyCoroWrapper_Type, tp_iternext);
 
 static PyObject *
 compute_cr_origin(int origin_depth)
@@ -1666,6 +1695,7 @@ async_gen_asend_traverse(PyAsyncGenASend *o, visitproc visit, void *arg)
 static PyObject *
 async_gen_asend_send(PyAsyncGenASend *o, PyObject *arg)
 {
+    STACKLESS_GETARG();
     PyObject *result;
 
     if (o->ags_state == AWAITABLE_STATE_CLOSED) {
@@ -1680,6 +1710,16 @@ async_gen_asend_send(PyAsyncGenASend *o, PyObject *arg)
         o->ags_state = AWAITABLE_STATE_ITER;
     }
 
+#ifdef STACKLESS
+    if (stackless) {
+        STACKLESS_PROMOTE_ALL();
+        result = gen_send_ex2((PyGenObject*)o->ags_gen, arg, 0, 0, (PyObject *)o);
+        STACKLESS_ASSERT();
+        if (STACKLESS_UNWINDING(result))
+            return result;
+    }
+    else
+#endif
     result = gen_send_ex((PyGenObject*)o->ags_gen, arg, 0, 0);
     result = async_gen_unwrap_value(o->ags_gen, result);
 
@@ -1690,6 +1730,22 @@ async_gen_asend_send(PyAsyncGenASend *o, PyObject *arg)
     return result;
 }
 
+#ifdef STACKLESS
+static PyObject *
+async_gen_asend_send_end(PyAsyncGenObject *gen, PyObject *asend, PyObject *result)
+{
+    PyAsyncGenASend *o = (PyAsyncGenASend *) asend;
+    assert(o->ags_gen == gen);
+
+    result = async_gen_unwrap_value(o->ags_gen, result);
+
+    if (result == NULL) {
+        o->ags_state = AWAITABLE_STATE_CLOSED;
+    }
+
+    return result;
+}
+#endif
 
 static PyObject *
 async_gen_asend_iternext(PyAsyncGenASend *o)
@@ -1728,7 +1784,7 @@ async_gen_asend_close(PyAsyncGenASend *o, PyObject *args)
 
 
 static PyMethodDef async_gen_asend_methods[] = {
-    {"send", (PyCFunction)async_gen_asend_send, METH_O, send_doc},
+    {"send", (PyCFunction)async_gen_asend_send, METH_O | METH_STACKLESS, send_doc},
     {"throw", (PyCFunction)async_gen_asend_throw, METH_VARARGS, throw_doc},
     {"close", (PyCFunction)async_gen_asend_close, METH_NOARGS, close_doc},
     {NULL, NULL}        /* Sentinel */
@@ -1783,6 +1839,8 @@ PyTypeObject _PyAsyncGenASend_Type = {
     0,                                          /* tp_alloc */
     0,                                          /* tp_new */
 };
+
+STACKLESS_DECLARE_METHOD(&_PyAsyncGenASend_Type, tp_iternext);
 
 
 static PyObject *

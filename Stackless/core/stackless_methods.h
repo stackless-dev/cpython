@@ -14,8 +14,8 @@ typedef struct {
 #define MFLAG_OFS_IND(meth) MFLAG_OFS(meth) + MFLAG_IND
 
 static _stackless_method _stackless_methtable[] = {
-    /* from methodobject.c */
-    {&PyCFunction_Type,            MFLAG_OFS(tp_call)},
+    /* from classobject.c */
+    {&PyMethod_Type,            MFLAG_OFS(tp_call)},
     /* from descrobject.c */
     {&PyMethodDescr_Type,        MFLAG_OFS(tp_call)},
     {&PyClassMethodDescr_Type,    MFLAG_OFS(tp_call)},
@@ -24,10 +24,12 @@ static _stackless_method _stackless_methtable[] = {
     {&PyFunction_Type,            MFLAG_OFS(tp_call)},
     /* from genobject.c */
     {&PyGen_Type,                MFLAG_OFS(tp_iternext)},
+    {&_PyCoroWrapper_Type,        MFLAG_OFS(tp_iternext)},
+    {&_PyAsyncGenASend_Type,    MFLAG_OFS(tp_iternext)},
+    /* from methodobject.c */
+    {&PyCFunction_Type,            MFLAG_OFS(tp_call)},
     /* from typeobject.c */
     {&PyType_Type,                MFLAG_OFS(tp_call)},
-    /* from classobject.c */
-    {&PyMethod_Type,            MFLAG_OFS(tp_call)},
     /* from channelobject.c */
     {&PyChannel_Type,            MFLAG_OFS(tp_iternext)},
     {0, 0} /* sentinel */
