@@ -6,6 +6,7 @@ import types
 import pickle
 import contextlib
 import sys
+import contextvars
 import asyncio
 
 from support import test_main  # @UnusedImport
@@ -67,10 +68,10 @@ class TestGarbageCollection(StacklessTestCase):
                 raise
 
         def task(generator):
-            l = [i for i in generator]
-            self.assertListEqual(l, [1])
+            li = [i for i in generator]
+            self.assertListEqual(li, [1])
 
-        self.run_GC_test(task,gen())
+        self.run_GC_test(task, gen())
 
     def testGCRunningCoroutine(self):
         async def coro():
@@ -251,6 +252,26 @@ class TestStacklessOperations(StacklessTestCase):
         else:
             self.assertGreater(stackless.current.nesting_level, expected)
 
+    def gen_1_2(self):
+        self.assertLevel()
+        yield 1
+        self.assertLevel()
+        yield 2
+        self.assertLevel()
+
+    def supergen(self, gen):
+        self.assertLevel()
+        yield from gen
+        self.assertLevel()
+
+    @types.coroutine
+    def wrapped_generator_coro(self):
+        self.assertLevel()
+        yield
+        self.assertLevel()
+        yield
+        self.assertLevel()
+
     @types.coroutine
     def coro1yield(self):
         yield
@@ -261,6 +282,89 @@ class TestStacklessOperations(StacklessTestCase):
         self.assertLevel()
         await self.coro1yield()
         self.assertLevel()
+
+    async def agen_1_2(self):
+        self.assertLevel()
+        await self.coro1yield()
+        yield 1
+        await self.coro1yield()
+        self.assertLevel()
+        yield 2
+        await self.coro1yield()
+        self.assertLevel()
+
+    @contextlib.asynccontextmanager
+    async def async_ctx_mgr(self):
+        self.assertLevel()
+        await self.coro1yield()
+        try:
+            yield
+        finally:
+            self.assertLevel()
+            await self.coro1yield()
+
+    def run_until_complete(self, coro):
+        n = 0
+        it = coro.__await__()
+        while True:
+            try:
+                x = it.send(None)
+                self.assertIsNone(x)
+                n += 1
+            except StopIteration:
+                return n
+
+    def test_yield_from(self):
+        li = [i for i in self.supergen(self.gen_1_2())]
+        self.assertListEqual(li, [1, 2])
+
+    def test_async_for(self):
+        async def test():
+            li = []
+            async for v in self.agen_1_2():
+                li.append(v)
+            self.assertListEqual(li, [1, 2])
+
+        t = test()
+        n = self.run_until_complete(t)
+        self.assertEqual(n, 3)
+
+    def test_async_with(self):
+        async def test():
+            async with self.async_ctx_mgr():
+                await self.coro()
+
+        t = test()
+        n = self.run_until_complete(t)
+        self.assertEqual(n, 4)
+
+    def test_coroutine_wrapper(self):
+        async def test():
+            await self.wrapped_generator_coro()
+
+        t = test()
+        n = self.run_until_complete(t)
+        self.assertEqual(n, 2)
+
+    def test_coroutine(self):
+        async def test():
+            await self.coro()
+
+        t = test()
+        n = self.run_until_complete(t)
+        self.assertEqual(n, 2)
+
+    def test_async_iter_asend_send(self):
+        async def test():
+            a = self.agen_1_2().__aiter__()
+            x = a.asend(None).send(None)
+
+        t = test()
+        n = self.run_until_complete(t)
+        self.assertEqual(n, 0)
+
+    def test_context_run(self):
+        contextvars.Context().run(self.assertLevel)
 
     def _test_asyncio(self, task_class):
         async def test():
