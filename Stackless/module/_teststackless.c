@@ -34,6 +34,9 @@ static PyTypeObject SoftSwitchableDemo_Type;
 
 #define SoftSwitchableDemoObject_Check(v)      (Py_TYPE(v) == &SoftSwitchableDemo_Type)
 
+/* The documentation includes the following code as an example and needs
+ * the next comment as marker.
+ */
 /*DO-NOT-REMOVE-OR-MODIFY-THIS-MARKER:ssf-example-start*/
 
 /*
@@ -78,6 +81,8 @@ demo_soft_switchable(PyObject *retval, long *step, PyObject **ob1,
      * Specific vars for this example.
      */
     int do_schedule = *n;
+    if (*step == 0 && *n >= 100)
+        *step = *n; // n==100: demo for calling back to Python
 
     /*
      * Always present: the switch, that is used to jump to the next step.
@@ -87,8 +92,6 @@ demo_soft_switchable(PyObject *retval, long *step, PyObject **ob1,
      * (*step) is the number of the next state to enter.
      * The initial value of (*step) is 0.
      */
-    if (*step == 0 && *n >= 100)
-        *step = *n;
     switch(*step) {
     case 0:
         (*step)++;  // set to the next step
@@ -167,6 +170,9 @@ demo_soft_switchable(PyObject *retval, long *step, PyObject **ob1,
         Py_SETREF(retval, PyLong_FromLong(*n));
         break;
 
+    /*
+     * Demo code for calling back to Python.
+     */
     case 100:
         (*step)++;  // set to the next step
         /*

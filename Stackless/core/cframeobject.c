@@ -485,7 +485,7 @@ PyStackless_CallFunction(PyStacklessFunctionDeclarationObject *ssfd, PyObject *a
 {
     STACKLESS_GETARG();
     PyThreadState *ts = PyThreadState_GET();
-    PyObject *et, *ev, *tb;
+    PyObject *et=NULL, *ev=NULL, *tb=NULL;
 
     assert(ssfd);
     assert(ts->st.main != NULL);
