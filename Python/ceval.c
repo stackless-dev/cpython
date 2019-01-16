@@ -19,8 +19,8 @@
 #include "pydtrace.h"
 #include "setobject.h"
 #include "structmember.h"
-#include "core/stackless_impl.h"
-#include "platf/slp_platformselect.h" /* for stack saving */
+#include "internal/stackless_impl.h"
+#include "internal/slp_platformselect.h" /* for stack saving */
 
 #include <ctype.h>
 

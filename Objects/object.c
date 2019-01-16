@@ -6,7 +6,7 @@
 #include "internal/context.h"
 #include "frameobject.h"
 #ifdef STACKLESS
-#include "core/stackless_impl.h"
+#include "internal/stackless_impl.h"
 #endif
 
 #ifdef __cplusplus

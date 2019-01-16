@@ -28,8 +28,8 @@
 #include "structmember.h"
 
 #ifdef STACKLESS
-#include "stackless_impl.h"
-#include "pickling/prickelpit.h"
+#include "internal/stackless_impl.h"
+#include "internal/slp_prickelpit.h"
 
 static PyCFrameObject *free_list = NULL;
 static int numfree = 0;         /* number of cframes currently in free_list */

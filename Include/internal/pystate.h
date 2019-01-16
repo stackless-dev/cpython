@@ -13,7 +13,7 @@ extern "C" {
 #include "internal/warnings.h"
 
 #ifdef STACKLESS
-#include "core/stackless_pystate.h"
+#include "internal/stackless_pystate.h"
 #endif
 
 /* GIL state */

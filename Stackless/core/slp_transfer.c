@@ -3,7 +3,7 @@
 
 #ifdef STACKLESS
 
-#include "stackless_impl.h"
+#include "internal/stackless_impl.h"
 
 /*
  * the following macros are spliced into the OS/compiler
@@ -39,7 +39,7 @@
 #ifdef STACKLESS_SLP_PLATFORM_SELECT_H
 #undef STACKLESS_SLP_PLATFORM_SELECT_H
 #endif
-#include "platf/slp_platformselect.h"
+#include "internal/slp_platformselect.h"
 
 #ifndef STACKLESS
 **********

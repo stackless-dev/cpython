@@ -5,7 +5,7 @@ extern "C" {
 #endif
 
 #ifdef STACKLESS
-#include "core/slp_exttype.h"
+#include "slp_exttype.h"
 #endif
 
 /* Object and type object interface */

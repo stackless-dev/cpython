@@ -35,7 +35,7 @@ extern const char *PyWin_DLLVersionString;
 #endif
 
 #ifdef STACKLESS
-#include "core/stackless_impl.h"
+#include "internal/stackless_impl.h"
 #endif
 
 /*[clinic input]

@@ -4,7 +4,7 @@
 #include "internal/pystate.h"
 #include "frameobject.h"
 #include "structmember.h"
-#include "core/stackless_impl.h"
+#include "internal/stackless_impl.h"
 
 #include <ctype.h>
 

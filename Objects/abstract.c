@@ -5,7 +5,7 @@
 #include <ctype.h>
 #include "structmember.h" /* we need the offsetof() macro from there */
 #include "longintrepr.h"
-#include "core/stackless_impl.h"
+#include "internal/stackless_impl.h"
 
 
 

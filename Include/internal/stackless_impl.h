@@ -20,7 +20,7 @@ extern "C" {
 #ifdef Py_BUILD_CORE
 #include "internal/pystate.h"  /* for _PyRuntime */
 #endif
-#include "pickling/prickelpit.h"
+#include "internal/slp_prickelpit.h"
 
 #undef STACKLESS_SPY
 /*

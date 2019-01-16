@@ -16,7 +16,7 @@
 
 /* This include file is included from internal/pystate.h only */
 
-#include "platf/slp_platformselect.h"  /* for SLP_CSTACK_SLOTS */
+#include "internal/slp_platformselect.h"  /* for SLP_CSTACK_SLOTS */
 
 /*
  * Stackless runtime state

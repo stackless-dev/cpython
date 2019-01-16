@@ -39,7 +39,7 @@ extern PyTypeObject PyWindowsConsoleIO_Type;
 #define PyWindowsConsoleIO_Check(op) (PyObject_TypeCheck((op), &PyWindowsConsoleIO_Type))
 #endif
 
-#include "core/stackless_impl.h"
+#include "internal/stackless_impl.h"
 
 _Py_IDENTIFIER(flush);
 _Py_IDENTIFIER(name);

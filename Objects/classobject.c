@@ -4,7 +4,7 @@
 #include "internal/mem.h"
 #include "internal/pystate.h"
 #include "structmember.h"
-#include "core/stackless_impl.h"
+#include "internal/stackless_impl.h"
 
 #define TP_DESCR_GET(t) ((t)->tp_descr_get)
 

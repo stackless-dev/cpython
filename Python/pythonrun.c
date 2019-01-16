@@ -24,7 +24,7 @@
 #include "marshal.h"
 #include "osdefs.h"
 #include <locale.h>
-#include "core/stackless_impl.h"
+#include "internal/stackless_impl.h"
 
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>

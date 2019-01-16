@@ -8,7 +8,7 @@
 #include "structmember.h"
 
 #ifdef STACKLESS
-#include "core/stackless_impl.h"
+#include "internal/stackless_impl.h"
 
 /*
  * Convert C-bitfield

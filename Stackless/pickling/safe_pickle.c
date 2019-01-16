@@ -4,8 +4,8 @@
 #include "compile.h"
 
 #define SLP_BUILD_CORE
-#include "core/stackless_impl.h"
-#include "platf/slp_platformselect.h"
+#include "internal/stackless_impl.h"
+#include "internal/slp_platformselect.h"
 
 /* safe pickling */
 

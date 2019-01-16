@@ -95,7 +95,7 @@ PY_CFLAGS_NODIST=$(CONFIGURE_CFLAGS_NODIST) $(CFLAGS_NODIST)
 # Both CPPFLAGS and LDFLAGS need to contain the shell's value for setup.py to
 # be able to build extension modules using the directories specified in the
 # environment variables
-PY_CPPFLAGS=	$(BASECPPFLAGS) -I. -I$(srcdir)/Include -I$(srcdir)/Stackless $(CONFIGURE_CPPFLAGS) $(CPPFLAGS)
+PY_CPPFLAGS=	$(BASECPPFLAGS) -I. -I$(srcdir)/Include $(CONFIGURE_CPPFLAGS) $(CPPFLAGS)
 PY_LDFLAGS=	$(CONFIGURE_LDFLAGS) $(LDFLAGS)
 NO_AS_NEEDED=	@NO_AS_NEEDED@
 LDLAST=		@LDLAST@
@@ -143,12 +143,6 @@ BINLIBDEST=	$(LIBDIR)/python$(VERSION)
 LIBDEST=	$(SCRIPTDIR)/python$(VERSION)
 INCLUDEPY=	$(INCLUDEDIR)/python$(LDVERSION)
 CONFINCLUDEPY=	$(CONFINCLUDEDIR)/python$(LDVERSION)
-STACKLESSINCLUDEDIRS=		\
-		core \
-		module \
-		pickling \
-		platf
-
 
 # Symbols used for using shared libraries
 SHLIB_SUFFIX=	@SHLIB_SUFFIX@
@@ -1040,24 +1034,22 @@ PYTHON_HEADERS= \
 		$(srcdir)/Include/unicodeobject.h \
 		$(srcdir)/Include/warnings.h \
 		$(srcdir)/Include/weakrefobject.h \
-		$(srcdir)/Stackless/stackless.h \
-		$(srcdir)/Stackless/stackless_api.h \
-		$(srcdir)/Stackless/stackless_version.h \
-		$(srcdir)/Stackless/core/cframeobject.h \
-		$(srcdir)/Stackless/core/stackless_impl.h \
-		$(srcdir)/Stackless/core/stackless_structs.h \
-		$(srcdir)/Stackless/core/stackless_tstate.h \
-		$(srcdir)/Stackless/core/stackless_pystate.h \
-		$(srcdir)/Stackless/module/channelobject.h \
-		$(srcdir)/Stackless/pickling/prickelpit.h \
-		$(srcdir)/Stackless/platf/slp_platformselect.h \
-		$(srcdir)/Stackless/platf/switch_ppc_macosx.h \
-		$(srcdir)/Stackless/platf/switch_ppc_unix.h \
-		$(srcdir)/Stackless/platf/switch_s390_unix.h \
-		$(srcdir)/Stackless/platf/switch_sparc_sun_gcc.h \
-		$(srcdir)/Stackless/platf/switch_arm32_gcc.h \
-		$(srcdir)/Stackless/platf/switch_x86_msvc.h \
-		$(srcdir)/Stackless/platf/switch_x86_unix.h \
+		$(srcdir)/Include/stackless.h \
+		$(srcdir)/Include/stackless_api.h \
+		$(srcdir)/Include/stackless_version.h \
+		$(srcdir)/Include/internal/stackless_impl.h \
+		$(srcdir)/Include/stackless_structs.h \
+		$(srcdir)/Include/stackless_tstate.h \
+		$(srcdir)/Include/internal/stackless_pystate.h \
+		$(srcdir)/Include/internal/slp_prickelpit.h \
+		$(srcdir)/Include/internal/slp_platformselect.h \
+		$(srcdir)/Include/internal/slp_switch_ppc_macosx.h \
+		$(srcdir)/Include/internal/slp_switch_ppc_unix.h \
+		$(srcdir)/Include/internal/slp_switch_s390_unix.h \
+		$(srcdir)/Include/internal/slp_switch_sparc_sun_gcc.h \
+		$(srcdir)/Include/internal/slp_switch_arm32_gcc.h \
+		$(srcdir)/Include/internal/slp_switch_x86_msvc.h \
+		$(srcdir)/Include/internal/slp_switch_x86_unix.h \
 		pyconfig.h \
 		$(PARSER_HEADERS) \
 		$(srcdir)/Include/Python-ast.h \
@@ -1479,23 +1471,10 @@ inclinstall:
 		else	true; \
 		fi; \
 	done
-	@for i in $(srcdir)/Include/*.h $(srcdir)/Stackless/*.h; \
+	@for i in $(srcdir)/Include/*.h; \
 	do \
 		echo $(INSTALL_DATA) $$i $(INCLUDEPY); \
 		$(INSTALL_DATA) $$i $(DESTDIR)$(INCLUDEPY); \
-	done
-	@for j in $(STACKLESSINCLUDEDIRS); \
-	do \
-		if test ! -d $(DESTDIR)$(INCLUDEPY)$$j; then \
-			echo "Creating directory $(DESTDIR)$(INCLUDEPY)/$$j"; \
-			$(INSTALL) -d -m $(DIRMODE) $(DESTDIR)$(INCLUDEPY)/$$j; \
-		else	true; \
-		fi; \
-		for i in $(srcdir)/Stackless/$$j/*.h; \
-		do \
-			echo $(INSTALL_DATA) $$i $(INCLUDEPY)/$$j; \
-			$(INSTALL_DATA) $$i $(DESTDIR)$(INCLUDEPY)/$$j; \
-		done \
 	done
 	$(INSTALL_DATA) pyconfig.h $(DESTDIR)$(CONFINCLUDEPY)/pyconfig.h
 

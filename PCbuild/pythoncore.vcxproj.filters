@@ -447,47 +447,41 @@
     <ClInclude Include="..\Include\namespaceobject.h">
       <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Stackless\stackless.h">
-      <Filter>Stackless</Filter>
+    <ClInclude Include="..\Include\stackless.h">
+      <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Stackless\stackless_api.h">
-      <Filter>Stackless</Filter>
+    <ClInclude Include="..\Include\stackless_api.h">
+      <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Stackless\stackless_version.h">
-      <Filter>Stackless</Filter>
+    <ClInclude Include="..\Include\stackless_version.h">
+      <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Stackless\core\cframeobject.h">
-      <Filter>Stackless\core</Filter>
+    <ClInclude Include="..\Include\slp_exttype.h">
+      <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Stackless\core\slp_exttype.h">
-      <Filter>Stackless\core</Filter>
+    <ClInclude Include="..\Include\internal\stackless_impl.h">
+      <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Stackless\core\stackless_impl.h">
-      <Filter>Stackless\core</Filter>
+    <ClInclude Include="..\Include\stackless_structs.h">
+      <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Stackless\core\stackless_structs.h">
-      <Filter>Stackless\core</Filter>
+    <ClInclude Include="..\Include\stackless_tstate.h">
+      <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Stackless\core\stackless_tstate.h">
-      <Filter>Stackless\core</Filter>
+    <ClInclude Include="..\Include\internal\stackless_pystate.h">
+      <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Stackless\core\stackless_pystate.h">
-      <Filter>Stackless\core</Filter>
+    <ClInclude Include="..\Include\internal\slp_platformselect.h">
+      <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Stackless\module\channelobject.h">
-      <Filter>Stackless\module</Filter>
+    <ClInclude Include="..\Include\internal\slp_switch_x64_msvc.h">
+      <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Stackless\platf\slp_platformselect.h">
-      <Filter>Stackless\platf</Filter>
+    <ClInclude Include="..\Include\internal\slp_switch_x86_msvc.h">
+      <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Stackless\platf\switch_x64_msvc.h">
-      <Filter>Stackless\platf</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Stackless\platf\switch_x86_msvc.h">
-      <Filter>Stackless\platf</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Stackless\pickling\prickelpit.h">
-      <Filter>Stackless\pickling</Filter>
+    <ClInclude Include="..\Include\internal\slp_prickelpit.h">
+      <Filter>Internal</Filter>
     </ClInclude>
     <ClInclude Include="..\Modules\hashtable.h">
       <Filter>Modules</Filter>

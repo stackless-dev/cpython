@@ -1,6 +1,6 @@
 /* Generator object implementation */
 
-#include "core/stackless_impl.h"
+#include "internal/stackless_impl.h"
 
 #include "Python.h"
 #include "internal/pystate.h"

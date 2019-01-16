@@ -6,7 +6,7 @@
 #ifdef STACKLESS
 #include "frameobject.h"
 #endif
-#include "core/stackless_impl.h"
+#include "internal/stackless_impl.h"
 
 #define GET_TSTATE() \
     ((PyThreadState*)_Py_atomic_load_relaxed(&_PyThreadState_Current))

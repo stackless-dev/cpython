@@ -6,7 +6,7 @@
 #include "internal/pystate.h"
 #include "code.h"
 #include "structmember.h"
-#include "core/stackless_impl.h"
+#include "internal/stackless_impl.h"
 
 PyObject *
 PyFunction_NewWithQualName(PyObject *code, PyObject *globals, PyObject *qualname)

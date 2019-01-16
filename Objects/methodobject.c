@@ -5,7 +5,7 @@
 #include "internal/mem.h"
 #include "internal/pystate.h"
 #include "structmember.h"
-#include "core/stackless_impl.h"
+#include "internal/stackless_impl.h"
 
 /* Free list for method objects to safe malloc/free overhead
  * The m_self element is used to chain the objects.

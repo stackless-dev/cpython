@@ -4,8 +4,8 @@
 #include "internal/pystate.h"
 #include "internal/context.h"
 #include "internal/hamt.h"
-#include "core/stackless_impl.h"
-#include "pickling/prickelpit.h"
+#include "internal/stackless_impl.h"
+#include "internal/slp_prickelpit.h"
 
 
 #define CONTEXT_FREELIST_MAXLEN 255

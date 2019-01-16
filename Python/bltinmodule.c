@@ -3,7 +3,7 @@
 #include "Python.h"
 #include "Python-ast.h"
 
-#include "core/stackless_impl.h"
+#include "internal/stackless_impl.h"
 
 #include "node.h"
 #include "code.h"

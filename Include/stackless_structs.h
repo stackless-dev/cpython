@@ -14,7 +14,7 @@ extern "C" {
 #ifdef SLP_BUILD_CORE
 
 #include "frameobject.h"
-#include "platf/slp_platformselect.h"
+#include "internal/slp_platformselect.h"
 
 /*** important structures: tasklet ***/
 

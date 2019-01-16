@@ -11,8 +11,8 @@
 #ifdef STACKLESS
 #define SLP_BUILD_CORE
 #include "stackless_api.h"
-#include "pickling/prickelpit.h"
-#include "platf/slp_platformselect.h" /* for stack saving */
+#include "internal/slp_prickelpit.h"
+#include "internal/slp_platformselect.h" /* for stack saving */
 #endif
 
 PyDoc_STRVAR(pickle_module_doc,
