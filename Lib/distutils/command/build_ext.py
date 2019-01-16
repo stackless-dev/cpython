@@ -164,24 +164,6 @@ class build_ext(Command):
         self.include_dirs.append(py_include)
         if plat_py_include != py_include:
             self.include_dirs.append(plat_py_include)
-            
-            stackless_plat_py_include = os.path.join(plat_py_include, "Stackless")
-            if os.path.exists(stackless_plat_py_include):
-                self.include_dirs.append(stackless_plat_py_include)
-        else:
-            # Do we already have the stackless includes covered in the normal Python include directory? (Linux)
-            stackless_include_file = os.path.join(py_include, "stackless.h")
-            if not os.path.exists(stackless_include_file):
-                # We need to add the Stackless directory if it is there as a subdirectory. (Windows installation)
-                stackless_py_include = os.path.join(py_include, "Stackless")
-                if os.path.exists(stackless_py_include):
-                    self.include_dirs.append(stackless_py_include)
-                else:
-                    # We need to add the Stackless directory if it is on the same level (Windows and Linux builds)
-                    py_include_parent_dir = os.path.dirname(py_include)
-                    stackless_py_include = os.path.join(py_include_parent_dir, "Stackless")
-                    if os.path.exists(stackless_py_include):
-                        self.include_dirs.append(stackless_py_include)
 
         self.ensure_string_list('libraries')
         self.ensure_string_list('link_objects')
