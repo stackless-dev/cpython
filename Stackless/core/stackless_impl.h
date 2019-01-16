@@ -716,6 +716,7 @@ PyObject * slp_null_error(void);
 #define RUNTIME_ERROR(str, ret) return (slp_runtime_error(str), ret)
 #define VALUE_ERROR(str, ret) return (slp_value_error(str), ret)
 
+int slp_init_cframetype(void);
 PyCFrameObject * slp_cframe_new(PyFrame_ExecFunc *exec,
                                 unsigned int linked);
 PyCFrameObject * slp_cframe_newfunc(PyObject *func,
@@ -754,6 +755,10 @@ Py_tracefunc slp_get_sys_trace_func(void);
 int slp_encode_ctrace_functions(Py_tracefunc c_tracefunc, Py_tracefunc c_profilefunc);
 PyTaskletTStateStruc * slp_get_saved_tstate(PyTaskletObject *task);
 
+/*
+ * Channel related prototypes
+ */
+PyObject * slp_channel_seq_callback(struct _frame *f,  int throwflag, PyObject *retval);
 PyObject * slp_get_channel_callback(void);
 
 /* macro for use when interrupting tasklets from watchdog */
@@ -770,6 +775,8 @@ void slp_head_unlock(void);
 #define SLP_HEAD_UNLOCK() slp_head_unlock()
 
 long slp_parse_thread_id(PyObject *thread_id, unsigned long *id);
+
+
 
 #endif /* #ifdef SLP_BUILD_CORE */
 

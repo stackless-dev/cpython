@@ -1,2 +1,1 @@
-
-int slp_init_cframetype(void);
+/* header is now empty and can be removed. */
