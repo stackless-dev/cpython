@@ -481,7 +481,7 @@
       <Filter>Include</Filter>
     </ClInclude>
     <ClInclude Include="..\Include\internal\slp_prickelpit.h">
-      <Filter>Internal</Filter>
+      <Filter>Include</Filter>
     </ClInclude>
     <ClInclude Include="..\Modules\hashtable.h">
       <Filter>Modules</Filter>
@@ -1141,6 +1141,11 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Stackless\readme.txt">
+      <Filter>Stackless</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Stackless\changelog.txt">
       <Filter>Stackless</Filter>
     </None>
   </ItemGroup>

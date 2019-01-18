@@ -471,6 +471,9 @@
     </CustomBuild>
     <None Include="..\Stackless\readme.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\Stackless\changelog.txt" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
