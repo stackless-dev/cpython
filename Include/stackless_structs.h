@@ -14,7 +14,9 @@ extern "C" {
 #ifdef SLP_BUILD_CORE
 
 #include "frameobject.h"
-#include "internal/slp_platformselect.h"
+#if defined(MS_WIN32) && !defined(MS_WIN64) && defined(_M_IX86)
+#define SLP_SEH32
+#endif
 
 /*** important structures: tasklet ***/
 

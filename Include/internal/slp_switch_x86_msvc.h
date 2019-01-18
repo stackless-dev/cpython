@@ -24,8 +24,6 @@
 
 #define SLP_USE_NATIVE_BITFIELD_LAYOUT 1
 
-#define SLP_SEH32
-
 #define SLP_STACK_REFPLUS 1
 
 /* switching related stuff */
