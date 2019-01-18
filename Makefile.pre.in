@@ -1038,9 +1038,9 @@ PYTHON_HEADERS= \
 		$(srcdir)/Include/stackless_api.h \
 		$(srcdir)/Include/stackless_version.h \
 		$(srcdir)/Include/internal/stackless_impl.h \
-		$(srcdir)/Include/stackless_structs.h \
-		$(srcdir)/Include/stackless_tstate.h \
-		$(srcdir)/Include/internal/stackless_pystate.h \
+		$(srcdir)/Include/slp_structs.h \
+		$(srcdir)/Include/slp_tstate.h \
+		$(srcdir)/Include/internal/slp_pystate.h \
 		$(srcdir)/Include/internal/slp_prickelpit.h \
 		$(srcdir)/Include/internal/slp_platformselect.h \
 		$(srcdir)/Include/internal/slp_switch_ppc_macosx.h \

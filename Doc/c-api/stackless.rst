@@ -34,7 +34,7 @@
    ==============    =============   ===============================
 
 
-|SLP| provides the following C functions.
+|SLP| provides the following C functions. Include ``<stackless_api.h>``.
 
 Tasklets
 --------

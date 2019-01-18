@@ -215,9 +215,9 @@
     <ClInclude Include="..\Python\wordcode_helpers.h" />
     <ClInclude Include="..\Include\slp_exttype.h" />
     <ClInclude Include="..\Include\internal\stackless_impl.h" />
-    <ClInclude Include="..\Include\stackless_structs.h" />
-    <ClInclude Include="..\Include\stackless_tstate.h" />
-    <ClInclude Include="..\Include\internal\stackless_pystate.h" />
+    <ClInclude Include="..\Include\slp_structs.h" />
+    <ClInclude Include="..\Include\slp_tstate.h" />
+    <ClInclude Include="..\Include\internal\slp_pystate.h" />
     <ClInclude Include="..\Include\internal\slp_prickelpit.h" />
     <ClInclude Include="..\Include\internal\slp_platformselect.h" />
     <ClInclude Include="..\Include\internal\slp_switch_x64_msvc.h" />

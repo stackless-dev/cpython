@@ -462,13 +462,13 @@
     <ClInclude Include="..\Include\internal\stackless_impl.h">
       <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Include\stackless_structs.h">
+    <ClInclude Include="..\Include\slp_structs.h">
       <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Include\stackless_tstate.h">
+    <ClInclude Include="..\Include\slp_tstate.h">
       <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Include\internal\stackless_pystate.h">
+    <ClInclude Include="..\Include\internal\slp_pystate.h">
       <Filter>Include</Filter>
     </ClInclude>
     <ClInclude Include="..\Include\internal\slp_platformselect.h">

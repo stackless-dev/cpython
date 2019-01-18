@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 #ifdef STACKLESS
-#include "stackless_tstate.h"
+#include "slp_tstate.h"
 #endif
 
 /* This limitation is for performance and simplicity. If needed it can be

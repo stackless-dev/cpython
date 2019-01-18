@@ -152,7 +152,7 @@ extern "C" {
  */
 
 /* The macro SLP_WITH_FRAME_REF_DEBUG gets eventually defined in
- * stackless_tstate.h. It enables reference debugging for frames and C-frames.
+ * slp_tstate.h. It enables reference debugging for frames and C-frames.
  */
 #ifdef SLP_WITH_FRAME_REF_DEBUG
 #ifndef Py_TRACE_REFS
