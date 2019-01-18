@@ -9,6 +9,13 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/208
+  Move Stackless include files to Include/ and Include/internal and rename them
+  to use consistent prefixes. Public includes use the prefix "stackless",
+  private includes use "slp".
+  Remove the special Stackless include path from Makefile*, PCbuild/*,
+  Mac/Makefile* and Lib/distutils/command/build_ext.py.
+
 - https://github.com/stackless-dev/stackless/issues/206
   Fix the error handling of the Python implementation of function-object
   pickling.
