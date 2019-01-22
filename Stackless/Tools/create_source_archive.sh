@@ -14,7 +14,7 @@ if [ $# != 3 ] ; then
    exit 1
 fi
 
-: ${excludes:=.gitignore .git* .hg* .bzrignore .mention-bot .travis.yml}
+: ${excludes:=.gitignore .git* .hg* .bzrignore .mention-bot .travis.yml .readthedocs.yml .azure-pipelines}
  
 git_python_dir="$1" ; shift
 if [ "x$1" = "x-v" ] ; then
