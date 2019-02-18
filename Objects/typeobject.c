@@ -2112,6 +2112,9 @@ type_init(PyObject *cls, PyObject *args, PyObject *kwds)
     /* Call object.__init__(self) now. */
     /* XXX Could call super(type, cls).__init__() but what's the point? */
     args = PyTuple_GetSlice(args, 0, 0);
+    if (args == NULL) {
+        return -1;
+    }
     res = object_init(cls, args, NULL);
     Py_DECREF(args);
     return res;
@@ -2642,6 +2645,7 @@ type_getattro(PyTypeObject *type, PyObject *name)
     PyTypeObject *metatype = Py_TYPE(type);
     PyObject *meta_attribute, *attribute;
     descrgetfunc meta_get;
+    PyObject* res;
 
     if (!PyString_Check(name)) {
         PyErr_Format(PyExc_TypeError,
@@ -2663,6 +2667,7 @@ type_getattro(PyTypeObject *type, PyObject *name)
     meta_attribute = _PyType_Lookup(metatype, name);
 
     if (meta_attribute != NULL) {
+        Py_INCREF(meta_attribute);
         meta_get = Py_TYPE(meta_attribute)->tp_descr_get;
 
         if (meta_get != NULL && PyDescr_IsData(meta_attribute)) {
@@ -2670,10 +2675,11 @@ type_getattro(PyTypeObject *type, PyObject *name)
              * writes. Assume the attribute is not overridden in
              * type's tp_dict (and bases): call the descriptor now.
              */
-            return meta_get(meta_attribute, (PyObject *)type,
-                            (PyObject *)metatype);
+            res = meta_get(meta_attribute, (PyObject *)type,
+                           (PyObject *)metatype);
+            Py_DECREF(meta_attribute);
+            return res;
         }
-        Py_INCREF(meta_attribute);
     }
 
     /* No data descriptor found on metatype. Look in tp_dict of this
@@ -2681,18 +2687,21 @@ type_getattro(PyTypeObject *type, PyObject *name)
     attribute = _PyType_Lookup(type, name);
     if (attribute != NULL) {
         /* Implement descriptor functionality, if any */
-        descrgetfunc local_get = Py_TYPE(attribute)->tp_descr_get;
+        descrgetfunc local_get;
+        Py_INCREF(attribute);
+        local_get = Py_TYPE(attribute)->tp_descr_get;
 
         Py_XDECREF(meta_attribute);
 
         if (local_get != NULL) {
             /* NULL 2nd argument indicates the descriptor was
              * found on the target object itself (or a base)  */
-            return local_get(attribute, (PyObject *)NULL,
-                             (PyObject *)type);
+            res = local_get(attribute, (PyObject *)NULL,
+                            (PyObject *)type);
+            Py_DECREF(attribute);
+            return res;
         }
 
-        Py_INCREF(attribute);
         return attribute;
     }
 

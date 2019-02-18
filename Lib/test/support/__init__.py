@@ -34,7 +34,7 @@ try:
 except ImportError:
     thread = None
 
-__all__ = ["Error", "TestFailed", "ResourceDenied", "import_module",
+__all__ = ["Error", "TestFailed", "TestDidNotRun", "ResourceDenied", "import_module",
            "verbose", "use_resources", "max_memuse", "record_original_stdout",
            "get_original_stdout", "unload", "unlink", "rmtree", "forget",
            "is_resource_enabled", "requires", "requires_mac_ver",
@@ -57,6 +57,9 @@ class Error(Exception):
 
 class TestFailed(Error):
     """Test failed."""
+
+class TestDidNotRun(Error):
+    """Test did not run any subtests."""
 
 class ResourceDenied(unittest.SkipTest):
     """Test skipped because it requested a disallowed resource.
@@ -659,8 +662,12 @@ if have_unicode:
         unichr(0x20AC),
     ):
         try:
-            character.encode(sys.getfilesystemencoding())\
-                     .decode(sys.getfilesystemencoding())
+            # In Windows, 'mbcs' is used, and encode() returns '?'
+            # for characters missing in the ANSI codepage
+            if character.encode(sys.getfilesystemencoding())\
+                        .decode(sys.getfilesystemencoding())\
+                    != character:
+                raise UnicodeError
         except UnicodeError:
             pass
         else:
@@ -1156,6 +1163,9 @@ def transient_internet(resource_name, timeout=30.0, errnos=()):
         ('EHOSTUNREACH', 113),
         ('ENETUNREACH', 101),
         ('ETIMEDOUT', 110),
+        # socket.create_connection() fails randomly with
+        # EADDRNOTAVAIL on Travis CI.
+        ('EADDRNOTAVAIL', 99),
     ]
     default_gai_errnos = [
         ('EAI_AGAIN', -3),
@@ -1538,6 +1548,8 @@ def _run_suite(suite):
         runner = BasicTestRunner()
 
     result = runner.run(suite)
+    if not result.testsRun:
+        raise TestDidNotRun
     if not result.wasSuccessful():
         if len(result.errors) == 1 and not result.failures:
             err = result.errors[0][1]
@@ -2073,10 +2085,19 @@ def fd_count():
     if sys.platform.startswith(('linux', 'freebsd')):
         try:
             names = os.listdir("/proc/self/fd")
-            return len(names)
+            # Substract one because listdir() opens internally a file
+            # descriptor to list the content of the /proc/self/fd/ directory.
+            return len(names) - 1
         except OSError as exc:
             if exc.errno != errno.ENOENT:
                 raise
+
+    MAXFD = 256
+    if hasattr(os, 'sysconf'):
+        try:
+            MAXFD = os.sysconf("SC_OPEN_MAX")
+        except OSError:
+            pass
 
     old_modes = None
     if sys.platform == 'win32':
@@ -2094,13 +2115,6 @@ def fd_count():
                                 msvcrt.CRT_ERROR,
                                 msvcrt.CRT_ASSERT):
                 old_modes[report_type] = msvcrt.CrtSetReportMode(report_type, 0)
-
-    MAXFD = 256
-    if hasattr(os, 'sysconf'):
-        try:
-            MAXFD = os.sysconf("SC_OPEN_MAX")
-        except OSError:
-            pass
 
     try:
         count = 0

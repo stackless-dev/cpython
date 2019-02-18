@@ -995,7 +995,11 @@ PyEval_EvalFrameEx_slp(PyFrameObject *f, int throwflag, PyObject *retval)
     PyObject *consts;
 #if defined(Py_DEBUG) || defined(LLTRACE)
     /* Make it easier to find out where we are with a debugger */
+#ifdef __GNUC__
+    char *filename __attribute__((unused));
+#else
     char *filename;
+#endif
 #endif
 
 #endif  /* not STACKLESS */
@@ -5444,8 +5448,7 @@ _PyEval_SliceIndexNotNone(PyObject *v, Py_ssize_t *pi)
 
 
 #undef ISINDEX
-#define ISINDEX(x) ((x) == NULL || \
-                    PyInt_Check(x) || PyLong_Check(x) || PyIndex_Check(x))
+#define ISINDEX(x) ((x) == NULL || _PyAnyInt_Check(x) || PyIndex_Check(x))
 
 static PyObject *
 apply_slice(PyObject *u, PyObject *v, PyObject *w) /* return u[v:w] */

@@ -211,9 +211,9 @@ def library_recipes():
 
     result.extend([
           dict(
-              name="OpenSSL 1.0.2o",
-              url="https://www.openssl.org/source/openssl-1.0.2o.tar.gz",
-              checksum='44279b8557c3247cbe324e2322ecd114',
+              name="OpenSSL 1.0.2q",
+              url="https://www.openssl.org/source/openssl-1.0.2q.tar.gz",
+              checksum='7563e1ce046cb21948eeb6ba1a0eb71c',
               buildrecipe=build_universal_openssl,
               configure=None,
               install=None,
@@ -223,9 +223,9 @@ def library_recipes():
     if internalTk():
         result.extend([
           dict(
-              name="Tcl 8.6.8",
-              url="ftp://ftp.tcl.tk/pub/tcl//tcl8_6/tcl8.6.8-src.tar.gz",
-              checksum='81656d3367af032e0ae6157eff134f89',
+              name="Tcl 8.6.9",
+              url="ftp://ftp.tcl.tk/pub/tcl//tcl8_6/tcl8.6.9-src.tar.gz",
+              checksum='aa0a121d95a0e7b73a036f26028538d4',
               buildDir="unix",
               configure_pre=[
                     '--enable-shared',
@@ -239,12 +239,9 @@ def library_recipes():
                   },
               ),
           dict(
-              name="Tk 8.6.8",
-              url="ftp://ftp.tcl.tk/pub/tcl//tcl8_6/tk8.6.8-src.tar.gz",
-              checksum='5e0faecba458ee1386078fb228d008ba',
-              patches=[
-                  "tk868_on_10_8_10_9.patch",
-                   ],
+              name="Tk 8.6.9.1",
+              url="ftp://ftp.tcl.tk/pub/tcl//tcl8_6/tk8.6.9.1-src.tar.gz",
+              checksum='9efe3976468352dc894dae0c4e785a8e',
               buildDir="unix",
               configure_pre=[
                     '--enable-aqua',
@@ -706,6 +703,7 @@ def extractArchive(builddir, archiveName):
     work for current Tcl and Tk source releases where the basename of
     the archive ends with "-src" but the uncompressed directory does not.
     For now, just special case Tcl and Tk tar.gz downloads.
+    Another special case: the tk8.6.9.1 tarball extracts to tk8.6.9.
     """
     curdir = os.getcwd()
     try:
@@ -715,6 +713,8 @@ def extractArchive(builddir, archiveName):
             if ((retval.startswith('tcl') or retval.startswith('tk'))
                     and retval.endswith('-src')):
                 retval = retval[:-4]
+                if retval == 'tk8.6.9.1':
+                    retval = 'tk8.6.9'
             if os.path.exists(retval):
                 shutil.rmtree(retval)
             fp = os.popen("tar zxf %s 2>&1"%(shellQuote(archiveName),), 'r')
@@ -824,6 +824,13 @@ def build_universal_openssl(basedir, archList):
         ]
         if no_asm:
             configure_opts.append("no-asm")
+        # OpenSSL 1.0.2o broke the Configure test for whether the compiler
+        # in use supports dependency rule generation (cc -M) with gcc-4.2
+        # used for the 10.6+ installer builds.  Patch Configure here to
+        # force use of "cc -M" rather than "makedepend".
+        runCommand(
+            """sed -i "" 's|my $cc_as_makedepend = 0|my $cc_as_makedepend = 1|g' Configure""")
+
         runCommand(" ".join(["perl", "Configure"]
                         + arch_opts[arch] + configure_opts))
         runCommand("make depend")
