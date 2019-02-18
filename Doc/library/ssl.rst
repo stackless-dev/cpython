@@ -294,11 +294,6 @@ purposes.
 
      3DES was dropped from the default cipher string.
 
-   .. versionchanged:: 2.7.15
-
-     TLS 1.3 cipher suites TLS_AES_128_GCM_SHA256, TLS_AES_256_GCM_SHA384,
-     and TLS_CHACHA20_POLY1305_SHA256 were added to the default cipher string.
-
 .. function:: _https_verify_certificates(enable=True)
 
    Specifies whether or not server certificates are verified when creating
@@ -747,6 +742,15 @@ Constants
 
    .. versionadded:: 2.7.9
 
+.. data:: OP_ENABLE_MIDDLEBOX_COMPAT
+
+   Send dummy Change Cipher Spec (CCS) messages in TLS 1.3 handshake to make
+   a TLS 1.3 connection look more like a TLS 1.2 connection.
+
+   This option is only available with OpenSSL 1.1.1 and later.
+
+   .. versionadded:: 2.7.16
+
 .. data:: OP_NO_COMPRESSION
 
    Disable compression on the SSL channel.  This is useful if the application
@@ -1063,6 +1067,17 @@ to speed up repeated connections from the same clients.
       :func:`create_default_context` lets the :mod:`ssl` module choose
       security settings for a given purpose.
 
+   .. versionchanged:: 2.7.16
+
+      The context is created with secure default values. The options
+      :data:`OP_NO_COMPRESSION`, :data:`OP_CIPHER_SERVER_PREFERENCE`,
+      :data:`OP_SINGLE_DH_USE`, :data:`OP_SINGLE_ECDH_USE`,
+      :data:`OP_NO_SSLv2` (except for :data:`PROTOCOL_SSLv2`),
+      and :data:`OP_NO_SSLv3` (except for :data:`PROTOCOL_SSLv3`) are
+      set by default. The initial cipher suite list contains only ``HIGH``
+      ciphers, no ``NULL`` ciphers and no ``MD5`` ciphers (except for
+      :data:`PROTOCOL_SSLv2`).
+
 
 :class:`SSLContext` objects have the following methods and attributes:
 
@@ -1178,6 +1193,9 @@ to speed up repeated connections from the same clients.
    .. note::
       when connected, the :meth:`SSLSocket.cipher` method of SSL sockets will
       give the currently selected cipher.
+
+      OpenSSL 1.1.1 has TLS 1.3 cipher suites enabled by default. The suites
+      cannot be disabled with :meth:`~SSLContext.set_ciphers`.
 
 .. method:: SSLContext.set_alpn_protocols(protocols)
 
