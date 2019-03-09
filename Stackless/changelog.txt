@@ -5,10 +5,10 @@ This file documents user visible changes to the Stackless extension of C-Python.
 For other changes see Misc/NEWS.
 
 
-What's New in Stackless 2.7.XX?
+What's New in Stackless 2.7.16?
 ===============================
 
-*Release date: XXXX-XX-XX*
+*Release date: 2019-03-09*
 
 - https://github.com/stackless-dev/stackless/issues/200
   Fix a bug in the C-API functions PyTasklet_Run_nr() and
