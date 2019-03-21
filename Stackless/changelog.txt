@@ -4,15 +4,10 @@ Stackless-Python News
 This file documents user visible changes to the Stackless extension of C-Python.
 For other changes see Misc/NEWS.
 
-What's New in Stackless 3.X.X?
-==============================
+What's New in Stackless 3.4.8, 3.4.9 and 3.4.10?
+================================================
 
-*Release date: 20XX-XX-XX*
-
-
-What's New in Stackless 3.4.8 and 3.4.9?
-========================================
-
+*Release date: 2019-03-21* (3.4.10)
 *Release date: 2018-09-05* (3.4.9)
 *Release date: 2018-02-25* (3.4.8)
 
