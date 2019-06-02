@@ -182,12 +182,15 @@ PyStackless_Schedule(PyObject *retval, int remove)
 {
     STACKLESS_GETARG();
     PyThreadState *ts = PyThreadState_GET();
-    PyTaskletObject *prev = ts->st.current, *next = prev->next;
+    PyTaskletObject *prev = ts->st.current, *next;
     PyObject *tmpval, *ret = NULL;
     int switched, fail;
 
-    if (ts->st.main == NULL) return PyStackless_Schedule_M(retval, remove);
+    if (ts->st.main == NULL)
+        return PyStackless_Schedule_M(retval, remove);
 
+    assert(prev);
+    next = prev->next;
     /* make sure we hold a reference to the previous tasklet.
      * this will be decrefed after the switch is complete
      */

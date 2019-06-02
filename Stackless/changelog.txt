@@ -10,6 +10,10 @@ What's New in Stackless 2.7.XX?
 
 *Release date: XXXX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/219
+  Fix a NULL pointer access in PyStackless_Schedule, if this function is called
+  from from "outside" and if no current tasklet exists.
+
 
 What's New in Stackless 2.7.16?
 ===============================
