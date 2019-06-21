@@ -18,7 +18,7 @@ class TestOutside(StacklessTestCase):
         test_outside()
         self.assertEqual(ran[0], True)
 
-    def test_otside2(self):
+    def test_outside2(self):
         c = channel()
         n = 3
         last = [None]
