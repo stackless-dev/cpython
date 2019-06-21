@@ -10,6 +10,10 @@ What's New in Stackless 2.7.XX?
 
 *Release date: XXXX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/222
+  Fix a bug that could cause an assertion failure and a reference leak during
+  the termination of a main-tasklet, if an application embeds Stackless Python.
+
 - https://github.com/stackless-dev/stackless/issues/219
   Fix a NULL pointer access in PyStackless_Schedule, if this function is called
   from from "outside" and if no current tasklet exists.

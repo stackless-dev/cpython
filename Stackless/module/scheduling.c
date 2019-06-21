@@ -1482,8 +1482,13 @@ slp_tasklet_end(PyObject *retval)
          * the original stub if necessary. (Meanwhile, task->cstate may be an old nesting state and not
          * the original stub, so we take the stub from the tstate)
          */
-        if (ts->st.serial_last_jump != ts->st.initial_stub->serial)
-            slp_transfer_return(ts->st.initial_stub);
+        if (ts->st.serial_last_jump != ts->st.initial_stub->serial) {
+            Py_DECREF(retval);
+            SLP_STORE_NEXT_FRAME(ts, NULL);
+            slp_transfer_return(ts->st.initial_stub); /* does not return */
+            assert(0);
+            return NULL;
+        }
     }
 
     /* remove current from runnables.  We now own its reference. */
