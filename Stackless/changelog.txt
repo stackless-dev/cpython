@@ -10,6 +10,10 @@ What's New in Stackless 2.7.XX?
 
 *Release date: XXXX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/217
+  C-API documentation update: update the names of watchdog flags to match the
+  implementation.
+
 - https://github.com/stackless-dev/stackless/issues/222
   Fix a bug that could cause an assertion failure and a reference leak during
   the termination of a main-tasklet, if an application embeds Stackless Python.

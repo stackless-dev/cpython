@@ -327,17 +327,17 @@ stackless module
      it will be awakened by other threads using channels which its
      blocked tasklets are waiting on.
 
-  ``Py_WATCHDOG_SOFT``
+  ``PY_WATCHDOG_SOFT``
      Instead of interrupting a tasklet, we wait until the
      next tasklet scheduling moment to return.  Always returns
      *Py_None*, as everything is in order.
 
-  ``Py_WATCHDOG_IGNORE_NESTING``
+  ``PY_WATCHDOG_IGNORE_NESTING``
      Allows interrupts at all levels, effectively acting as
      though the *ignore_nesting* attribute were set on all
      tasklets.
 
-  ``Py_WATCHDOG_TIMEOUT``
+  ``PY_WATCHDOG_TIMEOUT``
      Interprets *timeout* as a fixed run time, rather than a
      per-tasklet run limit.  The function will then attempt to
      interrupt execution once this many total opcodes have

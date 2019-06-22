@@ -334,18 +334,21 @@ PyAPI_FUNC(long) PyStackless_GetCurrentId(void);
  *   When set enables the old thread-blocking behaviour when
  *   we run out of tasklets on this thread and there are other
  *   Python(r) threads running.
- * Py_WATCHDOG_SOFT:
+ * PY_WATCHDOG_SOFT:
  *   Instead of interrupting a tasklet, we wait until the
  *   next tasklet scheduling moment to return.  Always returns
  *   Py_None, as everything is in order.
- * Py_WATCHDOG_IGNORE_NESTING:
+ * PY_WATCHDOG_IGNORE_NESTING:
  *   allows interrupts at all levels, effectively acting as
  *   though the "ignore_nesting" attribute were set on all
  *   tasklets.
- * Py_WATCHDOG_TIMEOUT:
+ * PY_WATCHDOG_TIMEOUT:
  *   interprets 'timeout' as a total timeout, rather than a
  *   timeslice length.  The function will then attempt to
- *   interrupt execution 
+ *   interrupt execution
+ *
+ * Note: the spelling is inconsistent (Py_ versus PY_) since ever.
+ *       We won't change it for compatibility reasons.
  */
 #define Py_WATCHDOG_THREADBLOCK		1
 #define PY_WATCHDOG_SOFT			2
