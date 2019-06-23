@@ -109,6 +109,10 @@ slp_current_remove_tasklet(PyTaskletObject *task)
     PyThreadState *ts = task->cstate->tstate;
     PyTaskletObject **chain = &ts->st.current, *ret, *hold;
 
+    /* Make sure the tasklet is scheduled.
+     */
+    assert(task->next != NULL);
+    assert(task->prev != NULL);
     assert(ts != NULL);
     --ts->st.runcount;
     assert(ts->st.runcount >= 0);
@@ -884,11 +888,13 @@ impl_tasklet_run_remove(PyTaskletObject *task, int remove)
         if (removed) {
             assert(ts->st.del_post_switch == (PyObject *)prev);
             ts->st.del_post_switch = NULL;
-            slp_current_unremove(prev);
+            if (prev->next == NULL) /* in case of an error, the state is unknown */
+                slp_current_unremove(prev);
         }
         if (inserted) {
-            /* we must undo the insertion that we did */
-            slp_current_uninsert(task);
+            /* we must undo the insertion that we did, but we don't know the state */
+            if (task->next != NULL)
+                slp_current_uninsert(task);
             Py_DECREF(task);
         }
     } else if (!switched) {

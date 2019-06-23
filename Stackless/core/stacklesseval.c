@@ -911,7 +911,7 @@ eval_frame_callback(PyFrameObject *f, int exc, PyObject *retval)
     SLP_FRAME_EXECFUNC_DECREF(cf);
     slp_transfer_return(cst);
     /* should never come here */
-    assert(0);
+    Py_FatalError("Return from stack spilling failed.");
 fatal:
     SLP_STORE_NEXT_FRAME(ts, cf->f_back);
     return NULL;

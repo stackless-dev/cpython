@@ -534,6 +534,7 @@ kill_wrap_bad_guy(PyTaskletObject *prev, PyTaskletObject *bad_guy)
     if (prev->next == NULL)
         slp_current_insert(prev);
     SLP_STORE_NEXT_FRAME(ts, prev->f.frame);
+    Py_CLEAR(prev->f.frame);
     ts->st.current = prev;
     if (newval != NULL) {
         /* merge bad guy into exception */
@@ -651,8 +652,11 @@ jump_soft_to_hard(PyFrameObject *f, int exc, PyObject *retval)
     Py_DECREF(retval); /* consume ref according to protocol */
     SLP_FRAME_EXECFUNC_DECREF(f);
     slp_transfer_return(ts->st.current->cstate);
-    /* we either have an error or don't come back, so: */
-    assert(0);
+    /* We either have an error or don't come back, so bail out.
+     * There is no way to recover, because we don't know the previous
+     * tasklet.
+     */
+    Py_FatalError("Soft-to-hard tasklet switch failed.");
     return NULL;
 }
 
@@ -1033,7 +1037,9 @@ slp_schedule_task(PyObject **result, PyTaskletObject *prev, PyTaskletObject *nex
 
     fail = slp_schedule_task_prepared(ts, result, prev, next, stackless, did_switch);
     if (fail && inserted) {
-        slp_current_uninsert(next);
+        /* in case of an error, it is unknown, if the tasklet is still scheduled */
+        if (next->next)
+            slp_current_uninsert(next);
         if (u_chan)
             slp_channel_insert(u_chan, next, u_dir, u_next);
         else
@@ -1275,7 +1281,7 @@ hard_switching:
     }
     else {
         PyFrameObject *f = SLP_CLAIM_NEXT_FRAME(ts);
-        Py_XDECREF(f);
+        Py_XSETREF(next->f.frame, f); /* revert the Py_CLEAR(next->f.frame) */
         kill_wrap_bad_guy(prev, next);
         return -1;
     }
@@ -1486,8 +1492,7 @@ slp_tasklet_end(PyObject *retval)
             Py_DECREF(retval);
             SLP_STORE_NEXT_FRAME(ts, NULL);
             slp_transfer_return(ts->st.initial_stub); /* does not return */
-            assert(0);
-            return NULL;
+            Py_FatalError("Failed to restore the initial C-stack.");
         }
     }
 

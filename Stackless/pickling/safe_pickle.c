@@ -46,7 +46,7 @@ pickle_callback(PyFrameObject *f, int exc, PyObject *retval)
     SLP_FRAME_EXECFUNC_DECREF(f);
     slp_transfer_return(cst);
     /* never come here */
-    assert(0);
+    Py_FatalError("Return from pickle stack spilling failed.");
     return NULL;
 }
 

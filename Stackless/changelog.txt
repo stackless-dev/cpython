@@ -10,6 +10,10 @@ What's New in Stackless 2.7.XX?
 
 *Release date: XXXX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/220
+  Improve the error handling in case of failed stack transfers / hard tasklet
+  switches. Call Py_FatalError, if a clean recovery is impossible.
+
 - https://github.com/stackless-dev/stackless/issues/217
   C-API documentation update: update the names of watchdog flags to match the
   implementation.

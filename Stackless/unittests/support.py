@@ -45,7 +45,7 @@ except NameError:
 try:
     import threading
     withThreads = True
-except:
+except Exception:
     withThreads = False
 
 
@@ -681,6 +681,7 @@ class StacklessTestCase(unittest.TestCase, StacklessTestCaseMixin):
                 self._ran_AsTaskletTestCase_setUp = True
             super(StacklessTestCase, self)._addSkip(result, reason)
 
+
 _tc = StacklessTestCase(methodName='run')
 try:
     _tc.setUp()
@@ -726,7 +727,7 @@ class AsTaskletTestCase(StacklessTestCase):
         def helper():
             try:
                 c.send(super(AsTaskletTestCase, self).run(result))
-            except:
+            except:  # @IgnorePep8
                 c.send_throw(*sys.exc_info())
         stackless.tasklet(helper)()
         result = c.receive()
