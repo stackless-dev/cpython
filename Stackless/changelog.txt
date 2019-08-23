@@ -10,6 +10,11 @@ What's New in Stackless 2.7.XX?
 
 *Release date: XXXX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/227
+  Protect climb_stack_and_eval_frame from trivialization.
+  gcc-4.8.5 (and possibly other versions between 4.7 and 5.4) trivializes a
+  side-effect-only alloca. Patch by Milo Mirate.
+
 - https://github.com/stackless-dev/stackless/issues/220
   Improve the error handling in case of failed stack transfers / hard tasklet
   switches. Call Py_FatalError, if a clean recovery is impossible.
