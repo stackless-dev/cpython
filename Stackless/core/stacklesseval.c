@@ -267,6 +267,8 @@ make_initial_stub(void)
     return result;
 }
 
+/* a write only variable used to prevent overly optimisation */
+intptr_t *global_goobledigoobs;
 static PyObject *
 climb_stack_and_eval_frame(PyFrameObject *f)
 {
@@ -286,6 +288,10 @@ climb_stack_and_eval_frame(PyFrameObject *f)
         goobledigoobs = alloca(needed * sizeof(intptr_t));
         if (goobledigoobs == NULL)
             return NULL;
+        /* hinder the compiler to optimise away 
+           goobledigoobs and the alloca call. 
+           This happens with gcc 4.7.x and -O2 */
+        global_goobledigoobs = goobledigoobs;
     }
     return slp_eval_frame(f);
 }
