@@ -5,6 +5,16 @@
  * Platform Selection for Stackless
  */
 
+/* First, see if stackman an implementation without external
+ * assembler, use that if possible
+ */
+#define STACKMAN_OPTIONAL
+#include "stackman/src/stackman.h"
+#if defined(STACKMAN_PLATFORM) && !defined(STACKMAN_EXTERNAL_ASM)
+#include "internal/slp_switch_stackman.h"
+
+#else  /* use traditional stackless switching */
+
 #if   defined(MS_WIN32) && !defined(MS_WIN64) && defined(_M_IX86)
 #include "internal/slp_switch_x86_msvc.h" /* MS Visual Studio on X86 */
 #elif defined(MS_WIN64) && defined(_M_X64)
@@ -31,6 +41,7 @@
 #include "internal/slp_switch_mips_unix.h" /* MIPS */
 #elif defined(SN_TARGET_PS3)
 #include "internal/slp_switch_ps3_SNTools.h" /* Sony PS3 */
+#endif
 #endif
 
 /* default definitions if not defined in above files */

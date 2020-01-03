@@ -1,0 +1,3 @@
+[submodule "Include/internal/stackman"]
+	path = Include/internal/stackman
+	url = ssh://git@github.com/kristjanvalur/stackman
