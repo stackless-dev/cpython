@@ -171,14 +171,18 @@ def _checknetloc(netloc):
     # looking for characters like \u2100 that expand to 'a/c'
     # IDNA uses NFKC equivalence, so normalize for this check
     import unicodedata
-    netloc2 = unicodedata.normalize('NFKC', netloc)
-    if netloc == netloc2:
+    n = netloc.replace(u'@', u'') # ignore characters already included
+    n = n.replace(u':', u'')      # but not the surrounding text
+    n = n.replace(u'#', u'')
+    n = n.replace(u'?', u'')
+    netloc2 = unicodedata.normalize('NFKC', n)
+    if n == netloc2:
         return
-    _, _, netloc = netloc.rpartition('@') # anything to the left of '@' is okay
     for c in '/?#@:':
         if c in netloc2:
-            raise ValueError("netloc '" + netloc2 + "' contains invalid " +
-                             "characters under NFKC normalization")
+            raise ValueError("netloc %r contains invalid characters "
+                             "under NFKC normalization"
+                             % netloc)
 
 def urlsplit(url, scheme='', allow_fragments=True):
     """Parse a URL into 5 components:

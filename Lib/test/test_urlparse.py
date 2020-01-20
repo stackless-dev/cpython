@@ -641,13 +641,29 @@ class UrlParseTestCase(unittest.TestCase):
         self.assertIn(u'\u2100', denorm_chars)
         self.assertIn(u'\uFF03', denorm_chars)
 
+        # bpo-36742: Verify port separators are ignored when they
+        # existed prior to decomposition
+        urlparse.urlsplit(u'http://\u30d5\u309a:80')
+        with self.assertRaises(ValueError):
+            urlparse.urlsplit(u'http://\u30d5\u309a\ufe1380')
+
         for scheme in [u"http", u"https", u"ftp"]:
-            for c in denorm_chars:
-                url = u"{}://netloc{}false.netloc/path".format(scheme, c)
-                if test_support.verbose:
-                    print "Checking %r" % url
-                with self.assertRaises(ValueError):
-                    urlparse.urlsplit(url)
+            for netloc in [u"netloc{}false.netloc", u"n{}user@netloc"]:
+                for c in denorm_chars:
+                    url = u"{}://{}/path".format(scheme, netloc.format(c))
+                    if test_support.verbose:
+                        print "Checking %r" % url
+                    with self.assertRaises(ValueError):
+                        urlparse.urlsplit(url)
+
+        # check error message: invalid netloc must be formated with repr()
+        # to get an ASCII error message
+        with self.assertRaises(ValueError) as cm:
+            urlparse.urlsplit(u'http://example.com\uFF03@bing.com')
+        self.assertEqual(str(cm.exception),
+                         "netloc u'example.com\\uff03@bing.com' contains invalid characters "
+                         "under NFKC normalization")
+        self.assertIsInstance(cm.exception.args[0], str)
 
 def test_main():
     test_support.run_unittest(UrlParseTestCase)

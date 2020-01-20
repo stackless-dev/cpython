@@ -192,7 +192,7 @@ _bz2
     Homepage:
         http://www.bzip.org/
 _ssl
-    Python wrapper for version 1.0.2o of the OpenSSL secure sockets
+    Python wrapper for version 1.0.2s of the OpenSSL secure sockets
     library, which is built by ssl.vcxproj
     Homepage:
         http://www.openssl.org/
@@ -227,7 +227,7 @@ _ssl
     functionality to _ssl or _hashlib. They will not clean up their output
     with the normal Clean target; CleanAll should be used instead.
 _sqlite3
-    Wraps SQLite 3.8.11.0, which is itself built by sqlite3.vcxproj
+    Wraps SQLite 3.28.0.0, which is itself built by sqlite3.vcxproj
     Homepage:
         http://www.sqlite.org/
 _tkinter

@@ -213,9 +213,9 @@ def library_recipes():
 
     result.extend([
           dict(
-              name="OpenSSL 1.0.2q",
-              url="https://www.openssl.org/source/openssl-1.0.2q.tar.gz",
-              checksum='7563e1ce046cb21948eeb6ba1a0eb71c',
+              name="OpenSSL 1.0.2t",
+              url="https://www.openssl.org/source/openssl-1.0.2t.tar.gz",
+              checksum='ef66581b80f06eae42f5268bc0b50c6d',
               buildrecipe=build_universal_openssl,
               configure=None,
               install=None,
@@ -311,9 +311,9 @@ def library_recipes():
                   ),
           ),
           dict(
-              name="SQLite 3.22.0",
-              url="https://www.sqlite.org/2018/sqlite-autoconf-3220000.tar.gz",
-              checksum='96b5648d542e8afa6ab7ffb8db8ddc3d',
+              name="SQLite 3.28.0",
+              url="https://www.sqlite.org/2019/sqlite-autoconf-3280000.tar.gz",
+              checksum='3c68eb400f8354605736cd55400e1572',
               extra_cflags=('-Os '
                             '-DSQLITE_ENABLE_FTS5 '
                             '-DSQLITE_ENABLE_FTS4 '
@@ -1553,7 +1553,7 @@ def buildDMG():
         print(" -- retrying hdiutil create")
         time.sleep(5)
     else:
-        raise RuntimeError("command failed: %s"%(commandline,))
+        raise RuntimeError("command failed: %s"%(cmd,))
 
     if not os.path.exists(os.path.join(WORKDIR, "mnt")):
         os.mkdir(os.path.join(WORKDIR, "mnt"))
