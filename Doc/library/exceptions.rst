@@ -524,6 +524,13 @@ module for more information.
    .. versionadded:: 2.5
 
 
+.. exception:: BytesWarning
+
+   Base class for warnings related to bytes and bytearray.
+
+   .. versionadded:: 2.6
+
+
 Exception hierarchy
 -------------------
 

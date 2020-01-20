@@ -57,6 +57,8 @@ exclude_patterns = [
 # Require Sphinx 1.2 for build.
 needs_sphinx = '1.2'
 
+# Avoid a warning with Sphinx >= 2.0
+master_doc = 'contents'
 
 # Options for HTML output
 # -----------------------
@@ -73,7 +75,7 @@ templates_path = ['tools/templates']
 
 # Custom sidebar templates, filenames relative to this file.
 html_sidebars = {
-    'index': 'indexsidebar.html',
+    'index': ['indexsidebar.html'],
 }
 
 # Additional templates that should be rendered to pages.
