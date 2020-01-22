@@ -12,7 +12,7 @@ at http://stackless.readthedocs.io
 
 2. The Stackless Web Site http://www.stackless.com
 
-The FAQ (https://bitbucket.org/stackless-dev/stackless/wiki/FAQ) has
+The FAQ (https://github.com/stackless-dev/stackless/wiki/FAQ) has
 a list of further readings.
 
 3. The Mailing List
@@ -39,7 +39,7 @@ Contributing
 ------------
 
 Contributions are always welcome. Please open an issue or create
-a pull request at https://bitbucket.org/stackless-dev/stackless.
+a pull request at https://github.com/stackless-dev/stackless.
 
 
 ##################################################################

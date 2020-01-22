@@ -89,7 +89,7 @@ class TestTaskletDel(StacklessTestCase):
 
     @unittest.skipUnless(withThreads, "requires thread support")
     def test_tasklet_dealloc_in_thread_shutdown(self):
-        # Test for https://bitbucket.org/stackless-dev/stackless/issues/89
+        # Test for https://github.com/stackless-dev/stackless/issues/89
         def other_thread_main():
             # print("other thread started")
             self.assertIs(stackless.main, stackless.current)
@@ -212,7 +212,7 @@ class TestInfiniteRecursion(StacklessTestCase):
 class TestExceptionInScheduleCallback(StacklessTestCase):
     # Problem
     # Assertion failed: ts->st.current == NULL, file ..\Stackless\module\taskletobject.c, line 51
-    # See https://bitbucket.org/stackless-dev/stackless/issue/38
+    # See https://github.com/stackless-dev/stackless/issue/38
 
     def scheduleCallback(self, prev, next):
         if next.is_main:
@@ -244,7 +244,7 @@ class TestCrashUponFrameUnpickling(StacklessTestCase):
         self.assertIsNone(f_back)
 
     def testMissingLocalsplusCrasher(self):
-        # A test case for issue #61 https://bitbucket.org/stackless-dev/stackless/issue/61
+        # A test case for issue #61 https://github.com/stackless-dev/stackless/issue/61
         #
         # Some versions of stackless create pickles of frames with the localsplus tuple set to None.
         # This test creates a frame with localsplus=None and ensures that Python does not crash upon
@@ -285,7 +285,7 @@ class TestCrashUponFrameUnpickling(StacklessTestCase):
 class TestShutdown(StacklessTestCase):
 
     def test_cstack_new(self):
-        # test for issue #80 https://bitbucket.org/stackless-dev/stackless/issues/80/
+        # test for issue #80 https://github.com/stackless-dev/stackless/issues/80/
         import subprocess
         rc = subprocess.call([sys.executable, "-s", "-S", "-E", "-c", """if 1:
             import stackless, sys
@@ -305,7 +305,7 @@ class TestShutdown(StacklessTestCase):
 
     @unittest.skipUnless(withThreads, "requires thread support")
     def test_interthread_kill(self):
-        # test for issue #87 https://bitbucket.org/stackless-dev/stackless/issues/87/
+        # test for issue #87 https://github.com/stackless-dev/stackless/issues/87/
         import subprocess
         rc = subprocess.call([sys.executable, "-s", "-S", "-E", "-c", """from __future__ import print_function, absolute_import\nif 1:
             import sys
@@ -365,7 +365,7 @@ class TestShutdown(StacklessTestCase):
 
     @unittest.skipUnless(withThreads, "requires thread support")
     def test_tasklet_end_with_wrong_recursion_level(self):
-        # test for issue #91 https://bitbucket.org/stackless-dev/stackless/issues/91/
+        # test for issue #91 https://github.com/stackless-dev/stackless/issues/91/
         """A test for issue #91, wrong recursion level after tasklet re-binding
 
         Assertion failed: ts->recursion_depth == 0 || (ts->st.main == NULL && prev == next), file ../Stackless/module/scheduling.c, line 1291
@@ -414,7 +414,7 @@ class TestShutdown(StacklessTestCase):
 class TestStacklessProtokoll(StacklessTestCase):
     """Various tests for violations of the STACKLESS_GETARG() STACKLESS_ASSERT() protocol
 
-    See https://bitbucket.org/stackless-dev/stackless/issues/84
+    See https://github.com/stackless-dev/stackless/issues/84
     """
     def test_invalid_args_channel_next(self):
         """test of typeobject.c wrap_next(...)"""
@@ -463,7 +463,7 @@ class TestCPickleBombHandling(StacklessTestCase):
         # which is fast-pickling a recursive structure. This leads to an
         # infinite recursion, which gets interrupted by a bomb thrown from
         # main-thread. Until issue #98 got fixed, this caused a crash.
-        # See https://bitbucket.org/stackless-dev/stackless/issues/98
+        # See https://github.com/stackless-dev/stackless/issues/98
         buf = BytesIO()
         import cPickle as pickle
         pickler = pickle.Pickler(buf, protocol=-1)
@@ -489,7 +489,7 @@ class TestCPickleBombHandling(StacklessTestCase):
 
 
 class TestUnwinding(StacklessTestCase):
-    # a test case for https://bitbucket.org/stackless-dev/stackless/issues/119
+    # a test case for https://github.com/stackless-dev/stackless/issues/119
     # The macros STACKLESS_PACK(retval) / STACKLESS_UNPACK(retval) are not thread
     # safe. And thread switching can occur, if a destructor runs during stack unwinding.
 

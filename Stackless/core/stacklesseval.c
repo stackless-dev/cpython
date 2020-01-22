@@ -1159,7 +1159,7 @@ unwind_repr(PyObject *op)
 {
     return PyString_FromString(
         "The invisible unwind token. If you ever should see this,\n"
-        "please report the error to https://bitbucket.org/stackless-dev/stackless/issues"
+        "please report the error to https://github.com/stackless-dev/stackless/issues"
     );
 }
 

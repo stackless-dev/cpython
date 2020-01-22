@@ -1217,7 +1217,7 @@ _impl_tasklet_throw_bomb(PyTaskletObject *self, int pending, PyObject *bomb)
          *    because a dead tasklet must not be scheduled.
          */
 
-#if 0   /* disabled until https://bitbucket.org/stackless-dev/stackless/issues/81 is resolved */
+#if 0   /* disabled until https://github.com/stackless-dev/stackless/issues/81 is resolved */
         assert(self->next == NULL && self->prev == NULL);
 #endif
 

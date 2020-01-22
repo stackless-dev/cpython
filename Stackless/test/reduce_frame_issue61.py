@@ -4,7 +4,7 @@
 
 """
 A test script to analyse the pickling related part of
-https://bitbucket.org/stackless-dev/stackless/issue/61
+https://github.com/stackless-dev/stackless/issue/61
 """
 
 from __future__ import absolute_import, print_function, unicode_literals, division

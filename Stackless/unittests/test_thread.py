@@ -398,7 +398,7 @@ class DeadThreadTest(RemoteTaskletTests):
 
     @testcase_leaks_references("test catches TaskletExit and refuses to die in its own thread")
     def test_rebind_from_dead_fail_cstate(self):
-        # A test for https://bitbucket.org/stackless-dev/stackless/issues/92
+        # A test for https://github.com/stackless-dev/stackless/issues/92
         loop = True
 
         def task():
@@ -599,7 +599,7 @@ class SwitchTest(RemoteTaskletTests):
 
 
 class SetupFromDifferentThreadTest(RemoteTaskletTests):
-    # Test case for issue #60 https://bitbucket.org/stackless-dev/stackless/issue/60
+    # Test case for issue #60 https://github.com/stackless-dev/stackless/issue/60
 
     def create_tasklet(self, action, *args, **kw):
         self.tasklet = stackless.tasklet(action)
@@ -621,7 +621,7 @@ class TestThreadLocalStorage(StacklessTestCase):
             self.event.set()
 
     def test_destructor_at_end_of_thread(self):
-        # Test case for issue #121 https://bitbucket.org/stackless-dev/stackless/issue/121
+        # Test case for issue #121 https://github.com/stackless-dev/stackless/issue/121
         # Run a destructor during clean up of thread local storage
         # Until issue #121 got fixed, this caused a reference leak
         tls = threading.local()

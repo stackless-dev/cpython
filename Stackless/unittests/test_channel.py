@@ -246,7 +246,7 @@ class TestClose(StacklessTestCase):
         self.c = stackless.channel()
 
     # TODO: This test shows how ill conceived the current closing/closed semantics are.
-    # See https://bitbucket.org/stackless-dev/stackless/issues/53
+    # See https://github.com/stackless-dev/stackless/issues/53
     def testSequence(self):
         def sender():
             self.c.send_sequence(xrange(10))
@@ -277,7 +277,7 @@ class TestClose(StacklessTestCase):
             self.assertEqual(length, 10)
             # A future version of Stackless may send StopIteration
             # automatically, if you close the channel
-            # See https://bitbucket.org/stackless-dev/stackless/issues/53
+            # See https://github.com/stackless-dev/stackless/issues/53
             self.c.send_exception(StopIteration)
             self.c.close()
 

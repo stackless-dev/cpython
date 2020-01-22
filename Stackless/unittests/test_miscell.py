@@ -168,7 +168,7 @@ class TestTaskletSwitching(StacklessTestCase):
         self.assertEqual(flag[0], True)
 
     def test_switch_to_current(self):
-        # See https://bitbucket.org/stackless-dev/stackless/issues/88
+        # See https://github.com/stackless-dev/stackless/issues/88
         current = stackless.current
         current.switch()
         current.switch()  # this second switch used to trigger an assertion violation
@@ -1167,7 +1167,7 @@ class TestBind(StacklessTestCase):
     @unittest.skipUnless(withThreads, "requires thread support")
     @testcase_leaks_references("Tasklet chatches TaskletExit and refuses to die in its thread")
     def test_unbind_fail_cstate_no_thread(self):
-        # https://bitbucket.org/stackless-dev/stackless/issues/92
+        # https://github.com/stackless-dev/stackless/issues/92
         loop = True
 
         def task():
@@ -1196,7 +1196,7 @@ class TestBind(StacklessTestCase):
 
     def test_setup_fail_alive(self):
         # make sure, that you can't bind a tasklet, which is alive
-        # https://bitbucket.org/stackless-dev/stackless/issues/106
+        # https://github.com/stackless-dev/stackless/issues/106
 
         def task():
             t = stackless.current
