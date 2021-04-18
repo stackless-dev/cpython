@@ -1124,7 +1124,7 @@ tasklet_setup(PyObject *self, PyObject *args, PyObject *kwds)
 
 
 PyDoc_STRVAR(tasklet_throw__doc__,
-             "tasklet.throw(exc, val=None, tb=None, immediate=True) -- raise an exception for the tasklet.\n\
+             "tasklet.throw(exc, val=None, tb=None, pending=False) -- raise an exception for the tasklet.\n\
              'exc', 'val' and 'tb' have the same semantics as the 'raise' statement of the Python(r) language.\n\
              If 'pending' is True, the tasklet is not immediately activated, just\n\
              merely made runnable, ready to raise the exception when run.");
