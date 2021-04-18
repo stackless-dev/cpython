@@ -5,16 +5,11 @@ This file documents user visible changes to the Stackless extension of C-Python.
 For other changes see Misc/NEWS.
 
 
-What's New in Stackless 2.7.XX?
-===============================
+What's New in Stackless 2.7.17 and 2.7.18?
+==========================================
 
-*Release date: XXXX-XX-XX*
-
-
-What's New in Stackless 2.7.17?
-===============================
-
-*Release date: 2020-01-22*
+*Release date: 2021-04-18*  (2.7.18)
+*Release date: 2020-01-22*  (2.7.17)
 
 - https://github.com/stackless-dev/stackless/issues/231
   Update Stackless related bitbucket.org URLs to github.com
