@@ -761,6 +761,11 @@ PyTaskletTStateStruc * slp_get_saved_tstate(PyTaskletObject *task);
 PyObject * slp_channel_seq_callback(struct _frame *f,  int throwflag, PyObject *retval);
 PyObject * slp_get_channel_callback(void);
 
+/*
+ * contextvars related prototypes
+ */
+PyObject* slp_context_run_callback(PyFrameObject *f, int exc, PyObject *result);
+
 /* macro for use when interrupting tasklets from watchdog */
 #define TASKLET_NESTING_OK(task) \
     (ts->st.nesting_level == 0 || \

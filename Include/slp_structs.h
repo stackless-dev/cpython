@@ -134,6 +134,7 @@ typedef struct _tasklet {
     int recursion_depth;
     PyObject *def_globals;
     PyObject *tsk_weakreflist;
+    PyObject *context;  /* if running: the saved context, otherwise the context for the tasklet */
 } PyTaskletObject;
 
 

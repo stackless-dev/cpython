@@ -710,6 +710,10 @@ new_lock(void)
  * whereas Stackless stores the exception state in the tasklet object.
  * When switching from one tasklet to another tasklet, we have to switch
  * the exc_info-pointer in the thread state.
+ *
+ * The same situation is for the current contextvars.Context. When switching
+ * from one tasklet to another tasklet, we have to switch the context-pointer
+ * in the thread state.
  */
 
 #if 1
@@ -718,19 +722,23 @@ Py_LOCAL_INLINE(void) SLP_EXCHANGE_EXCINFO(PyThreadState *tstate, PyTaskletObjec
     PyThreadState *ts_ = (tstate);
     PyTaskletObject *t_ = (task);
     _PyErr_StackItem *exc_info;
+    PyObject *c;
     assert(ts_);
     assert(t_);
     exc_info = ts_->exc_info;
     assert(exc_info);
     assert(t_->exc_info);
 #if 0
-    PyObject *c;
     c = PyStackless_GetCurrent();
     fprintf(stderr, "SLP_EXCHANGE_EXCINFO %3d current %14p,\tset task %p = %p,\ttstate %p = %p\n", __LINE__, c, t_, exc_info, ts_, t_->exc_info);
     Py_XDECREF(c);
 #endif
     ts_->exc_info = t_->exc_info;
     t_->exc_info = exc_info;
+    c = ts_->context;
+    ts_->context = t_->context;
+    t_->context = c;
+    ts_->context_ver++;
 }
 #else
 #define SLP_EXCHANGE_EXCINFO(tstate_, task_) \
@@ -738,6 +746,7 @@ Py_LOCAL_INLINE(void) SLP_EXCHANGE_EXCINFO(PyThreadState *tstate, PyTaskletObjec
         PyThreadState *ts_ = (tstate_); \
         PyTaskletObject *t_ = (task_); \
         _PyErr_StackItem *exc_info; \
+        PyObject *c; \
         assert(ts_); \
         assert(t_); \
         exc_info = ts_->exc_info; \
@@ -745,6 +754,10 @@ Py_LOCAL_INLINE(void) SLP_EXCHANGE_EXCINFO(PyThreadState *tstate, PyTaskletObjec
         assert(t_->exc_info); \
         ts_->exc_info = t_->exc_info; \
         t_->exc_info = exc_info; \
+        c = ts_->context; \
+        ts_->context = t_->context; \
+        t_->context = c; \
+        ts_->context_ver++; \
     } while(0)
 #endif
 

@@ -108,6 +108,18 @@ different address than *t1*, which was displayed earlier.
     objects and frame objects contain code objects. And code objects are
     usually incompatible between different minor versions of |CPY|.
 
+.. note::
+
+    If you pickle a tasklet, its :class:`~contextvars.Context` won't be pickled,
+    because :class:`~contextvars.Context` objects can't be pickled. See
+    :pep:`567` for an explanation.
+
+    It is however possible to create a subclass of :class:`tasklet` and
+    overload the methods :meth:`tasklet.__reduce_ex__` and :meth:`tasklet.__setstate__` to
+    pickle the values of particular :class:`~contextvars.ContextVar` objects together
+    with a tasklet.
+
+
 ======================
 Pickling other objects
 ======================

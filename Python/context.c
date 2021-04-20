@@ -604,23 +604,32 @@ _contextvars_Context_copy_impl(PyContext *self)
 
 
 #ifdef STACKLESS
-static PyObject* context_run_callback(PyFrameObject *f, int exc, PyObject *result)
+PyObject* slp_context_run_callback(PyFrameObject *f, int exc, PyObject *result)
 {
     PyCFrameObject *cf = (PyCFrameObject *)f;
-    assert(PyContext_CheckExact(cf->ob1));
     PyObject *context = cf->ob1;
     cf->ob1 = NULL;
 
-    if (PyContext_Exit(context)) {
-        Py_CLEAR(result);
+    if (cf->i) {
+        /* called by tasklet.context_run(...) */
+        PyThreadState *ts = PyThreadState_GET();
+        assert(ts);
+        assert(NULL == context || PyContext_CheckExact(context));
+        Py_XSETREF(ts->context, context);
+        ts->context_ver++;
+    } else {
+        assert(PyContext_CheckExact(context));
+        if (PyContext_Exit(context)) {
+            Py_CLEAR(result);
+        }
+        Py_DECREF(context);
     }
 
-    Py_DECREF(context);
     SLP_STORE_NEXT_FRAME(PyThreadState_GET(), cf->f_back);
     return result;
 }
 
-SLP_DEF_INVALID_EXEC(context_run_callback)
+SLP_DEF_INVALID_EXEC(slp_context_run_callback)
 #endif
 
 
@@ -629,6 +638,7 @@ context_run(PyContext *self, PyObject *const *args,
             Py_ssize_t nargs, PyObject *kwnames)
 {
     STACKLESS_GETARG();
+    assert(NULL != self);
 
     if (nargs < 1) {
         PyErr_SetString(PyExc_TypeError,
@@ -644,11 +654,12 @@ context_run(PyContext *self, PyObject *const *args,
     PyThreadState *ts = PyThreadState_GET();
     PyCFrameObject *f = NULL;
     if (stackless) {
-        f = slp_cframe_new(context_run_callback, 1);
+        f = slp_cframe_new(slp_context_run_callback, 1);
         if (f == NULL)
             return NULL;
         Py_INCREF(self);
         f->ob1 = (PyObject *)self;
+        assert(f->i == 0);
         SLP_SET_CURRENT_FRAME(ts, (PyFrameObject *)f);
         /* f contains the only counted reference to current frame. This reference
          * keeps the fame alive during the following _PyObject_FastCallKeywords().
@@ -1326,7 +1337,7 @@ _PyContext_Init(void)
 
 #ifdef STACKLESS
     if (slp_register_execute(&PyCFrame_Type, "context_run_callback",
-        context_run_callback, SLP_REF_INVALID_EXEC(context_run_callback)) != 0)
+        slp_context_run_callback, SLP_REF_INVALID_EXEC(slp_context_run_callback)) != 0)
     {
         return 0;
     }

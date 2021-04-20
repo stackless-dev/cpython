@@ -110,6 +110,13 @@ The ``tasklet`` class
    :meth:`tasklet.setup`.  The difference is that when providing them to
    :meth:`tasklet.bind`, the tasklet is not made runnable yet.
 
+   .. versionadded:: 3.7.6
+
+      If *func* is not :data:`None`, this method also sets the
+      :class:`~contextvars.Context` object of this tasklet to the
+      :class:`~contextvars.Context` object of the current tasklet.
+      Therefore it is usually not required to set the context explicitly.
+
    *func* can be :data:`None` when providing arguments, in which case a previous call
    to :meth:`tasklet.bind` must have provided the function.
 
@@ -344,6 +351,47 @@ The ``tasklet`` class
      # Implement unsafe logic here.
      t.set_ignore_nesting(old_value)
 
+.. method:: tasklet.set_context(context)
+
+   .. versionadded:: 3.7.6
+
+   Set the :class:`~contextvars.Context` object to be used while this tasklet runs.
+
+   Every tasklet has a private context attribute.
+   When the tasklet runs, this context becomes the current context of the thread.
+
+   :param context: the context to be set
+   :type context: :class:`contextvars.Context`
+   :return: the tasklet itself
+   :rtype: :class:`tasklet`
+   :raises RuntimeError: if the tasklet is bound to a foreign thread and is current or scheduled.
+   :raises RuntimeError: if called from within :meth:`contextvars.Context.run`.
+
+   .. note::
+
+      The methods :meth:`__init__`, :meth:`bind` and :meth:`__setstate__` also set the context
+      of the tasklet they are called on to the context of the current tasklet. Therefore it is
+      usually not required to set the context explicitly.
+
+.. method:: tasklet.context_run(callable, \*args, \*\*kwargs)
+
+   .. versionadded:: 3.7.6
+
+   Execute ``callable(*args, **kwargs)`` in the context object of the tasklet
+   the contest_run method is called on. Return the result of the
+   execution or propagate an exception if one occurred.
+   This method is roughly equivalent following pseudo code::
+
+       def context_run(self, callable, *args, **kwargs):
+           saved_context = stackless.current._internal_get_context()
+           stackless.current.set_context(self._internal_get_context())
+           try:
+               return callable(*args, **kw)
+           finally:
+               stackless.current.set_context(saved_context)
+
+   See also :meth:`contextvars.Context.run` for additional information.
+
 .. method:: tasklet.__del__()
 
    .. versionadded:: 3.7
@@ -364,6 +412,12 @@ The ``tasklet`` class
 .. method:: tasklet.__setstate__(state)
 
    See :meth:`object.__setstate__`.
+
+   .. versionadded:: 3.7.6
+
+      If the tasklet becomes alive through this
+      call, the :meth:`~__setstate__` also sets the :class:`~contextvars.Context` object of the
+      tasklet to the :class:`~contextvars.Context` object of the current tasklet.
 
    :param state: the state as given by ``__reduce_ex__(...)[2]``
    :type state: :class:`tuple`
@@ -422,6 +476,13 @@ The following attributes allow checking of user set situations:
 
    This attribute is ``True`` while this tasklet is within a
    :meth:`tasklet.set_ignore_nesting` block
+
+.. attribute:: tasklet.context_id
+
+   .. versionadded:: 3.7.6
+
+   This attribute is the :func:`id` of the :class:`~contextvars.Context` object to be used while this tasklet runs.
+
 
 The following attributes allow identification of tasklet place:
 
@@ -511,3 +572,64 @@ state transitions these functions are roughly equivalent to the following
 
    def schedule_remove():
        stackless.current.next.switch()
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Tasklets and Context Variables
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. versionadded:: 3.7.6
+
+Version 3.7 of the |PPL| adds context variables, see module :mod:`contextvars`.
+Usually they are used in connection with
+:mod:`asyncio`, but they are a useful concept for |SLP| too.
+Using context variables and multiple tasklets together didn't work well in |SLP| versions 3.7.0 to
+3.7.5, because all tasklets of a given thread shared the same context.
+
+Starting with version 3.7.6 |SLP| adds explicit support for context variables.
+Design requirements were
+
+1. Be fully compatible with |CPY| and its design decisions.
+2. Be fully compatible with previous applications of |SLP|, which are unaware of context variables.
+3. Automatically share a context between related tasklets. This way a tasklet, that needs to set
+   a context variable, can delegate this duty to a sub-tasklet without the need to manage the
+   context of the sub-tasklet manually.
+4. Enable the integration of tasklet-based co-routines into the :mod:`asyncio` framework.
+   This is an obvious application which involves context variables and tasklets.
+
+Now each tasklet object has a private context attribute, which is either undefined (``NULL``) or a
+:class:`~contextvars.Context` object. The design goals have some consequences:
+
+* The active :class:`~contextvars.Context` object of a thread (as defined by the |PPL|)
+  is the context of the :attr:`~stackless.current` tasklet. This implies that a tasklet switch,
+  switches the active context of the thread.
+
+* In accordance with the design decisions made in :pep:`576` the context of a tasklet can't be
+  accessed directly, but you can use the method :meth:`tasklet.context_run` to run arbitrary code
+  in this context. For instance ``tasklet.context_run(contextvars.copy_context())`` returns a copy
+  of the context.
+  The attribute :attr:`tasklet.context_id` can be used to test, if two tasklets share the context.
+
+* A tasklet, whose context is undefined must behave identically to a tasklet, whose context is an
+  empty :class:`~contextvars.Context` object. [#f1]_ Therefore the |PY| API provides no way to distinguish
+  both states.
+
+* Whenever the context of a tasklet is to be shared with another tasklet and the context is initially
+  undefined, it must be set to a newly created :class:`~contextvars.Context` object beforehand.
+  This affects the methods :meth:`~tasklet.context_run`, :meth:`~tasklet.__init__`, :meth:`~tasklet.bind`
+  and :meth:`~tasklet.__setstate__`.
+
+* If the state of a tasklet changes from *not alive* to *bound* or to *alive* (methods :meth:`~tasklet.__init__`,
+  :meth:`~tasklet.bind` or :meth:`~tasklet.__setstate__`), the context
+  of the tasklet is set to the currently active context. This way a newly initialized tasklet automatically
+  shares the context of its creator.
+
+* The :mod:`contextvars` implementation of |CPY| imposes several restrictions on |SLP|. Especially the sanity checks in
+  :c:func:`PyContext_Enter` and :c:func:`PyContext_Exit` make it impossible to replace the current context within
+  the execution of the method :meth:`contextvars.Context.run`. In that case |SLP| raises :exc:`RuntimeError`.
+
+.. rubric:: Footnotes
+
+.. [#f1]   Setting a context variable to a non default value sets a previously undefined
+           context attribute to a newly created :class:`~contextvars.Context` object. This can happen anytime in a
+           library call. Therefore any difference between an undefined context and an empty context causes ill defined
+           behavior.
