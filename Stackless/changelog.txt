@@ -4,6 +4,16 @@ Stackless-Python News
 This file documents user visible changes to the Stackless extension of C-Python.
 For other changes see Misc/NEWS.
 
+What's New in Stackless 3.X.X?
+==============================
+
+*Release date: 20XX-XX-XX*
+
+- https://github.com/stackless-dev/stackless/issues/241
+  Prevent a crash, if you call tasklet.__setstate__() on a tasklet, that is
+  alive.
+
+
 What's New in Stackless 3.6.9, 3.6.10, 3.6.11, 3.6.12 and 3.6.13?
 =================================================================
 

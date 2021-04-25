@@ -535,6 +535,11 @@ tasklet_setstate(PyObject *self, PyObject *args)
     Py_ssize_t i, nframes;
     int j;
 
+    assert(t && PyTasklet_Check(t));
+
+    if (PyTasklet_Alive(t))
+        RUNTIME_ERROR("tasklet is alive", NULL);
+
     if (!PyArg_ParseTuple(args, "iOiO!:tasklet",
                           &flags,
                           &tempval,

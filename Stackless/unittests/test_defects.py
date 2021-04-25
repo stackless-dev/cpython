@@ -646,6 +646,23 @@ class TestUnwinding(StacklessTestCase):
         self.assertEqual(r, 4711)
 
 
+class TestTaskletSetstate(StacklessTestCase):
+    # a test case for https://github.com/stackless-dev/stackless/issues/241
+
+    def test_setstate_not_alive(self):
+        state = stackless.tasklet().__reduce__()[2]
+        t = stackless.tasklet()
+        self.assertFalse(t.alive)
+        self.assertIs(t.__setstate__(state), t)
+        t.bind()  # unbind t
+
+    def test_setstate_alive(self):
+        state = stackless.tasklet().__reduce__()[2]
+        t = stackless.tasklet(lambda: None,())
+        self.assertTrue(t.alive)
+        self.assertRaisesRegex(RuntimeError, "tasklet is alive", t.__setstate__, state)
+
+
 if __name__ == '__main__':
     if not sys.argv[1:]:
         sys.argv.append('-v')
