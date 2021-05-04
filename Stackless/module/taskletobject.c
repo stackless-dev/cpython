@@ -291,6 +291,10 @@ PyTasklet_BindEx(PyTaskletObject *task, PyObject *func, PyObject *args, PyObject
 
     if (func != NULL && !PyCallable_Check(func))
         TYPE_ERROR("tasklet function must be a callable or None", -1);
+    if (args != NULL && !PyTuple_Check(args))
+        TYPE_ERROR("tasklet args must be a tuple or None", -1);
+    if (kwargs != NULL && !PyDict_Check(kwargs))
+        TYPE_ERROR("tasklet kwargs must be a dictionary or None", -1);
     if (ts && ts->st.current == task) {
         RUNTIME_ERROR("can't (re)bind the current tasklet", -1);
     }

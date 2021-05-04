@@ -663,6 +663,15 @@ class TestTaskletSetstate(StacklessTestCase):
         self.assertRaisesRegex(RuntimeError, "tasklet is alive", t.__setstate__, state)
 
 
+class TestTaskletBindArgumentTypes(StacklessTestCase):
+    # a test case for https://github.com/stackless-dev/stackless/issues/245
+    def test_bind_args(self):
+        self.assertRaisesRegex(TypeError, "tasklet args must be a tuple or None", stackless.tasklet, lambda:None, 123)
+
+    def test_bind_kwargs(self):
+        self.assertRaisesRegex(TypeError, "tasklet kwargs must be a dictionary or None", stackless.tasklet, lambda:None, None, 456)
+
+
 if __name__ == '__main__':
     if not sys.argv[1:]:
         sys.argv.append('-v')
