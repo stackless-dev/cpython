@@ -16,6 +16,10 @@ What's New in Stackless 3.X.X?
   New tasklet methods set_context() and context_run().
   New read only attribute tasklet.context_id.
 
+- https://github.com/stackless-dev/stackless/issues/245
+  Prevent a crash, if you call tasklet.__init__() or tasklet.bind() with wrong
+  argument types.
+
 - https://github.com/stackless-dev/stackless/issues/241
   Prevent a crash, if you call tasklet.__setstate__() on a tasklet, that is
   alive.
