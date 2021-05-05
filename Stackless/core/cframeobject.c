@@ -30,6 +30,7 @@
 #ifdef STACKLESS
 #include "internal/stackless_impl.h"
 #include "internal/slp_prickelpit.h"
+#include "internal/context.h"
 
 static PyCFrameObject *free_list = NULL;
 static int numfree = 0;         /* number of cframes currently in free_list */
@@ -136,6 +137,8 @@ cframe_reduce(PyCFrameObject *cf)
     PyObject *res = NULL, *exec_name = NULL;
     PyObject *params = NULL;
     int valid = 1;
+    PyObject *obs[3];
+    long i, n;
 
     if (cf->f_execute == execute_soft_switchable_func) {
         exec_name = (PyObject *) cf->any2;
@@ -146,7 +149,24 @@ cframe_reduce(PyCFrameObject *cf)
     } else if ((exec_name = slp_find_execname((PyFrameObject *) cf, &valid)) == NULL)
         return NULL;
 
-    params = slp_into_tuple_with_nulls(&cf->ob1, 3);
+    obs[0] = cf->ob1;
+    obs[1] = cf->ob2;
+    obs[2] = cf->ob3;
+    i = cf->i;
+    n = cf->n;
+
+    if (cf->f_execute == slp_context_run_callback && 0 == i) {
+        /*
+         * Replace a logical PyContext_Exit(context) with the equivalent
+         * stackless.current.set_context().
+         */
+        assert(PyContext_CheckExact(obs[0]));
+        assert(((PyContext *) obs[0])->ctx_entered);
+        obs[0] = (PyObject *)((PyContext *) obs[0])->ctx_prev;
+        i = 1;
+    }
+
+    params = slp_into_tuple_with_nulls(obs, 3);
     if (params == NULL) goto err_exit;
 
     res = Py_BuildValue ("(O()(" cframetuplefmt "))",
@@ -154,8 +174,8 @@ cframe_reduce(PyCFrameObject *cf)
                          valid,
                          exec_name,
                          params,
-                         cf->i,
-                         cf->n);
+                         i,
+                         n);
 
 err_exit:
     Py_XDECREF(exec_name);

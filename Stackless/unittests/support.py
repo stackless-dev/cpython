@@ -34,6 +34,7 @@ import contextlib
 import gc
 import os
 import functools
+import copyreg
 from test.support import run_unittest
 
 # emit warnings about uncollectable objects
@@ -674,21 +675,65 @@ class StacklessTestCase(unittest.TestCase, StacklessTestCaseMixin, metaclass=Sta
         self.assertIsInstance(tlet, stackless.tasklet)
         self.__uncollectable_tasklets.append(id(tlet))
 
-    def dumps(self, obj, protocol=None, *, fix_imports=True):
+    def dumps(self, obj, protocol=None, *, fix_imports=True, external_map=None, additional_dispatch_table=None):
+        if self._pickle_module == "P":
+            cls = pickle._Pickler
+        elif self._pickle_module == "C":
+            cls = pickle.Pickler
+        else:
+            raise ValueError("Invalid pickle module")
+
+        if external_map is not None:
+            inverted_external_map = {id(v): k for k,v in external_map.items()}
+            class PicklerWithExternalObjects(cls):
+                def persistent_id(self, obj):
+                    if external_map:
+                        return inverted_external_map.get(id(obj))
+                    return None
+            cls = PicklerWithExternalObjects
+
         if protocol is None:
             protocol = self._pickle_protocol
-        if self._pickle_module == "P":
-            return pickle._dumps(obj, protocol=protocol, fix_imports=fix_imports)
-        elif self._pickle_module == "C":
-            return pickle.dumps(obj, protocol=protocol, fix_imports=fix_imports)
-        raise ValueError("Invalid pickle module")
 
-    def loads(self, s, *, fix_imports=True, encoding="ASCII", errors="strict"):
+        f = io.BytesIO()
+        p=cls(f, protocol, fix_imports=fix_imports)
+        if additional_dispatch_table is not None:
+            dispatch_table = copyreg.dispatch_table.copy()
+            dispatch_table.update(additional_dispatch_table)
+            p.dispatch_table = dispatch_table
+        p.dump(obj)
+        res = f.getvalue()
+        assert isinstance(res, (bytes, bytearray))
+        return res
+
+    def loads(self, s, *, fix_imports=True, encoding="ASCII", errors="strict",  external_map=None):
+        if isinstance(s, str):
+            raise TypeError("Can't load pickle from unicode string")
         if self._pickle_module == "P":
-            return pickle._loads(s, fix_imports=fix_imports, encoding=encoding, errors=errors)
+            cls = pickle._Unpickler
         elif self._pickle_module == "C":
-            return pickle.loads(s, fix_imports=fix_imports, encoding=encoding, errors=errors)
-        raise ValueError("Invalid pickle module")
+            cls = pickle.Unpickler
+        else:
+            raise ValueError("Invalid pickle module")
+
+        if external_map is not None:
+            class UnPicklerWithExternalObjects(cls):
+                def persistent_load(self, pid):
+                    # This method is invoked whenever a persistent ID is encountered.
+                    # Here, pid is the tuple returned by DBPickler.
+                    if external_map is None:
+                        raise pickle.UnpicklingError("external_map not set")
+                    try:
+                        return external_map[pid]
+                    except KeyError:
+                        # Always raises an error if you cannot return the correct object.
+                        # Otherwise, the unpickler will think None is the object referenced
+                        # by the persistent ID.
+                        raise pickle.UnpicklingError("unsupported persistent object")
+            cls = UnPicklerWithExternalObjects
+
+        file = io.BytesIO(s)
+        return cls(file, fix_imports=fix_imports, encoding=encoding, errors=errors).load()
 
     # limited pickling support for test cases
     # Between setUp() and tearDown() the test-case has a

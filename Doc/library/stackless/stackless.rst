@@ -51,6 +51,21 @@ Constants
       These constants have been added on a provisional basis (see :pep:`411`
       for details.)
 
+.. data:: PICKLEFLAGS_PICKLE_CONTEXT
+
+   This constant defines an option flag for the function
+   :func:`pickle_flags`.
+
+   If this flag is set, |SLP| assumes that a :class:`~contextvars.Context` object
+   is pickleable. As a consequence the state information returned by :meth:`tasklet.__reduce_ex__`
+   includes the context of the tasklet.
+
+   .. versionadded:: 3.7.6
+
+   .. note::
+      This constant has been added on a provisional basis (see :pep:`411`
+      for details.)
+
 ---------
 Functions
 ---------

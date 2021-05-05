@@ -49,7 +49,8 @@ Py_ssize_t slp_from_tuple_with_nulls(PyObject **start, PyObject *tup);
 #define SLP_PICKLEFLAGS_PRESERVE_TRACING_STATE (1U)
 #define SLP_PICKLEFLAGS_PRESERVE_AG_FINALIZER  (1U<<1)
 #define SLP_PICKLEFLAGS_RESET_AG_FINALIZER     (1U<<2)
-#define SLP_PICKLEFLAGS__MAX_VALUE             ((1<<3)-1) /* must be a signed value */
+#define SLP_PICKLEFLAGS_PICKLE_CONTEXT         (1U<<3)
+#define SLP_PICKLEFLAGS__MAX_VALUE             ((1<<4)-1) /* must be a signed value */
 
 /* helper functions for module dicts */
 

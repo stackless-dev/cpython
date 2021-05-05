@@ -6,6 +6,8 @@ import inspect
 import copy
 import contextlib
 import threading
+import contextvars
+import ctypes
 import stackless
 
 from stackless import schedule, tasklet
@@ -924,6 +926,208 @@ class TestAsyncGenAThrowPickling(StacklessPickleTestCase):
             agt.__next__()
         self.assertIs(cm.exception, e)
         self.assertTupleEqual(self.inspect(agt), ((e, ), 1, True))
+
+
+class TestContextRunCallbackPickling(StacklessTestCase):
+    # Actually we test cframe.__reduce__ for cframes with exec function "context_run_callback"
+    # We can't pickle a contextvars.Context object.
+
+    # declare int PyContext_Exit(PyObject *octx)
+    PyContext_Exit =  ctypes.pythonapi.PyContext_Exit
+    PyContext_Exit.argtypes = [ctypes.py_object]
+    PyContext_Exit.restype = ctypes.c_int
+
+    # make sure, a context exists and contains an var whose value can't be pickled
+    cvar = contextvars.ContextVar("TestContextPickling.cvar", default="unset")
+    cvar.set(object())
+
+    @classmethod
+    def task(cls):
+        v = cls.cvar.get()
+        v = stackless.schedule_remove(v)
+        cls.cvar.set(v)
+
+    def _test_pickle_in_context_run(self, ctx1):
+        # test cframe.__reduce__ for "context_run_callback" called in Context.run
+        ctx2 = contextvars.Context()
+        t = stackless.tasklet(ctx2.run)(self.task)
+
+        stackless.run()
+        self.assertEqual(t.tempval, "unset")
+        self.assertTrue(t.alive)
+        self.assertTrue(t.paused)
+        if is_soft():
+            self.assertTrue(t.restorable)
+
+        # now ctx2 must be in state entered
+        self.assertRaisesRegex(RuntimeError, "cannot enter context:.*is already entered", ctx2.run, lambda: None)
+        frames = t.__reduce__()[2][3]
+        self.assertIsInstance(frames, list)
+
+        for f in frames:
+            if not isinstance(f, stackless.cframe):
+                continue
+            valid, exec_name, params, i, n = f.__reduce__()[2]
+            if exec_name != 'context_run_callback':
+                continue
+            self.assertEqual(valid, 1)
+            self.assertEqual(f.n, 0)
+            self.assertEqual(n, 0)
+            # now check, that context to switch to is in the state
+            # the original cframe has the currently active context
+            self.assertIs(f.ob1, ctx2)
+            self.assertTupleEqual(params, ((1, 2), ctx1, None, None))
+            self.assertEqual(f.i, 0)
+            self.assertEqual(i, 1)
+            break
+        else:
+            self.assertFalse(is_soft(), "no cframe 'context_run_callback'")
+
+        if is_soft():
+            t.bind(None)
+            self.assertRaisesRegex(RuntimeError, "the current context of the tasklet has been entered", t.set_context, contextvars.Context())
+            t.context_run(self.PyContext_Exit, ctx2)
+            t.set_context(contextvars.Context())
+
+    def test_pickle_in_context_run(self):
+        # test cframe.__reduce__ for "context_run_callback" called in Context.run
+        ctx1 = contextvars.copy_context()
+        ctx1.run(self._test_pickle_in_context_run, ctx1)
+
+    def _test_pickle_in_tasklet_context_run(self, ctx1):
+        # test cframe.__reduce__ for "context_run_callback" called in tasklet.context_run
+        ctx2 = contextvars.Context()
+        t_run = stackless.tasklet().set_context(ctx2)
+        t = stackless.tasklet(t_run.context_run)(self.task)
+
+        stackless.run()
+        self.assertEqual(t.tempval, "unset")
+        self.assertTrue(t.alive)
+        self.assertTrue(t.paused)
+        if is_soft():
+            self.assertTrue(t.restorable)
+
+        # now ctx2 must not be in state entered
+        ctx2.run(lambda:None)
+        frames = t.__reduce__()[2][3]
+        self.assertIsInstance(frames, list)
+
+        for f in frames:
+            if not isinstance(f, stackless.cframe):
+                continue
+            valid, exec_name, params, i, n = f.__reduce__()[2]
+            if exec_name != 'context_run_callback':
+                continue
+            self.assertEqual(valid, 1)
+            self.assertEqual(f.n, 0)
+            self.assertEqual(n, 0)
+            # now check, that context to switch to is in the state
+            # the original cframe has the currently active context
+            self.assertIs(f.ob1, ctx1)
+            self.assertTupleEqual(params, ((1, 2), ctx1, None, None))
+            self.assertEqual(f.i, 1)
+            self.assertEqual(i, 1)
+            break
+        else:
+            self.assertFalse(is_soft(), "no cframe 'context_run_callback'")
+
+        if is_soft():
+            t.bind(None)
+            t.set_context(contextvars.Context())
+
+    def test_pickle_in_tasklet_context_run(self):
+        # test cframe.__reduce__ for "context_run_callback" called in tasklet.context_run
+        ctx1 = contextvars.copy_context()
+        ctx1.run(self._test_pickle_in_tasklet_context_run, ctx1)
+
+    def test_tasklet_get_unpicklable_state(self):
+        cid = stackless.current.context_id
+        ctx = stackless._tasklet_get_unpicklable_state(stackless.current)['context']
+        self.assertEqual(stackless.current.context_id, cid)
+        self.assertIsInstance(ctx, contextvars.Context)
+        self.assertEqual(id(ctx), cid)
+
+
+class TestContextPickling(StacklessPickleTestCase):
+    # We can't pickle a contextvars.Context object.
+
+    # declare int PyContext_Exit(PyObject *octx)
+    PyContext_Exit =  ctypes.pythonapi.PyContext_Exit
+    PyContext_Exit.argtypes = [ctypes.py_object]
+    PyContext_Exit.restype = ctypes.c_int
+
+    # make sure, a context exists and contains an var whose value can't be pickled
+    cvar = contextvars.ContextVar("TestContextPickling.cvar", default="unset")
+    sentinel = object()
+    cvar.set(sentinel)
+
+    def setUp(self):
+        super().setUp()
+        stackless.pickle_flags(stackless.PICKLEFLAGS_PICKLE_CONTEXT, stackless.PICKLEFLAGS_PICKLE_CONTEXT)
+
+    def tearDown(self):
+        super().tearDown()
+        stackless.pickle_flags(0, stackless.PICKLEFLAGS_PICKLE_CONTEXT)
+
+    @classmethod
+    def task(cls, arg):
+        v = cls.cvar.get()
+        cls.cvar.set(arg)
+        v = stackless.schedule_remove(v)
+        cls.cvar.set(v)
+
+    def test_pickle_tasklet_with_context(self):
+        ctx = contextvars.copy_context()
+        t = stackless.tasklet(self.task)("changed").set_context(ctx)
+        stackless.run()
+        self.assertTrue(t.alive)
+        self.assertIs(t.tempval, self.sentinel)
+        self.assertEqual(ctx[self.cvar], "changed")
+
+        external_map = {"context ctx": ctx}
+
+        p = self.dumps(t, external_map = external_map)
+        # import pickletools; pickletools.dis(pickletools.optimize(p))
+        t.kill()
+
+        t = self.loads(p, external_map = external_map)
+        self.assertEqual(t.context_id, id(ctx))
+        self.assertTrue(t.alive)
+        t.insert()
+        t.tempval = "after unpickling"
+        if is_soft():
+            stackless.run()
+            self.assertFalse(t.alive)
+            self.assertEqual(ctx[self.cvar], "after unpickling")
+
+    def test_pickle_tasklet_in_tasklet_context_run(self):
+        ctx1 = contextvars.copy_context()
+        ctx2 = contextvars.Context()
+        t = stackless.tasklet(stackless.tasklet().set_context(ctx2).context_run)(self.task, "changed").set_context(ctx1)
+        self.assertEqual(t.context_id, id(ctx1))
+        stackless.run()
+        self.assertTrue(t.alive)
+        self.assertIs(ctx1[self.cvar], self.sentinel)
+        self.assertEqual(t.tempval, "unset")
+        self.assertEqual(ctx2[self.cvar], "changed")
+
+        external_map = {"context ctx1": ctx1, "context ctx2": ctx2,}
+
+        p = self.dumps(t, external_map = external_map)
+        # import pickletools; pickletools.dis(pickletools.optimize(p))
+        t.kill()
+
+        t = self.loads(p, external_map = external_map)
+        self.assertEqual(t.context_id, id(ctx2))
+        self.assertTrue(t.alive)
+        t.insert()
+        t.tempval = "after unpickling"
+        if is_soft():
+            stackless.run()
+            self.assertFalse(t.alive)
+            self.assertEqual(t.context_id, id(ctx1))
+            self.assertEqual(ctx2[self.cvar], "after unpickling")
+        self.assertIs(ctx1[self.cvar], self.sentinel)
 
 
 class TestCopy(StacklessTestCase):

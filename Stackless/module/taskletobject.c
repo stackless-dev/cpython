@@ -617,6 +617,7 @@ tasklet_reduce(PyTaskletObject * t)
     PyFrameObject *f;
     PyThreadState *ts = t->cstate->tstate;
     PyObject *exc_type, *exc_value, *exc_traceback, *exc_info;
+    PyObject *context = NULL;
 
     if (ts && t == ts->st.current)
         RUNTIME_ERROR("You cannot __reduce__ the tasklet which is"
@@ -649,6 +650,10 @@ tasklet_reduce(PyTaskletObject * t)
         goto err_exit;
     }
 
+    context = _get_tasklet_context(t);
+    if (NULL == context)
+        goto err_exit;
+
     assert(!ts || t->exc_info != &ts->exc_state);
     /* Because of the test a few lines above, it is guaranteed that t is not the current tasklet.
      * Therefore we can simplify the line
@@ -677,7 +682,8 @@ tasklet_reduce(PyTaskletObject * t)
     Py_INCREF(exc_type);
     Py_INCREF(exc_value);
     Py_INCREF(exc_traceback);
-    tup = Py_BuildValue("(O()(" TASKLET_TUPLEFMT "))",
+    tup = Py_BuildValue((ts && (ts->st.pickleflags & SLP_PICKLEFLAGS_PICKLE_CONTEXT)) ?
+                        "(O()(" TASKLET_TUPLEFMT "O))" : "(O()(" TASKLET_TUPLEFMT "))",
                         Py_TYPE(t),
                         tasklet_flags_as_integer(t->flags),
                         t->tempval,
@@ -686,7 +692,8 @@ tasklet_reduce(PyTaskletObject * t)
                         exc_type,
                         exc_value,
                         exc_traceback,
-                        exc_info
+                        exc_info,
+                        context
                         );
     Py_DECREF(exc_info);
     Py_DECREF(exc_type);
@@ -694,6 +701,7 @@ tasklet_reduce(PyTaskletObject * t)
     Py_DECREF(exc_traceback);
 err_exit:
     Py_XDECREF(lis);
+    Py_XDECREF(context);
     return tup;
 }
 
@@ -715,6 +723,7 @@ tasklet_setstate(PyObject *self, PyObject *args)
     PyObject *exc_type, *exc_value, *exc_traceback;
     PyObject *old_type, *old_value, *old_traceback;
     PyObject *exc_info_obj;
+    PyObject *context = NULL;
     PyFrameObject *f;
     Py_ssize_t i, nframes;
     int j;
@@ -724,7 +733,7 @@ tasklet_setstate(PyObject *self, PyObject *args)
     if (PyTasklet_Alive(t))
         RUNTIME_ERROR("tasklet is alive", NULL);
 
-    if (!PyArg_ParseTuple(args, "iOiO!OOOO:tasklet",
+    if (!PyArg_ParseTuple(args, "iOiO!OOOO|O:tasklet",
                           &flags,
                           &tempval,
                           &nesting_level,
@@ -732,8 +741,14 @@ tasklet_setstate(PyObject *self, PyObject *args)
                           &exc_type,
                           &exc_value,
                           &exc_traceback,
-                          &exc_info_obj))
+                          &exc_info_obj,
+                          &context))
         return NULL;
+
+    if (Py_None == context)
+        context = NULL;
+    if (context != NULL && !PyContext_CheckExact(context))
+        TYPE_ERROR("tasklet state[8] must be a contextvars.Context or None", NULL);
 
     nframes = PyList_GET_SIZE(lis);
     TASKLET_SETVAL(t, tempval);
@@ -783,9 +798,16 @@ tasklet_setstate(PyObject *self, PyObject *args)
             back = f;
         }
         t->f.frame = f;
-        if(_tasklet_init_context(t))
+        if(NULL == context && _tasklet_init_context(t))
             return NULL;
     }
+    if (context) {
+        PyObject *obj = _stackless_tasklet_set_context_impl(t, context);
+        if (NULL == obj)
+            return NULL;
+        Py_DECREF(obj);
+    }
+
     /* walk frames again and calculate recursion_depth */
     for (f = t->f.frame; f != NULL; f = f->f_back) {
         if (PyFrame_Check(f) && f->f_execute != PyEval_EvalFrameEx_slp) {

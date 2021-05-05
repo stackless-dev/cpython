@@ -373,6 +373,10 @@ The ``tasklet`` class
       of the tasklet they are called on to the context of the current tasklet. Therefore it is
       usually not required to set the context explicitly.
 
+   .. note::
+      This method has been added on a provisional basis (see :pep:`411`
+      for details.)
+
 .. method:: tasklet.context_run(callable, \*args, \*\*kwargs)
 
    .. versionadded:: 3.7.6
@@ -391,6 +395,10 @@ The ``tasklet`` class
                stackless.current.set_context(saved_context)
 
    See also :meth:`contextvars.Context.run` for additional information.
+
+   .. note::
+      This method has been added on a provisional basis (see :pep:`411`
+      for details.)
 
 .. method:: tasklet.__del__()
 
@@ -415,8 +423,9 @@ The ``tasklet`` class
 
    .. versionadded:: 3.7.6
 
-      If the tasklet becomes alive through this
-      call, the :meth:`~__setstate__` also sets the :class:`~contextvars.Context` object of the
+      If the tasklet becomes alive through this call and if *state* does not contain
+      a :class:`~contextvars.Context` object, then :meth:`~__setstate__` also sets
+      the :class:`~contextvars.Context` object of the
       tasklet to the :class:`~contextvars.Context` object of the current tasklet.
 
    :param state: the state as given by ``__reduce_ex__(...)[2]``
@@ -482,6 +491,10 @@ The following attributes allow checking of user set situations:
    .. versionadded:: 3.7.6
 
    This attribute is the :func:`id` of the :class:`~contextvars.Context` object to be used while this tasklet runs.
+
+   .. note::
+      This attribute has been added on a provisional basis (see :pep:`411`
+      for details.)
 
 
 The following attributes allow identification of tasklet place:
@@ -626,6 +639,9 @@ Now each tasklet object has a private context attribute, which is either undefin
 * The :mod:`contextvars` implementation of |CPY| imposes several restrictions on |SLP|. Especially the sanity checks in
   :c:func:`PyContext_Enter` and :c:func:`PyContext_Exit` make it impossible to replace the current context within
   the execution of the method :meth:`contextvars.Context.run`. In that case |SLP| raises :exc:`RuntimeError`.
+
+.. note::
+   Context support has been added on a provisional basis (see :pep:`411` for details.)
 
 .. rubric:: Footnotes
 

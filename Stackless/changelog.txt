@@ -13,8 +13,11 @@ What's New in Stackless 3.X.X?
   Add support for PEP 567 context variables to tasklets.
   Each tasklet now has a contextvars.Context object, that becomes active during
   the execution of the tasklet.
-  New tasklet methods set_context() and context_run().
-  New read only attribute tasklet.context_id.
+  New tasklet methods "set_context()" and "context_run()".
+  New read only attribute "tasklet.context_id".
+  New constant "stackless.PICKLEFLAGS_PICKLE_CONTEXT".
+  And an intentionally undocumented function
+  "stackless._tasklet_get_unpicklable_state()"
 
 - https://github.com/stackless-dev/stackless/issues/245
   Prevent a crash, if you call tasklet.__init__() or tasklet.bind() with wrong
