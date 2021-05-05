@@ -63,7 +63,7 @@ class Detector(object):
         self.checks = checks
         self.tasklets = tasklets
 
-        # In Py_Finalize() the PyImport_Cleanup() runs shortly after 
+        # In Py_Finalize() the PyImport_Cleanup() runs shortly after
         # slp_kill_tasks_with_stacks(NULL).
         # As very first action of PyImport_Cleanup() the Python
         # interpreter sets builtins._ to None.

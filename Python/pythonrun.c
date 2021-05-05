@@ -641,7 +641,7 @@ handle_system_exit(void)
 #ifdef STACKLESS
 void PyStackless_HandleSystemExit(void)
 {
-	handle_system_exit();
+        handle_system_exit();
 }
 #endif
 
@@ -651,7 +651,7 @@ PyErr_PrintEx(int set_sys_last_vars)
     PyObject *exception, *v, *tb, *hook;
 
 #ifdef STACKLESS
-	if (PyErr_ExceptionMatches(PyExc_SystemExit) && !PyErr_ExceptionMatches(PyExc_TaskletExit)) {
+        if (PyErr_ExceptionMatches(PyExc_SystemExit) && !PyErr_ExceptionMatches(PyExc_TaskletExit)) {
 #else
     if (PyErr_ExceptionMatches(PyExc_SystemExit)) {
 #endif

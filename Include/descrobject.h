@@ -32,7 +32,7 @@ struct wrapperbase {
     int flags;
     PyObject *name_strobj;
 #ifdef STACKLESS
-	int slp_offset;
+        int slp_offset;
 #endif
 };
 
@@ -73,7 +73,7 @@ typedef struct {
     struct wrapperbase *d_base;
     void *d_wrapped; /* This can be any function pointer */
 #ifdef STACKLESS
-	int d_slpmask;
+        int d_slpmask;
 #endif
 } PyWrapperDescrObject;
 #endif /* Py_LIMITED_API */

@@ -453,8 +453,8 @@ slp_register_execute(PyTypeObject *t, char *name, PyFrame_ExecFunc *good,
         || (o = PyDict_SetDefault(dp->dict, b, nameobj)) == NULL
         || !PyObject_RichCompareBool(o, nameobj, Py_EQ)
         ) {
-		if (! PyErr_Occurred())
-	        PyErr_SetString(PyExc_SystemError, "duplicate/ambiguous exec func");
+                if (! PyErr_Occurred())
+                PyErr_SetString(PyExc_SystemError, "duplicate/ambiguous exec func");
         goto err_exit;
     }
     PyErr_Clear();

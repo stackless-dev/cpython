@@ -643,7 +643,7 @@ typedef struct PicklerObject {
                                    the name of globals for Python 2.x. */
     PyObject *fast_memo;
 #ifdef STACKLESS
-	PyObject *module_dict_ids;
+        PyObject *module_dict_ids;
 #endif
 } PicklerObject;
 
@@ -4038,16 +4038,16 @@ save(PicklerObject *self, PyObject *obj, int pers_save)
     }
     else if (type == &PyDict_Type) {
 #ifdef STACKLESS
-			PyObject *ret = PyStackless_Pickle_ModuleDict(
-					    (PyObject *) self, obj);
+                        PyObject *ret = PyStackless_Pickle_ModuleDict(
+                                            (PyObject *) self, obj);
 
-			if (ret == NULL) return -1;
-			if (ret != Py_None) {
-				status = save_reduce(self, ret, obj);
-				Py_DECREF(ret);
-				goto done;
-			}
-			Py_DECREF(ret);
+                        if (ret == NULL) return -1;
+                        if (ret != Py_None) {
+                                status = save_reduce(self, ret, obj);
+                                Py_DECREF(ret);
+                                goto done;
+                        }
+                        Py_DECREF(ret);
 #endif
         status = save_dict(self, obj);
         goto done;
@@ -4323,7 +4323,7 @@ Pickler_dealloc(PicklerObject *self)
     Py_XDECREF(self->dispatch_table);
     Py_XDECREF(self->fast_memo);
 #ifdef STACKLESS
-	Py_XDECREF(self->module_dict_ids);
+        Py_XDECREF(self->module_dict_ids);
 #endif
 
     PyMemoTable_Del(self->memo);
@@ -4339,7 +4339,7 @@ Pickler_traverse(PicklerObject *self, visitproc visit, void *arg)
     Py_VISIT(self->dispatch_table);
     Py_VISIT(self->fast_memo);
 #ifdef STACKLESS
-	Py_VISIT(self->module_dict_ids);
+        Py_VISIT(self->module_dict_ids);
 #endif
     return 0;
 }
@@ -4353,7 +4353,7 @@ Pickler_clear(PicklerObject *self)
     Py_CLEAR(self->dispatch_table);
     Py_CLEAR(self->fast_memo);
 #ifdef STACKLESS
-	Py_CLEAR(self->module_dict_ids);
+        Py_CLEAR(self->module_dict_ids);
 #endif
 
     if (self->memo != NULL) {
@@ -4699,29 +4699,29 @@ Pickler_set_memo(PicklerObject *self, PyObject *obj, void *Py_UNUSED(ignored))
 static PyObject *
 Pickler_get_module_dict_ids(PicklerObject *p)
 {
-	if (p->module_dict_ids == NULL)
-		PyErr_SetString(PyExc_AttributeError, "module_dict_ids");
-	else
-		Py_INCREF(p->module_dict_ids);
-	return p->module_dict_ids;
+        if (p->module_dict_ids == NULL)
+                PyErr_SetString(PyExc_AttributeError, "module_dict_ids");
+        else
+                Py_INCREF(p->module_dict_ids);
+        return p->module_dict_ids;
 }
 
 static int
 Pickler_set_module_dict_ids(PicklerObject *p, PyObject *v)
 {
-	if (v == NULL) {
-		PyErr_SetString(PyExc_TypeError,
-				"attribute deletion is not supported");
-		return -1;
-	}
-	if (!PyDict_Check(v)) {
-		PyErr_SetString(PyExc_TypeError, "module-dict-ids must be a dictionary");
-		return -1;
-	}
-	Py_XDECREF(p->module_dict_ids);
-	Py_INCREF(v);
-	p->module_dict_ids = v;
-	return 0;
+        if (v == NULL) {
+                PyErr_SetString(PyExc_TypeError,
+                                "attribute deletion is not supported");
+                return -1;
+        }
+        if (!PyDict_Check(v)) {
+                PyErr_SetString(PyExc_TypeError, "module-dict-ids must be a dictionary");
+                return -1;
+        }
+        Py_XDECREF(p->module_dict_ids);
+        Py_INCREF(v);
+        p->module_dict_ids = v;
+        return 0;
 }
 #endif
 
@@ -4770,7 +4770,7 @@ static PyGetSetDef Pickler_getsets[] = {
                       (setter)Pickler_set_persid},
 #ifdef STACKLESS
     {"module_dict_ids", (getter)Pickler_get_module_dict_ids,
-					  (setter)Pickler_set_module_dict_ids},
+                                          (setter)Pickler_set_module_dict_ids},
 #endif
     {NULL}
 };

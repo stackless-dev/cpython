@@ -22,19 +22,19 @@ want to make use of more than one thread.
 Tasklets and Threads
 --------------------
 
-A tasklet usually has an associated thread. This thread is identified by the 
-attribute :attr:`tasklet.thread_id`. A newly created tasklet is always  
-associated with its creator thread. 
+A tasklet usually has an associated thread. This thread is identified by the
+attribute :attr:`tasklet.thread_id`. A newly created tasklet is always
+associated with its creator thread.
 
-The associated thread of a tasklet changes only as the result of 
-a :meth:`tasklet.bind_thread` call or if the associated thread 
-terminates. In the later case the thread id becomes ``-1``. Application 
+The associated thread of a tasklet changes only as the result of
+a :meth:`tasklet.bind_thread` call or if the associated thread
+terminates. In the later case the thread id becomes ``-1``. Application
 code can bind the tasklet to another thread using :meth:`~tasklet.bind_thread`.
 
-When a thread dies, only tasklets with a C-state are actively killed. 
-Soft-switched tasklets simply stop. All tasklets bound to the thread will 
+When a thread dies, only tasklets with a C-state are actively killed.
+Soft-switched tasklets simply stop. All tasklets bound to the thread will
 lose their thread-state, which means that their :attr:`~tasklet.thread_id`
-will report as ``-1``. This also includes soft-switched tasklets, 
+will report as ``-1``. This also includes soft-switched tasklets,
 which share a C-state.
 
 The reason Stackless kills tasklets with C-state is that not doing so
@@ -45,8 +45,8 @@ with a C-state. Stackless cannot
 kill soft-switched tasklets, because there is no central list of them.
 Stackless only knows about the hard-switched ones.
 
-Threads that end really should make sure that they finish whatever worker 
-tasklets they have going by manually killing (``tasklet.kill()``) or 
+Threads that end really should make sure that they finish whatever worker
+tasklets they have going by manually killing (``tasklet.kill()``) or
 unbinding (``tasklet.bind(None)``) them, but that is up to application code.
 
 During interpreter shutdown Stackless kills other daemon threads (non-daemon
@@ -69,7 +69,7 @@ Example - scheduler per thread::
 
     import threading
     import stackless
-    
+
     def secondary_thread_func():
         print("THREAD(2): Has", stackless.runcount, "tasklets in its scheduler")
 
@@ -78,12 +78,12 @@ Example - scheduler per thread::
         while thread.is_alive():
             stackless.schedule()
         print("THREAD(1): Death of THREAD(2) detected")
-    
+
     mainThreadTasklet = stackless.tasklet(main_thread_func)()
-    
+
     thread = threading.Thread(target=secondary_thread_func)
     thread.start()
-    
+
     stackless.run()
 
 Output::
