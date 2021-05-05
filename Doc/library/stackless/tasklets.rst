@@ -616,7 +616,7 @@ Now each tasklet object has a private context attribute, which is either undefin
   is the context of the :attr:`~stackless.current` tasklet. This implies that a tasklet switch,
   switches the active context of the thread.
 
-* In accordance with the design decisions made in :pep:`576` the context of a tasklet can't be
+* In accordance with the design decisions made in :pep:`567` the context of a tasklet can't be
   accessed directly, but you can use the method :meth:`tasklet.context_run` to run arbitrary code
   in this context. For instance ``tasklet.context_run(contextvars.copy_context())`` returns a copy
   of the context.
