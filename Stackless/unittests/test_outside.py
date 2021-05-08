@@ -155,6 +155,19 @@ class TestOutside(StacklessTestCase):
             raise self.result
         self.assertIs(self.result, False)
 
+    def test_call_from_non_main_tasklet(self):
+        done = False
+        def task():
+            nonlocal done
+            done = True
+
+        stackless.tasklet(task)()
+        stackless.tasklet(stackless.test_outside)().switch()
+        self.assertTrue(done)
+
+    def test_call_from_non_main_tasklet2(self):
+        self.assertRaisesRegex(RuntimeError, "main tasklet is still scheduled", stackless.tasklet(stackless.test_outside)().run)
+
 
 class TestCframe(StacklessTestCase):
     n = 100

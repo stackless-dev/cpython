@@ -969,6 +969,9 @@ test_outside(PyObject *self)
 {
     PyThreadState *ts = PyThreadState_GET();
     PyTaskletObject *stmain = ts->st.main;
+    if (PyTasklet_Scheduled(stmain) && !PyTasklet_IsCurrent(stmain))
+        RUNTIME_ERROR("main tasklet is still scheduled", NULL);
+    PyTaskletObject *current;
     PyCStackObject *initial_stub = ts->st.initial_stub;
     PyFrameObject *f = SLP_CURRENT_FRAME(ts);
     int recursion_depth = ts->recursion_depth;
@@ -989,7 +992,7 @@ test_outside(PyObject *self)
     ts->st.nesting_level = 0;
     SLP_SET_CURRENT_FRAME(ts, NULL);
     ts->recursion_depth = 0;
-    slp_current_remove();
+    current = slp_current_remove();
     while (ts->st.runcount > 0) {
         Py_DECREF(ret);
         ret = PyStackless_Schedule(Py_None, 0);
@@ -1004,7 +1007,7 @@ test_outside(PyObject *self)
     Py_CLEAR(ts->st.initial_stub);
     ts->st.initial_stub = initial_stub;
     SLP_SET_CURRENT_FRAME(ts, f);
-    slp_current_insert(stmain);
+    slp_current_insert(current);
     ts->recursion_depth = recursion_depth;
     ts->st.nesting_level = nesting_level;
     ts->st.serial_last_jump = jump;
