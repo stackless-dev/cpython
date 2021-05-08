@@ -1758,16 +1758,27 @@ class TestTaskletContext(AsTaskletTestCase):
         # This is important, if there is already a context set, when the interpreter
         # gets called. Example: an interactive python prompt.
         # See also: test_main_tasklet_fini
-        cid1 = stackless.current.context_id
-        cid2 = None
+        ctx_holder1 = None  # use a tasklet to keep the context alive
+        ctx_holder2 = None
         def task():
-            nonlocal cid2
-            cid2 = stackless.main.context_id
+            nonlocal ctx_holder2
+            ctx_holder2 = stackless.main.context_run(stackless.tasklet, id)
+            self.assertEqual(ctx_holder2.context_id, stackless.main.context_id)
 
-        stackless.tasklet(task)()
-        stackless.test_outside()
-        self.assertEqual(stackless.current.context_id, cid1)
-        self.assertEqual(cid1, cid2)
+        t = stackless.tasklet(task, ())
+        def other_thread():
+            nonlocal ctx_holder1
+            t.bind_thread()
+            t.insert()
+            ctx_holder1 = stackless.tasklet(id)
+            self.assertEqual(ctx_holder1.context_id, stackless.current.context_id)
+            stackless.test_outside()
+
+        tr = threading.Thread(target=other_thread, name="other thread")
+        tr.start()
+        tr.join()
+        self.assertIsNot(ctx_holder1, ctx_holder2)
+        self.assertEqual(ctx_holder1.context_id, ctx_holder2.context_id)
 
     def test_main_tasklet_fini(self):
         # for a main tasklet of a thread initially ts->context == NULL
