@@ -609,27 +609,27 @@ Design requirements were
 4. Enable the integration of tasklet-based co-routines into the :mod:`asyncio` framework.
    This is an obvious application which involves context variables and tasklets.
 
-Now each tasklet object has a private context attribute, which is either undefined (``NULL``) or a
-:class:`~contextvars.Context` object. The design goals have some consequences:
+Now each tasklet object has it own private context attribute. The design goals have some consequences:
 
 * The active :class:`~contextvars.Context` object of a thread (as defined by the |PPL|)
   is the context of the :attr:`~stackless.current` tasklet. This implies that a tasklet switch,
   switches the active context of the thread.
 
 * In accordance with the design decisions made in :pep:`567` the context of a tasklet can't be
-  accessed directly, but you can use the method :meth:`tasklet.context_run` to run arbitrary code
+  accessed directly [#f1]_, but you can use the method :meth:`tasklet.context_run` to run arbitrary code
   in this context. For instance ``tasklet.context_run(contextvars.copy_context())`` returns a copy
   of the context.
   The attribute :attr:`tasklet.context_id` can be used to test, if two tasklets share the context.
 
-* A tasklet, whose context is undefined must behave identically to a tasklet, whose context is an
-  empty :class:`~contextvars.Context` object. [#f1]_ Therefore the |PY| API provides no way to distinguish
-  both states.
-
-* Whenever the context of a tasklet is to be shared with another tasklet and the context is initially
-  undefined, it must be set to a newly created :class:`~contextvars.Context` object beforehand.
+* If you use the C-API, the context attribute of a tasklet is stored in the field *context* of the structure
+  :c:type:`PyTaskletObject` or :c:type:`PyThreadState`. This field is is either undefined (``NULL``) or a pointer to a
+  :class:`~contextvars.Context` object.
+  A tasklet, whose *context* is ``NULL`` **must** behave identically to a tasklet, whose context is an
+  empty :class:`~contextvars.Context` object [#f2]_. Therefore the |PY| API provides no way to distinguish
+  both states. Whenever the context of a tasklet is to be shared with another tasklet and `tasklet->context`
+  is initially `NULL`, it must be set to a newly created :class:`~contextvars.Context` object beforehand.
   This affects the methods :meth:`~tasklet.context_run`, :meth:`~tasklet.__init__`, :meth:`~tasklet.bind`
-  and :meth:`~tasklet.__setstate__`.
+  and :meth:`~tasklet.__setstate__` as well as the attribute :attr:`tasklet.context_id`.
 
 * If the state of a tasklet changes from *not alive* to *bound* or to *alive* (methods :meth:`~tasklet.__init__`,
   :meth:`~tasklet.bind` or :meth:`~tasklet.__setstate__`), the context
@@ -645,7 +645,11 @@ Now each tasklet object has a private context attribute, which is either undefin
 
 .. rubric:: Footnotes
 
-.. [#f1]   Setting a context variable to a non default value sets a previously undefined
-           context attribute to a newly created :class:`~contextvars.Context` object. This can happen anytime in a
+.. [#f1]   Not exactly true. The return value of :meth:`tasklet.__reduce_ex__` can contain references to class
+           :class:`contextvars.Context`, but it is strongly discouraged, to use them for any other purpose
+           than pickling.
+
+.. [#f2]   Setting a context variable to a non default value changes the value of the field *context* from ``NULL``
+           to a pointer to a newly created :class:`~contextvars.Context` object. This can happen anytime in a
            library call. Therefore any difference between an undefined context and an empty context causes ill defined
            behavior.

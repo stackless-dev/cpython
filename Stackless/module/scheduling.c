@@ -1298,6 +1298,9 @@ slp_initialize_main_and_current(void)
     assert(task->exc_state.exc_traceback == NULL);
     assert(task->exc_state.previous_item == NULL);
     assert(task->exc_info == &task->exc_state);
+    assert(task->context == NULL);
+    Py_XINCREF(ts->context);
+    task->context = ts->context;
     SLP_EXCHANGE_EXCINFO(ts, task);
 
     NOTIFY_SCHEDULE(ts, NULL, task, -1);
@@ -1393,6 +1396,9 @@ schedule_task_destruct(PyObject **retval, PyTaskletObject *prev, PyTaskletObject
         assert(ts->exc_info == &prev->exc_state);
         SLP_EXCHANGE_EXCINFO(ts, prev);
         TASKLET_CLAIMVAL(prev, retval);
+        Py_XINCREF(prev->context);
+        Py_XSETREF(ts->context, prev->context);
+        ts->context_ver++;
         if (PyBomb_Check(*retval))
             *retval = slp_bomb_explode(*retval);
     }

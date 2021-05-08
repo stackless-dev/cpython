@@ -1752,6 +1752,51 @@ class TestTaskletContext(AsTaskletTestCase):
         self.assertNotEqual(cid0, cid)
         self.assertEqual(id(ctx), cid)
 
+    def test_main_tasklet_init(self):
+        # This test succeeds, if Stackless copies ts->context to into the main
+        # tasklet, when Stackless creates the main tasklet.
+        # This is important, if there is already a context set, when the interpreter
+        # gets called. Example: an interactive python prompt.
+        # See also: test_main_tasklet_fini
+        cid1 = stackless.current.context_id
+        cid2 = None
+        def task():
+            nonlocal cid2
+            cid2 = stackless.main.context_id
+
+        stackless.tasklet(task)()
+        stackless.test_outside()
+        self.assertEqual(stackless.current.context_id, cid1)
+        self.assertEqual(cid1, cid2)
+
+    def test_main_tasklet_fini(self):
+        # for a main tasklet of a thread initially ts->context == NULL
+        # This test succeeds, if Stackless copies the context of the main
+        # tasklet to ts->context after the main tasklet exits
+        # This way the last context of the main tasklet is preserved and available
+        # on the next invocation of the interpreter.
+        ctx_holder1 = None  # use a tasklet to keep the context alive
+        ctx_holder2 = None
+        def task():
+            nonlocal ctx_holder1
+            ctx_holder1 = stackless.main.context_run(stackless.tasklet, id)
+            self.assertEqual(ctx_holder1.context_id, stackless.main.context_id)
+
+        t = stackless.tasklet(task, ())
+        def other_thread():
+            nonlocal ctx_holder2
+            t.bind_thread()
+            t.insert()
+            stackless.test_outside()
+            ctx_holder2 = stackless.tasklet(id)
+            self.assertEqual(ctx_holder2.context_id, stackless.current.context_id)
+
+        tr = threading.Thread(target=other_thread, name="other thread")
+        tr.start()
+        tr.join()
+        self.assertIsNot(ctx_holder1, ctx_holder2)
+        self.assertEqual(ctx_holder1.context_id, ctx_holder2.context_id)
+
 
 #///////////////////////////////////////////////////////////////////////////////
 

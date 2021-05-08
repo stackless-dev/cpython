@@ -434,10 +434,8 @@ PyTasklet_BindEx(PyTaskletObject *task, PyObject *func, PyObject *args, PyObject
 
     /*
      * Set the context to the current context. It can be changed later on.
-     * But only for non-main tasklest, because tasklet.set_context must not
-     * be used for a main tasklet.
      */
-    if (func && !(ts && task == ts->st.main))
+    if (func)
         if (_tasklet_init_context(task))
             return -1;
 
