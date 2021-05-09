@@ -1772,7 +1772,7 @@ class TestTaskletContext(AsTaskletTestCase):
             t.insert()
             ctx_holder1 = stackless.tasklet(id)
             self.assertEqual(ctx_holder1.context_id, stackless.current.context_id)
-            stackless.test_outside()
+            stackless._stackless._test_outside()
 
         tr = threading.Thread(target=other_thread, name="other thread")
         tr.start()
@@ -1798,7 +1798,7 @@ class TestTaskletContext(AsTaskletTestCase):
             nonlocal ctx_holder2
             t.bind_thread()
             t.insert()
-            stackless.test_outside()
+            stackless._stackless._test_outside()
             ctx_holder2 = stackless.tasklet(id)
             self.assertEqual(ctx_holder2.context_id, stackless.current.context_id)
 
