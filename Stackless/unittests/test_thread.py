@@ -7,7 +7,7 @@ import sys
 import time
 import struct
 import _teststackless
-from stackless import _test_nostacklesscall as apply_not_stackless
+from _stackless import _test_nostacklesscall as apply_not_stackless
 
 from support import test_main  # @UnusedImport
 from support import StacklessTestCase, AsTaskletTestCase, testcase_leaks_references

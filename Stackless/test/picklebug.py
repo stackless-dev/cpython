@@ -35,14 +35,14 @@ post = None
 newob = None
 del pre, post, newob
 gc.collect()
-pre = stackless._get_all_objects()
+pre = stackless._stackless._get_all_objects()
 post = pre[:]
 
 print("refs before unpickling, objects", sys.gettotalrefcount(), len(pre))
 pickle.loads(s).run()
 post = None
 gc.collect()
-post = stackless._get_all_objects()
+post = stackless._stackless._get_all_objects()
 for i, ob in enumerate(post):
     if id(ob) == id(pre):
         del post[i]

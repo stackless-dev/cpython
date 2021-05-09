@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import unittest
 import threading
 import stackless
-from stackless import test_cframe_nr, test_outside
+from _stackless import _test_cframe_nr as test_cframe_nr, _test_outside as test_outside
 from stackless import tasklet, channel, run
 from _teststackless import test_cframe, test_cstate
 
@@ -162,11 +162,11 @@ class TestOutside(StacklessTestCase):
             done = True
 
         stackless.tasklet(task)()
-        stackless.tasklet(stackless.test_outside)().switch()
+        stackless.tasklet(test_outside)().switch()
         self.assertTrue(done)
 
     def test_call_from_non_main_tasklet2(self):
-        self.assertRaisesRegex(RuntimeError, "main tasklet is still scheduled", stackless.tasklet(stackless.test_outside)().run)
+        self.assertRaisesRegex(RuntimeError, "main tasklet is still scheduled", stackless.tasklet(test_outside)().run)
 
 
 class TestCframe(StacklessTestCase):

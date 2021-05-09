@@ -835,11 +835,11 @@ class AsTaskletTestCase(StacklessTestCase):
 
 
 def get_reduce_frame():
-    """counterpart to stackless._wrap.set_reduce_frame()
+    """counterpart to _stackless._wrap.set_reduce_frame()
 
     Only for testing!
     """
-    return getattr(stackless._wrap, "reduce_frame", None)
+    return getattr(stackless._stackless._wrap, "reduce_frame", None)
 
 
 def test_main():

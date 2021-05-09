@@ -6,7 +6,7 @@ import builtins
 import os
 import time
 import collections
-from stackless import _test_nostacklesscall as apply
+from _stackless import _test_nostacklesscall as apply
 
 # sys.argv.extend(['--debug', '--running', '--hard', '0'])
 

@@ -950,22 +950,22 @@ PyStackless_CallErrorHandler(void)
 
  ******************************************************/
 
-PyDoc_STRVAR(test_outside__doc__,
-"test_outside() -- a builtin testing function.\n\
+PyDoc_STRVAR(_test_outside__doc__,
+"_test_outside() -- a builtin testing function.\n\
 This function simulates an application that does not run \"inside\"\n\
 Stackless, with active, running frames, but always needs to initialize\n\
 the main tasklet to get \"inside\".\n\
 The function will terminate when no other tasklets are runnable.\n\
 \n\
-Typical usage: Create a tasklet for test_cframe and run by test_outside().\n\
+Typical usage: Create a tasklet for test_cframe and run by _test_outside().\n\
 \n\
     t1 = tasklet(test_cframe)(1000000)\n\
-    test_outside()\n\
+    _test_outside()\n\
 This can be used to measure the execution time of 1.000.000 switches.");
 
 static
 PyObject *
-test_outside(PyObject *self)
+_test_outside(PyObject *self)
 {
     PyThreadState *ts = PyThreadState_GET();
     PyTaskletObject *stmain = ts->st.main;
@@ -1015,8 +1015,8 @@ test_outside(PyObject *self)
 }
 
 
-PyDoc_STRVAR(test_cframe_nr__doc__,
-"test_cframe_nr(switches) -- a builtin testing function that does nothing\n\
+PyDoc_STRVAR(_test_cframe_nr__doc__,
+"_test_cframe_nr(switches) -- a builtin testing function that does nothing\n\
 but soft tasklet switching. The function will call PyStackless_Schedule_nr() for switches\n\
 times and then finish.\n\
 All remaining arguments are intentionally undocumented. Don't use them!\n\
@@ -1024,7 +1024,7 @@ Usage: Cf. test_cframe().");
 
 static
 PyObject *
-test_cframe_nr_loop(PyFrameObject *f, int exc, PyObject *retval)
+_test_cframe_nr_loop(PyFrameObject *f, int exc, PyObject *retval)
 {
     PyThreadState *ts = PyThreadState_GET();
     PyCFrameObject *cf = (PyCFrameObject *) f;
@@ -1050,7 +1050,7 @@ exit_test_cframe_nr_loop:
 
 static
 PyObject *
-test_cframe_nr(PyObject *self, PyObject *args, PyObject *kwds)
+_test_cframe_nr(PyObject *self, PyObject *args, PyObject *kwds)
 {
     static char *argnames[] = {"switches", "cstate_add_addr", NULL};
     PyThreadState *ts = PyThreadState_GET();
@@ -1058,7 +1058,7 @@ test_cframe_nr(PyObject *self, PyObject *args, PyObject *kwds)
     long switches;
     PyObject *cstack = NULL;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "l|O!:test_cframe_nr",
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "l|O!:_test_cframe_nr",
                                      argnames, &switches, &PyCStack_Type, &cstack))
         return NULL;
     if (cstack) {
@@ -1069,7 +1069,7 @@ test_cframe_nr(PyObject *self, PyObject *args, PyObject *kwds)
         ((PyCStackObject*)cstack)->startaddr += switches;
         Py_RETURN_NONE;
     }
-    cf = slp_cframe_new(test_cframe_nr_loop, 1);
+    cf = slp_cframe_new(_test_cframe_nr_loop, 1);
     if (cf == NULL)
         return NULL;
     cf->n = switches;
@@ -1672,10 +1672,10 @@ static PyMethodDef stackless_methods[] = {
      getmain__doc__},
     {"enable_softswitch",           (PCF)enable_softswitch,     METH_O,
      enable_soft__doc__},
-    {"test_cframe_nr",              (PCF)test_cframe_nr,        METH_VARARGS | METH_KEYWORDS,
-    test_cframe_nr__doc__},
-    {"test_outside",                (PCF)test_outside,          METH_NOARGS,
-    test_outside__doc__},
+    {"_test_cframe_nr",              (PCF)_test_cframe_nr,        METH_VARARGS | METH_KEYWORDS,
+    _test_cframe_nr__doc__},
+    {"_test_outside",                (PCF)_test_outside,          METH_NOARGS,
+    _test_outside__doc__},
     {"set_channel_callback",        (PCF)set_channel_callback,  METH_O,
      set_channel_callback__doc__},
     {"get_channel_callback",        (PCF)get_channel_callback,  METH_NOARGS,

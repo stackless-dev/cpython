@@ -8,6 +8,7 @@ import types
 import _stackless
 from _stackless import *
 # various debugging things starting with underscore
+from _stackless import _test_outside as test_outside, _test_cframe_nr as test_cframe_nr
 from _stackless import _test_nostacklesscall, _pickle_moduledict, _gc_track, _gc_untrack
 try:
     from _stackless import _peek  # defined if compiled with STACKLESS_SPY

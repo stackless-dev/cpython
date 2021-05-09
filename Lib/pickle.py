@@ -414,7 +414,7 @@ class _Pickler:
         self.fix_imports = fix_imports and protocol < 3
         ## Stackless addition BEGIN
         try:
-            from stackless import _pickle_moduledict
+            from _stackless import _pickle_moduledict
         except ImportError:
             _pickle_moduledict = lambda self, obj:None
         self._pickle_moduledict = _pickle_moduledict

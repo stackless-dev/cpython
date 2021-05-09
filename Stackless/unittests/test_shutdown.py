@@ -41,7 +41,7 @@ import time
 import collections
 import unittest
 import subprocess
-from stackless import _test_nostacklesscall as apply_not_stackless
+from _stackless import _test_nostacklesscall as apply_not_stackless
 try:
     import _thread as thread
     import threading
@@ -143,7 +143,7 @@ class TestShutdown(StacklessTestCase):
             import stackless
             import time
             import sys
-            from stackless import _test_nostacklesscall as apply
+            from _stackless import _test_nostacklesscall as apply
 
             if "--hard" in sys.argv:
                 stackless.enable_softswitch(False)
@@ -181,7 +181,7 @@ class TestShutdown(StacklessTestCase):
 
             import stackless
             import sys
-            from stackless import _test_nostacklesscall as apply
+            from _stackless import _test_nostacklesscall as apply
 
             if "--hard" in sys.argv:
                 stackless.enable_softswitch(False)
@@ -219,7 +219,7 @@ class TestShutdown(StacklessTestCase):
 
             import stackless
             import sys
-            from stackless import _test_nostacklesscall as apply
+            from _stackless import _test_nostacklesscall as apply
 
             if "--hard" in sys.argv:
                 stackless.enable_softswitch(False)
@@ -263,7 +263,7 @@ class TestShutdown(StacklessTestCase):
 
             import stackless
             import sys
-            from stackless import _test_nostacklesscall as apply
+            from _stackless import _test_nostacklesscall as apply
 
             if "--hard" in sys.argv:
                 stackless.enable_softswitch(False)
@@ -317,7 +317,7 @@ class TestShutdown(StacklessTestCase):
             import stackless
             import sys
             import ctypes
-            from stackless import _test_nostacklesscall as apply
+            from _stackless import _test_nostacklesscall as apply
 
             if "--hard" in sys.argv:
                 stackless.enable_softswitch(False)
@@ -404,7 +404,7 @@ class TestShutdown(StacklessTestCase):
             import stackless
             import time
             import sys
-            from stackless import _test_nostacklesscall as apply
+            from _stackless import _test_nostacklesscall as apply
 
             DEBUG = False
             event = threading.Event()

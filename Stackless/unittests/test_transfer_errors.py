@@ -36,7 +36,7 @@ class TestStackTransferFailures(StacklessTestCase):
         cstate = tasklet.cstate
         self.assertNotEqual(cstate.startaddr, 0)  # not invalidated
         self.assertIs(cstate.task, tasklet)
-        test_cframe_nr = stackless.test_cframe_nr
+        test_cframe_nr = stackless._stackless._test_cframe_nr
         # Otherwise undocumented and only for this test.
         # Add 1 to the startaddr of cstate
         test_cframe_nr(1, cstate_add_addr=cstate)

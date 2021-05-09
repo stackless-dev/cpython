@@ -504,9 +504,9 @@ class TestFramePickling(StacklessTestCase):
         # test setting / getting the reduce frame function
         rf = get_reduce_frame()
         self.assertTrue(callable(rf))
-        stackless._wrap.set_reduce_frame(None)
+        stackless._stackless._wrap.set_reduce_frame(None)
         self.assertIsNone(get_reduce_frame())
-        stackless._wrap.set_reduce_frame(rf)
+        stackless._stackless._wrap.set_reduce_frame(rf)
         self.assertIs(get_reduce_frame(), rf)
 
     def testLocalplus(self):
@@ -517,7 +517,7 @@ class TestFramePickling(StacklessTestCase):
             result2 = result  # create the cell variable
 
             def func(current):
-                result2.append(stackless._wrap.frame.__reduce__(current.frame))
+                result2.append(stackless._stackless._wrap.frame.__reduce__(current.frame))
             stackless.tasklet().bind(func, (stackless.current,)).run()
             return result[0]
 
@@ -547,7 +547,7 @@ class TestFramePickling(StacklessTestCase):
             self.assertIs(cell.cell_contents, result)
 
     def testSetstateFailure(self):
-        # incomplete, just one of many failure modes of stackless._wrap.frame.__setstate__
+        # incomplete, just one of many failure modes of stackless._stackless._wrap.frame.__setstate__
         foo = "foo"
 
         def f1(bar="bar"):
@@ -556,7 +556,7 @@ class TestFramePickling(StacklessTestCase):
             except ZeroDivisionError:
                 x = foo
                 locals()
-                return stackless._wrap.frame.__reduce__(sys._getframe())
+                return stackless._stackless._wrap.frame.__reduce__(sys._getframe())
             assert False
 
         def f2():
@@ -568,7 +568,7 @@ class TestFramePickling(StacklessTestCase):
         r = f2()
         self.assertEqual(len(r), 3)
         wrap_frame = r[0](*r[1])
-        self.assertIsInstance(wrap_frame, stackless._wrap.frame)
+        self.assertIsInstance(wrap_frame, stackless._stackless._wrap.frame)
         invalid_state = r[2][:-2] + ((("Not a", "tuple of 3", "integers"),), r[2][-1])
         self.assertRaisesRegex(TypeError, "an integer is required", wrap_frame.__setstate__, invalid_state)
         # must not raise an assertion
@@ -850,8 +850,8 @@ class TestAsyncGenASendPickling(StacklessPickleTestCase):
         yield 100
 
     def inspect(self, ags):
-        r = stackless._wrap.async_generator_asend.__reduce__(ags)
-        self.assertIs(r[0], stackless._wrap.async_generator_asend)
+        r = stackless._stackless._wrap.async_generator_asend.__reduce__(ags)
+        self.assertIs(r[0], stackless._stackless._wrap.async_generator_asend)
         self.assertIsInstance(r[2][0], types.AsyncGeneratorType)
         return r[2][1:]
 
@@ -888,8 +888,8 @@ class TestAsyncGenAThrowPickling(StacklessPickleTestCase):
         yield 200
 
     def inspect(self, ags):
-        r = stackless._wrap.async_generator_athrow.__reduce__(ags)
-        self.assertIs(r[0], stackless._wrap.async_generator_athrow)
+        r = stackless._stackless._wrap.async_generator_athrow.__reduce__(ags)
+        self.assertIs(r[0], stackless._stackless._wrap.async_generator_athrow)
         self.assertIsInstance(r[2][0], types.AsyncGeneratorType)
         return r[2][1:]
 

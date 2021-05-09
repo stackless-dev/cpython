@@ -110,14 +110,14 @@ class TestGarbageCollection(StacklessTestCase):
 
 class TestGeneratorWrapper(StacklessTestCase):
     def test_run_wrap_generator(self):
-        g = stackless._wrap.generator()
+        g = stackless._stackless._wrap.generator()
         self.assertIsInstance(g, types.GeneratorType)
         self.assertIsNot(type(g), types.GeneratorType)
         self.assertRaises(StopIteration, next, g)
 
     def test_wrap_generator_frame_code(self):
-        g0 = stackless._wrap.generator()
-        g1 = stackless._wrap.generator()
+        g0 = stackless._stackless._wrap.generator()
+        g1 = stackless._stackless._wrap.generator()
         self.assertIsInstance(g0.gi_frame, types.FrameType)
         self.assertIsInstance(g0.gi_code, types.CodeType)
         self.assertIs(g0.gi_code, g1.gi_code)

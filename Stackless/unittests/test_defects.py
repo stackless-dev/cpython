@@ -12,7 +12,7 @@ try:
 except:
     withThreads = False
 
-from stackless import _test_nostacklesscall as apply_not_stackless
+from _stackless import _test_nostacklesscall as apply_not_stackless
 from support import test_main  # @UnusedImport
 from support import (StacklessTestCase, captured_stderr, require_one_thread,
                      get_reduce_frame)
@@ -258,7 +258,7 @@ class TestCrashUponFrameUnpickling(StacklessTestCase):
             result = []
 
             def func(current):
-                result.append(stackless._wrap.frame.__reduce__(current.frame))
+                result.append(stackless._stackless._wrap.frame.__reduce__(current.frame))
             stackless.tasklet().bind(func, (stackless.current,)).run()
             return result[0]
 
@@ -294,7 +294,7 @@ class TestShutdown(StacklessTestCase):
         import subprocess
         rc = subprocess.call([sys.executable, "-s", "-S", "-E", "-c", """if 1:
             import stackless, sys
-            from stackless import _test_nostacklesscall as apply_not_stackless
+            from _stackless import _test_nostacklesscall as apply_not_stackless
 
             def func():
                 global channel
@@ -319,7 +319,7 @@ class TestShutdown(StacklessTestCase):
             import stackless
             import os
             import time
-            from stackless import _test_nostacklesscall as apply_not_stackless
+            from _stackless import _test_nostacklesscall as apply_not_stackless
 
             # This lock is used as a simple event variable.
             ready = thread.allocate_lock()
