@@ -722,23 +722,18 @@ Py_LOCAL_INLINE(void) SLP_EXCHANGE_EXCINFO(PyThreadState *tstate, PyTaskletObjec
     PyThreadState *ts_ = (tstate);
     PyTaskletObject *t_ = (task);
     _PyErr_StackItem *exc_info;
-    PyObject *c;
     assert(ts_);
     assert(t_);
     exc_info = ts_->exc_info;
     assert(exc_info);
     assert(t_->exc_info);
 #if 0
-    c = PyStackless_GetCurrent();
+    PyObject *c = PyStackless_GetCurrent();
     fprintf(stderr, "SLP_EXCHANGE_EXCINFO %3d current %14p,\tset task %p = %p,\ttstate %p = %p\n", __LINE__, c, t_, exc_info, ts_, t_->exc_info);
     Py_XDECREF(c);
 #endif
     ts_->exc_info = t_->exc_info;
     t_->exc_info = exc_info;
-    c = ts_->context;
-    ts_->context = t_->context;
-    t_->context = c;
-    ts_->context_ver++;
 }
 #else
 #define SLP_EXCHANGE_EXCINFO(tstate_, task_) \
@@ -746,7 +741,6 @@ Py_LOCAL_INLINE(void) SLP_EXCHANGE_EXCINFO(PyThreadState *tstate, PyTaskletObjec
         PyThreadState *ts_ = (tstate_); \
         PyTaskletObject *t_ = (task_); \
         _PyErr_StackItem *exc_info; \
-        PyObject *c; \
         assert(ts_); \
         assert(t_); \
         exc_info = ts_->exc_info; \
@@ -754,10 +748,6 @@ Py_LOCAL_INLINE(void) SLP_EXCHANGE_EXCINFO(PyThreadState *tstate, PyTaskletObjec
         assert(t_->exc_info); \
         ts_->exc_info = t_->exc_info; \
         t_->exc_info = exc_info; \
-        c = ts_->context; \
-        ts_->context = t_->context; \
-        t_->context = c; \
-        ts_->context_ver++; \
     } while(0)
 #endif
 
@@ -766,13 +756,23 @@ Py_LOCAL_INLINE(void) SLP_UPDATE_TSTATE_ON_SWITCH(PyThreadState *tstate, PyTaskl
 {
     SLP_EXCHANGE_EXCINFO(tstate, prev);
     SLP_EXCHANGE_EXCINFO(tstate, next);
+    prev->context = tstate->context;
+    tstate->context = next->context;
+    tstate->context_ver++;
+    next->context = NULL;
 }
 #else
 #define SLP_UPDATE_TSTATE_ON_SWITCH(tstate__, prev_, next_) \
     do { \
         PyThreadState *ts__ = (tstate__); \
-        SLP_EXCHANGE_EXCINFO(ts__, (prev_)); \
-        SLP_EXCHANGE_EXCINFO(ts__, (next_)); \
+        PyTaskletObject *prev__ = (prev_); \
+        PyTaskletObject *next__ = (next_); \
+        SLP_EXCHANGE_EXCINFO(ts__, prev__); \
+        SLP_EXCHANGE_EXCINFO(ts__, next__); \
+        prev__->context = ts__->context; \
+        ts__->context = next__->context; \
+        ts__->context_ver++; \
+        next__->context = NULL; \
     } while(0)
 #endif
 
@@ -1299,8 +1299,6 @@ slp_initialize_main_and_current(void)
     assert(task->exc_state.previous_item == NULL);
     assert(task->exc_info == &task->exc_state);
     assert(task->context == NULL);
-    Py_XINCREF(ts->context);
-    task->context = ts->context;
     SLP_EXCHANGE_EXCINFO(ts, task);
 
     NOTIFY_SCHEDULE(ts, NULL, task, -1);
@@ -1394,11 +1392,9 @@ schedule_task_destruct(PyObject **retval, PyTaskletObject *prev, PyTaskletObject
         /* main is exiting */
         assert(ts->st.main == NULL);
         assert(ts->exc_info == &prev->exc_state);
+        assert(prev->context == NULL);
         SLP_EXCHANGE_EXCINFO(ts, prev);
         TASKLET_CLAIMVAL(prev, retval);
-        Py_XINCREF(prev->context);
-        Py_XSETREF(ts->context, prev->context);
-        ts->context_ver++;
         if (PyBomb_Check(*retval))
             *retval = slp_bomb_explode(*retval);
     }

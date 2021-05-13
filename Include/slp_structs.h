@@ -134,8 +134,7 @@ typedef struct _tasklet {
     int recursion_depth;
     PyObject *def_globals;
     PyObject *tsk_weakreflist;
-    /* If the tasklet is current: the context, the value of ts->context when the main tasklet was created.
-     *   (The context of a current tasklet is always ints->tasklet.)
+    /* If the tasklet is current: NULL. (The context of a current tasklet is always in ts->tasklet.)
      * If the tasklet is not current: the context for the tasklet */
     PyObject *context;
 } PyTaskletObject;
