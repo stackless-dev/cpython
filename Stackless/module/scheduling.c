@@ -711,11 +711,9 @@ new_lock(void)
  * When switching from one tasklet to another tasklet, we have to switch
  * the exc_info-pointer in the thread state.
  *
- * The same situation is for the current contextvars.Context. When switching
- * from one tasklet to another tasklet, we have to switch the context-pointer
- * in the thread state.
+ * With current compilers, an inline function performs no worse than a macro,
+ * but in the debugger single stepping it is much simpler.
  */
-
 #if 1
 Py_LOCAL_INLINE(void) SLP_EXCHANGE_EXCINFO(PyThreadState *tstate, PyTaskletObject *task)
 {
@@ -751,6 +749,12 @@ Py_LOCAL_INLINE(void) SLP_EXCHANGE_EXCINFO(PyThreadState *tstate, PyTaskletObjec
     } while(0)
 #endif
 
+/*
+ * The inline function (or macro) SLP_UPDATE_TSTATE_ON_SWITCH encapsulates some changes
+ * to the thread state when Stackless switches tasklets:
+ * - Exchange the exception information
+ * - Switch the PEP 567 context
+ */
 #if 1
 Py_LOCAL_INLINE(void) SLP_UPDATE_TSTATE_ON_SWITCH(PyThreadState *tstate, PyTaskletObject *prev, PyTaskletObject *next)
 {

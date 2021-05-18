@@ -395,6 +395,12 @@ The ``tasklet`` class
                stackless.current.set_context(saved_context)
 
    See also :meth:`contextvars.Context.run` for additional information.
+   Use this method with care, because it lets you manipulate the context of
+   another tasklet. Often it is sufficient to use a copy of the context
+   instead of the original object::
+
+       copied_context = tasklet.context_run(contextvars.copy_context)
+       copied_context.run(...)
 
    .. note::
       This method has been added on a provisional basis (see :pep:`411`
@@ -491,6 +497,7 @@ The following attributes allow checking of user set situations:
    .. versionadded:: 3.7.6
 
    This attribute is the :func:`id` of the :class:`~contextvars.Context` object to be used while this tasklet runs.
+   It is intended mostly for debugging.
 
    .. note::
       This attribute has been added on a provisional basis (see :pep:`411`
@@ -599,7 +606,7 @@ Using context variables and multiple tasklets together didn't work well in |SLP|
 3.7.5, because all tasklets of a given thread shared the same context.
 
 Starting with version 3.7.6 |SLP| adds explicit support for context variables.
-Design requirements were
+Design requirements were:
 
 1. Be fully compatible with |CPY| and its design decisions.
 2. Be fully compatible with previous applications of |SLP|, which are unaware of context variables.
@@ -607,7 +614,8 @@ Design requirements were
    a context variable, can delegate this duty to a sub-tasklet without the need to manage the
    context of the sub-tasklet manually.
 4. Enable the integration of tasklet-based co-routines into the :mod:`asyncio` framework.
-   This is an obvious application which involves context variables and tasklets.
+   This is an obvious application which involves context variables and tasklets. See
+   `slp-coroutine <https://pypi.org/project/slp-coroutine>`_ for an example.
 
 Now each tasklet object has it own private context attribute. The design goals have some consequences:
 
