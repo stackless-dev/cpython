@@ -245,6 +245,10 @@ class TestAsyncGenPickling(StacklessTestCase):
 
 
 class TestStacklessOperations(StacklessTestCase):
+    def tearDown(self):
+        super().tearDown()
+        asyncio.set_event_loop_policy(None)
+
     def assertLevel(self, expected=0):
         self.assertTrue(stackless.current.alive)
         if stackless.enable_softswitch(None):
