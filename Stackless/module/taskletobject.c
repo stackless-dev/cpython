@@ -1160,9 +1160,10 @@ impl_tasklet_run_remove(PyTaskletObject *task, int remove)
         }
         if (inserted) {
             /* we must undo the insertion that we did, but we don't know the state */
-            if (task->next != NULL)
+            if (task->next != NULL) {
                 slp_current_uninsert(task);
-            Py_DECREF(task);
+                Py_DECREF(task);
+            }
         }
     } else if (!switched) {
         Py_CLEAR(ts->st.del_post_switch);

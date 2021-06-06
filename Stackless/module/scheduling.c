@@ -526,11 +526,12 @@ kill_wrap_bad_guy(PyTaskletObject *prev, PyTaskletObject *bad_guy)
     if (bad_guy->next != NULL) {
         ts->st.current = bad_guy;
         slp_current_remove();
+        Py_DECREF(bad_guy);
     }
     /* restore last tasklet */
     if (prev->next == NULL)
         slp_current_insert(prev);
-    SLP_STORE_NEXT_FRAME(ts, prev->f.frame);
+    SLP_SET_CURRENT_FRAME(ts, prev->f.frame);
     Py_CLEAR(prev->f.frame);
     ts->st.current = prev;
     if (newval != NULL) {
@@ -1053,12 +1054,14 @@ slp_schedule_task(PyObject **result, PyTaskletObject *prev, PyTaskletObject *nex
     fail = slp_schedule_task_prepared(ts, result, prev, next, stackless, did_switch);
     if (fail && inserted) {
         /* in case of an error, it is unknown, if the tasklet is still scheduled */
-        if (next->next)
+        if (next->next) {
             slp_current_uninsert(next);
-        if (u_chan)
-            slp_channel_insert(u_chan, next, u_dir, u_next);
-        else
             Py_DECREF(next);
+        }
+        if (u_chan) {
+            Py_INCREF(next);
+            slp_channel_insert(u_chan, next, u_dir, u_next);
+        }
     }
     return fail;
 }

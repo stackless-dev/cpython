@@ -68,7 +68,6 @@ class TestStackTransferFailures(StacklessTestCase):
         t.run()
         self.assertTrue(self.tasklet_done)
 
-    @testcase_leaks_references("unknown")
     def test_scheduler(self):
         t = self.prepare_tasklet()
         with self.corrupted_cstack_startaddr(t):
@@ -77,7 +76,6 @@ class TestStackTransferFailures(StacklessTestCase):
         self.end(t)
     test_scheduler.enable_softswitch = False  # soft switching causes soft-to-hard
 
-    @testcase_leaks_references("unknown")
     def test_run(self):
         t = self.prepare_tasklet()
         with self.corrupted_cstack_startaddr(t):
@@ -85,7 +83,6 @@ class TestStackTransferFailures(StacklessTestCase):
         self.end(t)
     test_run.enable_softswitch = False  # soft switching causes soft-to-hard
 
-    @testcase_leaks_references("unknown")
     def test_switch(self):
         t = self.prepare_tasklet()
         with self.corrupted_cstack_startaddr(t):
@@ -93,7 +90,6 @@ class TestStackTransferFailures(StacklessTestCase):
         self.end(t)
     test_switch.enable_softswitch = False  # soft switching causes soft-to-hard
 
-    @testcase_leaks_references("unknown")
     def test_kill(self):
         t = self.prepare_tasklet()
         with self.corrupted_cstack_startaddr(t):

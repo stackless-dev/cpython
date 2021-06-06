@@ -9,6 +9,10 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/262
+  Do not leak references in case of failed stack transfers / hard tasklet
+  switches.
+
 
 What's New in Stackless 3.7.6, 3.7.7, 3.7.8 and 3.7.9?
 ======================================================

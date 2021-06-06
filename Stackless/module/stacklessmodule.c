@@ -588,6 +588,8 @@ PyStackless_RunWatchdogEx(long timeout, int flags)
     if (fail) {
         /* we failed to switch */
         PyTaskletObject *undo = pop_watchdog(ts);
+        if (NULL == undo)
+            return NULL;
         assert(undo == old_current);
         /* In case of an error, we don't know the state */
         if (undo->next == NULL)
