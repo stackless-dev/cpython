@@ -9,6 +9,10 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/265
+  Fix C-API functions PyChannel_Send() and PyChannel_Send_nr() for calls from
+  outside of the interpreter (with no main-tasklet).
+
 - https://github.com/stackless-dev/stackless/issues/264
   Implement bpo-35134 for Stackless: move header Include/slp_tstate.h to
   Include/cpython/slp_tstate.h.

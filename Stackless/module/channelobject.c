@@ -426,9 +426,12 @@ be activated immediately, and the sender is put at the end of\n\
 the runnables list.");
 
 static PyObject *
+impl_channel_send(PyChannelObject *self, PyObject *arg);
+
+static PyObject *
 PyChannel_Send_M(PyChannelObject *self, PyObject *arg)
 {
-    PyMethodDef def = {"send", (PyCFunction)PyChannel_Send, METH_O};
+    PyMethodDef def = {"send", (PyCFunction)impl_channel_send, METH_O};
     return PyStackless_CallCMethod_Main(&def, (PyObject *) self, "O", arg);
 }
 
