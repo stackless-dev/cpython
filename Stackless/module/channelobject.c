@@ -774,9 +774,15 @@ the runnables list.\n\
 The above policy can be changed by setting channel flags.");
 
 static PyObject *
+PyChannel_Receive_cfunc(PyChannelObject *self, PyObject *unused)
+{
+    return PyChannel_Receive(self);
+}
+
+static PyObject *
 PyChannel_Receive_M(PyChannelObject *self)
 {
-    PyMethodDef def = {"receive", (PyCFunction)PyChannel_Receive, METH_NOARGS};
+    PyMethodDef def = {"receive", (PyCFunction)PyChannel_Receive_cfunc, METH_NOARGS};
     return PyStackless_CallCMethod_Main(&def, (PyObject *) self, NULL);
 }
 

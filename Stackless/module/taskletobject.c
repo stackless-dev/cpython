@@ -539,8 +539,11 @@ tasklet_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     /* we always need a cstate, so be sure to initialize */
     if (ts->st.initial_stub == NULL) {
-        PyMethodDef def = {"__new__", (PyCFunction)tasklet_new, METH_NOARGS};
-        return PyStackless_CallCMethod_Main(&def, (PyObject*)type, NULL);
+        PyMethodDef def = {"__new__", (PyCFunction)(void(*)(void))tasklet_new, METH_VARARGS|METH_KEYWORDS};
+        PyObject *func = PyCFunction_New(&def, (PyObject*)type);
+        PyObject *retval = PyStackless_Call_Main(func, args, kwds);
+        Py_DECREF(func);
+        return retval;
     }
     if (type == NULL)
         type = &PyTasklet_Type;
