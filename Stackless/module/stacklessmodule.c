@@ -855,8 +855,13 @@ get_thread_info(PyObject *self, PyObject *args)
 }
 
 static PyObject *
-slpmodule_reduce(PyObject *self)
+slpmodule_reduce(PyObject *self, PyObject *value)
 {
+    if (value && !PyLong_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "__reduce_ex__ argument should be an integer");
+        return NULL;
+    }
+
     return PyUnicode_FromString("_stackless");
 }
 
@@ -1709,7 +1714,7 @@ static PyMethodDef stackless_methods[] = {
      _get_all_objects__doc__},
 #endif
     {"__reduce__",                  (PCF)slpmodule_reduce,      METH_NOARGS, NULL},
-    {"__reduce_ex__",               (PCF)slpmodule_reduce,      METH_VARARGS, NULL},
+    {"__reduce_ex__",               (PCF)slpmodule_reduce,      METH_O, NULL},
     {"getdebug",                   (PCF)slpmodule_getdebug,    METH_NOARGS,
     slpmodule_getdebug__doc__},
     {"getuncollectables",          (PCF)slpmodule_getuncollectables,    METH_NOARGS,

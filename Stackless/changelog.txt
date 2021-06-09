@@ -10,6 +10,10 @@ What's New in Stackless 3.X.X?
 *Release date: 20XX-XX-XX*
 
 - https://github.com/stackless-dev/stackless/issues/265
+  Avoid undefined behavior, if Stackless classes implement __reduce__() and
+  __reduce_ex__() using a single C-function.
+
+- https://github.com/stackless-dev/stackless/issues/265
   Fix C-API functions PyChannel_Send(), PyChannel_Send_nr(),
   PyChannel_Receive(), PyChannel_Receive_nr(), and
   PyObject_Call(&PyTasklet_Type, PyObject *args, PyObject *kwargs) if called

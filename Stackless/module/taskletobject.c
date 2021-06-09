@@ -612,13 +612,18 @@ simply the tasklet() call without parameters.
 */
 
 static PyObject *
-tasklet_reduce(PyTaskletObject * t)
+tasklet_reduce(PyTaskletObject * t, PyObject *value)
 {
     PyObject *tup = NULL, *lis = NULL;
     PyFrameObject *f;
     PyThreadState *ts = t->cstate->tstate;
     PyObject *exc_type, *exc_value, *exc_traceback, *exc_info;
     PyObject *context = NULL;
+
+    if (value && !PyLong_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "__reduce_ex__ argument should be an integer");
+        return NULL;
+    }
 
     if (ts && t == ts->st.current)
         RUNTIME_ERROR("You cannot __reduce__ the tasklet which is"
@@ -2580,7 +2585,7 @@ static PyMethodDef tasklet_methods[] = {
      tasklet_setup__doc__},
     {"__reduce__",              (PCF)tasklet_reduce,        METH_NOARGS,
      tasklet_reduce__doc__},
-    {"__reduce_ex__",           (PCF)tasklet_reduce,        METH_VARARGS,
+    {"__reduce_ex__",           (PCF)tasklet_reduce,        METH_O,
      tasklet_reduce__doc__},
     {"__setstate__",            (PCF)tasklet_setstate,      METH_O,
      tasklet_setstate__doc__},

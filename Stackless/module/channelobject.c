@@ -1104,11 +1104,16 @@ PyDoc_STRVAR(channel_reduce__doc__,
 "channel.__reduce__() -- currently does not distinguish threads.");
 
 static PyObject *
-channel_reduce(PyChannelObject * ch)
+channel_reduce(PyChannelObject * ch, PyObject *value)
 {
     PyObject *tup = NULL, *lis = NULL;
     PyTaskletObject *t;
     int i, n;
+
+    if (value && !PyLong_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "__reduce_ex__ argument should be an integer");
+        return NULL;
+    }
 
     lis = PyList_New(0);
     if (lis == NULL) goto err_exit;
@@ -1188,7 +1193,7 @@ channel_methods[] = {
     channel_open__doc__},
     {"__reduce__",              (PCF)channel_reduce,        METH_NOARGS,
      channel_reduce__doc__},
-    {"__reduce_ex__",           (PCF)channel_reduce,        METH_VARARGS,
+    {"__reduce_ex__",           (PCF)channel_reduce,        METH_O,
      channel_reduce__doc__},
     {"__setstate__",            (PCF)channel_setstate,      METH_O,
      channel_setstate__doc__},

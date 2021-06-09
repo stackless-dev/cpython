@@ -216,9 +216,14 @@ slp_bomb_explode(PyObject *_bomb)
 }
 
 static PyObject *
-bomb_reduce(PyBombObject *bomb)
+bomb_reduce(PyBombObject *bomb, PyObject *value)
 {
     PyObject *tup;
+
+    if (value && !PyLong_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "__reduce_ex__ argument should be an integer");
+        return NULL;
+    }
 
     tup = slp_into_tuple_with_nulls(&bomb->curexc_type, 3);
     if (tup != NULL)
@@ -246,7 +251,7 @@ static PyMemberDef bomb_members[] = {
 
 static PyMethodDef bomb_methods[] = {
     {"__reduce__",              (PyCFunction)bomb_reduce,       METH_NOARGS},
-    {"__reduce_ex__",           (PyCFunction)bomb_reduce,       METH_VARARGS},
+    {"__reduce_ex__",           (PyCFunction)bomb_reduce,       METH_O},
     {"__setstate__",            (PyCFunction)bomb_setstate,     METH_O},
     {NULL,     NULL}             /* sentinel */
 };
