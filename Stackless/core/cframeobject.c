@@ -66,7 +66,7 @@ cframe_traverse(PyCFrameObject *cf, visitproc visit, void *arg)
 
 /* clearing a cframe while the object still exists */
 
-static void
+static int
 cframe_clear(PyCFrameObject *cf)
 {
     /* The Python C-API documentation recomends to use Py_CLEAR() to release
@@ -86,6 +86,7 @@ cframe_clear(PyCFrameObject *cf)
     Py_XDECREF(tmp_ob1);
     Py_XDECREF(tmp_ob2);
     Py_XDECREF(tmp_ob3);
+    return 0;
 }
 
 

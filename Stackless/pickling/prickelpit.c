@@ -129,12 +129,13 @@ _wrap_traverse(PyObject *ob, visitproc visit, void *arg)
     return ret;
 }
 
-static void
+static int
 _wrap_clear(PyObject *ob)
 {
     Py_TYPE(ob) = Py_TYPE(ob)->tp_base;
     if (Py_TYPE(ob)->tp_clear != NULL)
         Py_TYPE(ob)->tp_clear(ob);
+    return 0;
 }
 
 

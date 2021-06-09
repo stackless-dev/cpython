@@ -197,7 +197,7 @@ exc_state_clear(_PyErr_StackItem *exc_state)
     Py_XDECREF(tb);
 }
 
-static void
+static int
 tasklet_clear(PyTaskletObject *t)
 {
     tasklet_clear_frames(t);
@@ -219,6 +219,7 @@ tasklet_clear(PyTaskletObject *t)
      * the order of calls to tp_clear is undefined.
      */
     t->exc_info = &t->exc_state;
+    return 0;
 }
 
 /*

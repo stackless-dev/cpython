@@ -56,7 +56,7 @@ channel_traverse(PyChannelObject *ch, visitproc visit, void *arg)
     return 0;
 }
 
-static void
+static int
 channel_clear(PyObject *ob)
 {
     PyChannelObject *ch = (PyChannelObject *) ob;
@@ -74,6 +74,7 @@ channel_clear(PyObject *ob)
         ob = (PyObject *) slp_channel_remove(ch, NULL, NULL, NULL);
         Py_DECREF(ob);
     }
+    return 0;
 }
 
 static void

@@ -42,12 +42,13 @@ bomb_traverse(PyBombObject *bomb, visitproc visit, void *arg)
     return 0;
 }
 
-static void
+static int
 bomb_clear(PyBombObject *bomb)
 {
     Py_CLEAR(bomb->curexc_type);
     Py_CLEAR(bomb->curexc_value);
     Py_CLEAR(bomb->curexc_traceback);
+    return 0;
 }
 
 PyBombObject *
