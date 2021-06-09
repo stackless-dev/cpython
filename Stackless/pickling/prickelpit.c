@@ -144,7 +144,7 @@ _wrap_clear(PyObject *ob)
 static PyMethodDef prefix##_methods[] = { \
     {"__reduce__",     (PyCFunction)reduce,             METH_NOARGS,    NULL}, \
     {"__setstate__",   (PyCFunction)setstate,           METH_O,         NULL}, \
-    {"__new__",            (PyCFunction)_new_wrapper,   METH_VARARGS | METH_KEYWORDS, \
+    {"__new__",        (PyCFunction)(void(*)(void))_new_wrapper, METH_VARARGS | METH_KEYWORDS, \
      PyDoc_STR("wwwwwaaaaaT.__new__(S, ...) -> " \
                "a new object with type S, a subtype of T")}, \
     {NULL, NULL} \
@@ -289,7 +289,7 @@ unwrap_frame_arg(PyObject * args) {
 }
 
 static struct PyMethodDef _new_methoddef[] = {
-    {"__new__", (PyCFunction)_new_wrapper, METH_VARARGS | METH_KEYWORDS,
+    {"__new__", (PyCFunction)(void(*)(void))_new_wrapper, METH_VARARGS | METH_KEYWORDS,
      PyDoc_STR("T.__new__(S, ...) -> "
                "a new object with type S, a subtype of T.__base__")},
     {0}

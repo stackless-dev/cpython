@@ -1414,7 +1414,7 @@ static PyObject *
 PyTasklet_Throw_M(PyTaskletObject *self, int pending, PyObject *exc,
                            PyObject *val, PyObject *tb)
 {
-    PyMethodDef def = {"throw", (PyCFunction)tasklet_throw, METH_VARARGS|METH_KEYWORDS};
+    PyMethodDef def = {"throw", (PyCFunction)(void(*)(void))tasklet_throw, METH_VARARGS|METH_KEYWORDS};
     if (!val)
         val = Py_None;
     if (!tb)
@@ -2574,15 +2574,15 @@ static PyMethodDef tasklet_methods[] = {
      tasklet_set_atomic__doc__},
     {"set_ignore_nesting", (PCF)tasklet_set_ignore_nesting, METH_O,
      tasklet_set_ignore_nesting__doc__},
-    {"throw",                   (PCF)tasklet_throw,         METH_KS,
+    {"throw",            (PCF)(void(*)(void))tasklet_throw, METH_KS,
     tasklet_throw__doc__},
-    {"raise_exception",         (PCF)tasklet_raise_exception, METH_VS,
+    {"raise_exception",       (PCF)tasklet_raise_exception, METH_VS,
     tasklet_raise_exception__doc__},
-    {"kill",                    (PCF)tasklet_kill,          METH_KS,
+    {"kill",              (PCF)(void(*)(void))tasklet_kill, METH_KS,
      tasklet_kill__doc__},
-    {"bind",                    (PCF)tasklet_bind,          METH_VARARGS | METH_KEYWORDS,
+    {"bind",              (PCF)(void(*)(void))tasklet_bind, METH_VARARGS | METH_KEYWORDS,
      tasklet_bind__doc__},
-    {"setup",                   (PCF)tasklet_setup,         METH_VARARGS | METH_KEYWORDS,
+    {"setup",            (PCF)(void(*)(void))tasklet_setup, METH_VARARGS | METH_KEYWORDS,
      tasklet_setup__doc__},
     {"__reduce__",              (PCF)tasklet_reduce,        METH_NOARGS,
      tasklet_reduce__doc__},
@@ -2592,7 +2592,7 @@ static PyMethodDef tasklet_methods[] = {
      tasklet_setstate__doc__},
     {"bind_thread",              (PCF)tasklet_bind_thread,  METH_VARARGS,
     tasklet_bind_thread__doc__},
-    {"context_run", (PCF)tasklet_context_run, METH_FASTCALL | METH_KEYWORDS | METH_STACKLESS,
+    {"context_run", (PCF)(void(*)(void))tasklet_context_run, METH_FASTCALL | METH_KEYWORDS | METH_STACKLESS,
             tasklet_context_run__doc__},
     _STACKLESS_TASKLET_SET_CONTEXT_METHODDEF
     {NULL,     NULL}             /* sentinel */

@@ -10,6 +10,11 @@ What's New in Stackless 3.X.X?
 *Release date: 20XX-XX-XX*
 
 - https://github.com/stackless-dev/stackless/issues/265
+  Fix invalid function cast warnings with gcc 8 for method conventions
+  different from METH_NOARGS, METH_O and METH_VARARGS excluding Argument Clinic
+  generated code.
+
+- https://github.com/stackless-dev/stackless/issues/265
   Most (getter)-functions, (setter)-functions and (PyCFunction)-functions with
   flag METH_NOARGS used to lack an unused last argument, "void *" for (getter)
   and (setter), "PyObject *" for (PyCFunction)-functions.

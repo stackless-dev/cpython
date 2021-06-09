@@ -227,8 +227,8 @@ schedule_remove(PyObject *self, PyObject *args, PyObject *kwds);
 static PyObject *
 PyStackless_Schedule_M(PyObject *retval, int remove)
 {
-    PyMethodDef sched = {"schedule", (PyCFunction)schedule, METH_VARARGS|METH_KEYWORDS};
-    PyMethodDef s_rem = {"schedule", (PyCFunction)schedule_remove, METH_VARARGS|METH_KEYWORDS};
+    PyMethodDef sched = {"schedule", (PyCFunction)(void(*)(void))schedule, METH_VARARGS|METH_KEYWORDS};
+    PyMethodDef s_rem = {"schedule", (PyCFunction)(void(*)(void))schedule_remove, METH_VARARGS|METH_KEYWORDS};
     if (remove)
         return PyStackless_CallCMethod_Main(&s_rem, NULL, "O", retval);
     else
@@ -510,7 +510,7 @@ run_watchdog(PyObject *self, PyObject *args, PyObject *kwds);
 static PyObject *
 PyStackless_RunWatchdog_M(long timeout, long flags)
 {
-    PyMethodDef def = {"run", (PyCFunction)run_watchdog, METH_VARARGS | METH_KEYWORDS};
+    PyMethodDef def = {"run", (PyCFunction)(void(*)(void))run_watchdog, METH_VARARGS | METH_KEYWORDS};
     int threadblock, soft, ignore_nesting, totaltimeout;
     threadblock = (flags & Py_WATCHDOG_THREADBLOCK) ? 1 : 0;
     soft =        (flags & PY_WATCHDOG_SOFT) ? 1 : 0;
@@ -1663,11 +1663,11 @@ PyDoc_STRVAR(slpmodule_getthreads__doc__,
 static PyMethodDef stackless_methods[] = {
         _STACKLESS_PICKLE_FLAGS_DEFAULT_METHODDEF
         _STACKLESS_PICKLE_FLAGS_METHODDEF
-    {"schedule",                    (PCF)schedule,              METH_KS,
+    {"schedule",                  (PCF)(void(*)(void))schedule, METH_KS,
      schedule__doc__},
-    {"schedule_remove",             (PCF)schedule_remove,       METH_KS,
+    {"schedule_remove",    (PCF)(void(*)(void))schedule_remove, METH_KS,
      schedule__doc__},
-    {"run",                         (PCF)run_watchdog,          METH_VARARGS | METH_KEYWORDS,
+    {"run",                   (PCF)(void(*)(void))run_watchdog, METH_VARARGS | METH_KEYWORDS,
      run_watchdog__doc__},
     {"getruncount",                 (PCF)getruncount,           METH_NOARGS,
      getruncount__doc__},
@@ -1679,9 +1679,9 @@ static PyMethodDef stackless_methods[] = {
      getmain__doc__},
     {"enable_softswitch",           (PCF)enable_softswitch,     METH_O,
      enable_soft__doc__},
-    {"_test_cframe_nr",              (PCF)_test_cframe_nr,        METH_VARARGS | METH_KEYWORDS,
+    {"_test_cframe_nr",    (PCF)(void(*)(void))_test_cframe_nr, METH_VARARGS | METH_KEYWORDS,
     _test_cframe_nr__doc__},
-    {"_test_outside",                (PCF)_test_outside,          METH_NOARGS,
+    {"_test_outside",                (PCF)_test_outside,        METH_NOARGS,
     _test_outside__doc__},
     {"set_channel_callback",        (PCF)set_channel_callback,  METH_O,
      set_channel_callback__doc__},
