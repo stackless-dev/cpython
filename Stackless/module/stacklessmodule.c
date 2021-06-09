@@ -40,7 +40,7 @@ typedef struct PyAtomicObject
 } PyAtomicObject;
 
 static PyObject *
-atomic_enter(PyObject *self)
+atomic_enter(PyObject *self, PyObject *unused)
 {
     PyAtomicObject *a = (PyAtomicObject*)self;
     PyObject *c = PyStackless_GetCurrent();
@@ -333,7 +333,7 @@ PyStackless_GetRunCount(void)
 }
 
 static PyObject *
-getruncount(PyObject *self)
+getruncount(PyObject *self, PyObject *unused)
 {
     PyThreadState *ts = _PyThreadState_GET();
     return PyLong_FromLong(ts->st.runcount);
@@ -360,7 +360,7 @@ PyStackless_GetCurrent(void)
 }
 
 static PyObject *
-getcurrent(PyObject *self)
+getcurrent(PyObject *self, PyObject *unused)
 {
     return PyStackless_GetCurrent();
 }
@@ -398,7 +398,7 @@ PyStackless_GetCurrentId(void)
 }
 
 static PyObject *
-getcurrentid(PyObject *self)
+getcurrentid(PyObject *self, PyObject *unused)
 {
     return PyLong_FromUnsignedLong(PyStackless_GetCurrentId());
 }
@@ -407,7 +407,7 @@ PyDoc_STRVAR(getmain__doc__,
 "getmain() -- return the main tasklet of this thread.");
 
 static PyObject *
-getmain(PyObject *self)
+getmain(PyObject *self, PyObject *unused)
 {
     PyThreadState *ts = _PyThreadState_GET();
     PyObject * t = (PyObject*) ts->st.main;
@@ -972,7 +972,7 @@ This can be used to measure the execution time of 1.000.000 switches.");
 
 static
 PyObject *
-_test_outside(PyObject *self)
+_test_outside(PyObject *self, PyObject *unused)
 {
     PyThreadState *ts = _PyThreadState_GET();
     PyTaskletObject *stmain = ts->st.main;
@@ -1378,7 +1378,7 @@ PyDoc_STRVAR(get_schedule_callback__doc__,
 This function returns None, if no callback is installed.");
 
 static PyObject *
-get_schedule_callback(PyObject *self)
+get_schedule_callback(PyObject *self, PyObject *unused)
 {
     PyThreadState * ts = _PyThreadState_GET();
     PyObject *temp = ts->interp->st.schedule_hook;
@@ -1419,7 +1419,7 @@ PyDoc_STRVAR(get_channel_callback__doc__,
 This function returns None, if no callback is installed.");
 
 static PyObject *
-get_channel_callback(PyObject *self)
+get_channel_callback(PyObject *self, PyObject *unused)
 {
     PyObject *temp = slp_get_channel_callback();
     if (NULL == temp) {
@@ -1498,7 +1498,7 @@ PyDoc_STRVAR(_get_refinfo__doc__,
 "refcount, ref_total, computed total)");
 
 static PyObject *
-_get_refinfo(PyObject *self)
+_get_refinfo(PyObject *self, PyObject *unused)
 {
     PyObject *op, *max = Py_None;
     PyObject *refchain;
@@ -1524,7 +1524,7 @@ PyDoc_STRVAR(_get_all_objects__doc__,
 "_get_all_objects -- return a list with all objects but the list.");
 
 static PyObject *
-_get_all_objects(PyObject *self)
+_get_all_objects(PyObject *self, PyObject *unused)
 {
     PyObject *lis, *ob;
     lis = PyList_New(0);
@@ -1576,7 +1576,7 @@ PyDoc_STRVAR(_gc_untrack__doc__,
 "_gc_untrack, gc_track -- remove or add an object from the gc list.");
 
 static PyObject *
-slpmodule_getdebug(PyObject *self)
+slpmodule_getdebug(PyObject *self, PyObject *unused)
 {
 #ifdef _DEBUG
     PyObject *ret = Py_True;
@@ -1591,7 +1591,7 @@ PyDoc_STRVAR(slpmodule_getdebug__doc__,
 "Returns True if this is a DEBUG build");
 
 static PyObject *
-slpmodule_getuncollectables(PyObject *self)
+slpmodule_getuncollectables(PyObject *self, PyObject *unused)
 {
     PyThreadState * ts = _PyThreadState_GET();
     PyObject *lis = PyList_New(0);
@@ -1619,7 +1619,7 @@ since their C stack might prevent garbage collection.\n\
 Note that a tasklet is reported for every C stacks it has.");
 
 PyObject *
-slp_getthreads(PyObject *self)
+slp_getthreads(PyObject *self, PyObject *unused)
 {
     PyObject *lis = PyList_New(0);
     PyThreadState *ts = _PyThreadState_GET();

@@ -946,7 +946,7 @@ end or to explicitly kill() them.\
 ");
 
 static PyObject *
-tasklet_remove(PyObject *self);
+tasklet_remove(PyObject *self, PyObject *unused);
 
 static int
 PyTasklet_Remove_M(PyTaskletObject *task)
@@ -989,7 +989,7 @@ PyTasklet_Remove(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_remove(PyObject *self)
+tasklet_remove(PyObject *self, PyObject *unused)
 {
     if (impl_tasklet_remove((PyTaskletObject*) self))
         return NULL;
@@ -1004,7 +1004,7 @@ given that it isn't blocked.\n\
 Blocked tasklets need to be reactivated by channels.");
 
 static PyObject *
-tasklet_insert(PyObject *self);
+tasklet_insert(PyObject *self, PyObject *unused);
 
 static int
 PyTasklet_Insert_M(PyTaskletObject *task)
@@ -1047,7 +1047,7 @@ PyTasklet_Insert(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_insert(PyObject *self)
+tasklet_insert(PyObject *self, PyObject *unused)
 {
     if (impl_tasklet_insert((PyTaskletObject*) self))
         return NULL;
@@ -1061,7 +1061,7 @@ PyDoc_STRVAR(tasklet_run__doc__,
 Blocked tasks need to be reactivated by channels.");
 
 static PyObject *
-tasklet_run(PyObject *self);
+tasklet_run(PyObject *self, PyObject *unused);
 
 static PyObject *
 PyTasklet_Run_M(PyTaskletObject *task)
@@ -1181,7 +1181,7 @@ impl_tasklet_run_remove(PyTaskletObject *task, int remove)
 }
 
 static PyObject *
-tasklet_run(PyObject *self)
+tasklet_run(PyObject *self, PyObject *unused)
 {
     return impl_tasklet_run_remove((PyTaskletObject *) self, 0);
 }
@@ -1193,7 +1193,7 @@ custom scheduling behaviour.  Only works for tasklets of the\n\
 same thread.");
 
 static PyObject *
-tasklet_switch(PyObject *self);
+tasklet_switch(PyObject *self, PyObject *unused);
 
 static PyObject *
 PyTasklet_Switch_M(PyTaskletObject *task)
@@ -1217,7 +1217,7 @@ PyTasklet_Switch(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_switch(PyObject *self)
+tasklet_switch(PyObject *self, PyObject *unused)
 {
     return impl_tasklet_run_remove((PyTaskletObject *) self, 1);
 }
@@ -1775,7 +1775,7 @@ tasklet_kill(PyObject *self, PyObject *args, PyObject *kwds)
 /* attributes which are hiding in small fields */
 
 static PyObject *
-tasklet_get_blocked(PyTaskletObject *task)
+tasklet_get_blocked(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(task->flags.blocked);
 }
@@ -1787,7 +1787,7 @@ int PyTasklet_GetBlocked(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_atomic(PyTaskletObject *task)
+tasklet_get_atomic(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(task->flags.atomic);
 }
@@ -1799,7 +1799,7 @@ int PyTasklet_GetAtomic(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_ignore_nesting(PyTaskletObject *task)
+tasklet_get_ignore_nesting(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(task->flags.ignore_nesting);
 }
@@ -1811,7 +1811,7 @@ int PyTasklet_GetIgnoreNesting(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_frame(PyTaskletObject *task)
+tasklet_get_frame(PyTaskletObject *task, void *closure)
 {
     PyObject *ret = (PyObject*) PyTasklet_GetFrame(task);
     if (ret)
@@ -1833,7 +1833,7 @@ PyTasklet_GetFrame(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_block_trap(PyTaskletObject *task)
+tasklet_get_block_trap(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(task->flags.block_trap);
 }
@@ -1845,7 +1845,7 @@ int PyTasklet_GetBlockTrap(PyTaskletObject *task)
 
 
 static int
-tasklet_set_block_trap(PyTaskletObject *task, PyObject *value)
+tasklet_set_block_trap(PyTaskletObject *task, PyObject *value, void *closure)
 {
     if (!PyLong_Check(value))
         TYPE_ERROR("block_trap must be set to a bool or integer", -1);
@@ -1860,7 +1860,7 @@ void PyTasklet_SetBlockTrap(PyTaskletObject *task, int value)
 
 
 static PyObject *
-tasklet_is_main(PyTaskletObject *task)
+tasklet_is_main(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     return PyBool_FromLong(ts && task == ts->st.main);
@@ -1875,7 +1875,7 @@ PyTasklet_IsMain(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_is_current(PyTaskletObject *task)
+tasklet_is_current(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     return PyBool_FromLong(ts && task == ts->st.current);
@@ -1890,7 +1890,7 @@ PyTasklet_IsCurrent(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_recursion_depth(PyTaskletObject *task)
+tasklet_get_recursion_depth(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts;
 
@@ -1913,7 +1913,7 @@ PyTasklet_GetRecursionDepth(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_nesting_level(PyTaskletObject *task)
+tasklet_get_nesting_level(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts;
 
@@ -1939,7 +1939,7 @@ PyTasklet_GetNestingLevel(PyTaskletObject *task)
 /* attributes which are handy, but easily computed */
 
 static PyObject *
-tasklet_alive(PyTaskletObject *task)
+tasklet_alive(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(slp_get_frame(task) != NULL);
 }
@@ -1952,7 +1952,7 @@ PyTasklet_Alive(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_paused(PyTaskletObject *task)
+tasklet_paused(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(
         slp_get_frame(task) != NULL && task->next == NULL);
@@ -1966,7 +1966,7 @@ PyTasklet_Paused(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_scheduled(PyTaskletObject *task)
+tasklet_scheduled(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(task->next != NULL);
 }
@@ -1978,7 +1978,7 @@ PyTasklet_Scheduled(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_restorable(PyTaskletObject *task)
+tasklet_restorable(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts;
 
@@ -2001,7 +2001,7 @@ PyTasklet_Restorable(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_get_channel(PyTaskletObject *task)
+tasklet_get_channel(PyTaskletObject *task, void *closure)
 {
     PyTaskletObject *prev = task->prev;
     PyObject *ret = Py_None;
@@ -2016,7 +2016,7 @@ tasklet_get_channel(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_get_next(PyTaskletObject *task)
+tasklet_get_next(PyTaskletObject *task, void *closure)
 {
     PyObject *ret = Py_None;
 
@@ -2027,7 +2027,7 @@ tasklet_get_next(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_get_prev(PyTaskletObject *task)
+tasklet_get_prev(PyTaskletObject *task, void *closure)
 {
     PyObject *ret = Py_None;
 
@@ -2038,7 +2038,7 @@ tasklet_get_prev(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_thread_id(PyTaskletObject *task)
+tasklet_thread_id(PyTaskletObject *task, void *closure)
 {
     if (task->cstate->tstate) {
         return PyLong_FromUnsignedLong(task->cstate->tstate->thread_id);
@@ -2047,7 +2047,7 @@ tasklet_thread_id(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_get_trace_function(PyTaskletObject *task)
+tasklet_get_trace_function(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     PyCFrameObject *f;
@@ -2091,7 +2091,7 @@ tasklet_get_trace_function(PyTaskletObject *task)
 }
 
 static int
-tasklet_set_trace_function(PyTaskletObject *task, PyObject *value)
+tasklet_set_trace_function(PyTaskletObject *task, PyObject *value, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     PyCFrameObject *f;
@@ -2181,7 +2181,7 @@ tasklet_set_trace_function(PyTaskletObject *task, PyObject *value)
 }
 
 static PyObject *
-tasklet_get_profile_function(PyTaskletObject *task)
+tasklet_get_profile_function(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     PyCFrameObject *f;
@@ -2225,7 +2225,7 @@ tasklet_get_profile_function(PyTaskletObject *task)
 }
 
 static int
-tasklet_set_profile_function(PyTaskletObject *task, PyObject *value)
+tasklet_set_profile_function(PyTaskletObject *task, PyObject *value, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     PyCFrameObject *f;
@@ -2442,7 +2442,7 @@ tasklet_context_run(PyTaskletObject *self, PyObject *const *args,
 }
 
 static PyObject *
-tasklet_context_id(PyTaskletObject *self)
+tasklet_context_id(PyTaskletObject *self, void *closure)
 {
     PyObject *ctx = _get_tasklet_context(self);
     PyObject *result = PyLong_FromVoidPtr(ctx);

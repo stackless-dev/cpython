@@ -780,7 +780,7 @@ PyObject* slp_context_run_callback(PyFrameObject *f, int exc, PyObject *result);
      (ts->st.runflags & PY_WATCHDOG_IGNORE_NESTING))
 
 /* Interpreter shutdown and thread state access */
-PyObject * slp_getthreads(PyObject *self);
+PyObject * slp_getthreads(PyObject *self, PyObject *unused);
 void slp_head_lock(void);
 void slp_head_unlock(void);
 #define SLP_HEAD_LOCK() slp_head_lock()
