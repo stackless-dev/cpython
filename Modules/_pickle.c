@@ -4697,7 +4697,7 @@ Pickler_set_memo(PicklerObject *self, PyObject *obj, void *Py_UNUSED(ignored))
 
 #ifdef STACKLESS
 static PyObject *
-Pickler_get_module_dict_ids(PicklerObject *p)
+Pickler_get_module_dict_ids(PicklerObject *p, void *closure)
 {
         if (p->module_dict_ids == NULL)
                 PyErr_SetString(PyExc_AttributeError, "module_dict_ids");
@@ -4707,7 +4707,7 @@ Pickler_get_module_dict_ids(PicklerObject *p)
 }
 
 static int
-Pickler_set_module_dict_ids(PicklerObject *p, PyObject *v)
+Pickler_set_module_dict_ids(PicklerObject *p, PyObject *v, void *closure)
 {
         if (v == NULL) {
                 PyErr_SetString(PyExc_TypeError,

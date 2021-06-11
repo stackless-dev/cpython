@@ -129,12 +129,13 @@ _wrap_traverse(PyObject *ob, visitproc visit, void *arg)
     return ret;
 }
 
-static void
+static int
 _wrap_clear(PyObject *ob)
 {
     Py_TYPE(ob) = Py_TYPE(ob)->tp_base;
     if (Py_TYPE(ob)->tp_clear != NULL)
         Py_TYPE(ob)->tp_clear(ob);
+    return 0;
 }
 
 
@@ -143,7 +144,7 @@ _wrap_clear(PyObject *ob)
 static PyMethodDef prefix##_methods[] = { \
     {"__reduce__",     (PyCFunction)reduce,             METH_NOARGS,    NULL}, \
     {"__setstate__",   (PyCFunction)setstate,           METH_O,         NULL}, \
-    {"__new__",            (PyCFunction)_new_wrapper,   METH_VARARGS | METH_KEYWORDS, \
+    {"__new__",        (PyCFunction)(void(*)(void))_new_wrapper, METH_VARARGS | METH_KEYWORDS, \
      PyDoc_STR("wwwwwaaaaaT.__new__(S, ...) -> " \
                "a new object with type S, a subtype of T")}, \
     {NULL, NULL} \
@@ -288,7 +289,7 @@ unwrap_frame_arg(PyObject * args) {
 }
 
 static struct PyMethodDef _new_methoddef[] = {
-    {"__new__", (PyCFunction)_new_wrapper, METH_VARARGS | METH_KEYWORDS,
+    {"__new__", (PyCFunction)(void(*)(void))_new_wrapper, METH_VARARGS | METH_KEYWORDS,
      PyDoc_STR("T.__new__(S, ...) -> "
                "a new object with type S, a subtype of T.__base__")},
     {0}
@@ -620,7 +621,7 @@ slp_from_tuple_with_nulls(PyObject **start, PyObject *tup)
 static struct _typeobject wrap_PyCode_Type;
 
 static PyObject *
-code_reduce(PyCodeObject * co)
+code_reduce(PyCodeObject * co, PyObject *unused)
 {
     PyObject *tup = Py_BuildValue(
         "(O(" codetuplefmt ")())",
@@ -676,7 +677,7 @@ static PyTypeObject wrap_PyCell_Type;
 PyTypeObject *_Pywrap_PyCell_Type = &wrap_PyCell_Type;
 
 static PyObject *
-cell_reduce(PyCellObject *cell)
+cell_reduce(PyCellObject *cell, PyObject *unused)
 {
     PyObject *tup = NULL;
 
@@ -743,7 +744,7 @@ static int init_celltype(PyObject * mod)
 static PyTypeObject wrap_PyFunction_Type;
 
 static PyObject *
-func_reduce(PyFunctionObject * func)
+func_reduce(PyFunctionObject * func, PyObject *unused)
 {
     PyObject *tup = Py_BuildValue(
         "(O()(" functuplefmt "))",
@@ -846,7 +847,7 @@ SLP_DEF_INVALID_EXEC(slp_tp_init_callback)
 static PyTypeObject wrap_PyFrame_Type;
 
 static PyObject *
-frameobject_reduce(PyFrameObject *f)
+frameobject_reduce(PyFrameObject *f, PyObject *unused)
 {
     int i;
     PyObject **f_stacktop;
@@ -1121,7 +1122,7 @@ slp_clone_frame(PyFrameObject *f)
     PyFrameObject *fnew;
 
     if (PyFrame_Check(f))
-        tup = frameobject_reduce(f);
+        tup = frameobject_reduce(f, NULL);
     else
         tup = PyObject_CallMethod((PyObject *) f, "__reduce__", "");
     if (tup == NULL)
@@ -1232,7 +1233,7 @@ typedef PyTracebackObject tracebackobject;
 static PyTypeObject wrap_PyTraceBack_Type;
 
 static PyObject *
-tb_reduce(tracebackobject * tb)
+tb_reduce(tracebackobject * tb, PyObject *unused)
 {
     PyObject *tup = NULL;
     PyObject *frame_reducer;
@@ -1331,7 +1332,7 @@ static PyTypeObject wrap_PyModule_Type;
 
 
 static PyObject *
-module_reduce(PyObject * m)
+module_reduce(PyObject * m, PyObject *unused)
 {
     static PyObject *import = NULL;
     PyObject *modules = PyImport_GetModuleDict();
@@ -1440,7 +1441,7 @@ dictview_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 static PyObject *
-dictkeysview_reduce(_PyDictViewObject *di)
+dictkeysview_reduce(_PyDictViewObject *di, PyObject *unused)
 {
     PyObject *tup;
 
@@ -1455,7 +1456,7 @@ dictkeysview_reduce(_PyDictViewObject *di)
 static PyTypeObject wrap_PyDictValues_Type;
 
 static PyObject *
-dictvaluesview_reduce(_PyDictViewObject *di)
+dictvaluesview_reduce(_PyDictViewObject *di, PyObject *unused)
 {
     PyObject *tup;
 
@@ -1470,7 +1471,7 @@ dictvaluesview_reduce(_PyDictViewObject *di)
 static PyTypeObject wrap_PyDictItems_Type;
 
 static PyObject *
-dictitemsview_reduce(_PyDictViewObject *di)
+dictitemsview_reduce(_PyDictViewObject *di, PyObject *unused)
 {
     PyObject *tup;
 
@@ -1747,7 +1748,7 @@ setstate_from_gen_obj_head(const gen_obj_head_ty *goh,
 /* The usual reduce method.
  */
 static PyObject *
-gen_reduce(PyGenObject *gen)
+gen_reduce(PyGenObject *gen, PyObject *unused)
 {
     PyObject *tup;
     gen_obj_head_ty goh;
@@ -1869,7 +1870,7 @@ static int init_generatortype(PyObject * mod)
 #define initchain init_generatortype
 
 static PyObject *
-coro_reduce(PyCoroObject *coro)
+coro_reduce(PyCoroObject *coro, PyObject *unused)
 {
     PyObject *tup;
     gen_obj_head_ty goh;
@@ -1976,7 +1977,7 @@ static int init_coroutinetype(PyObject * mod)
 #define initchain init_coroutinetype
 
 static PyObject *
-async_gen_reduce(PyAsyncGenObject *async_gen)
+async_gen_reduce(PyAsyncGenObject *async_gen, PyObject *unused)
 {
     PyThreadState *ts = PyThreadState_GET();
     PyObject *tup;
@@ -2128,7 +2129,7 @@ init_async_gentype(PyObject * mod)
 #define initchain init_async_gentype
 
 static PyObject *
-async_generator_asend_reduce(PyObject *o)
+async_generator_asend_reduce(PyObject *o, PyObject *unused)
 {
     return slp_async_gen_asend_reduce(o, &wrap__PyAsyncGenASend_Type);
 }
@@ -2165,7 +2166,7 @@ init_async_generator_asend_type(PyObject * mod)
 #define initchain init_async_generator_asend_type
 
 static PyObject *
-async_generator_athrow_reduce(PyObject *o)
+async_generator_athrow_reduce(PyObject *o, PyObject *unused)
 {
     return slp_async_gen_athrow_reduce(o, &wrap__PyAsyncGenAThrow_Type);
 }
@@ -2202,7 +2203,7 @@ init_async_generator_athrow_type(PyObject * mod)
 #define initchain init_async_generator_athrow_type
 
 static PyObject *
-coro_wrapper_reduce(PyObject *o)
+coro_wrapper_reduce(PyObject *o, PyObject *unused)
 {
     return slp_coro_wrapper_reduce(o, &wrap__PyCoroWrapper_Type);
 }

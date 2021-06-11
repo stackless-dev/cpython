@@ -65,7 +65,7 @@ cframe_traverse(PyCFrameObject *cf, visitproc visit, void *arg)
 
 /* clearing a cframe while the object still exists */
 
-static void
+static int
 cframe_clear(PyCFrameObject *cf)
 {
     /* The Python C-API documentation recomends to use Py_CLEAR() to release
@@ -85,6 +85,7 @@ cframe_clear(PyCFrameObject *cf)
     Py_XDECREF(tmp_ob1);
     Py_XDECREF(tmp_ob2);
     Py_XDECREF(tmp_ob3);
+    return 0;
 }
 
 
@@ -132,13 +133,18 @@ static PyObject * execute_soft_switchable_func(PyFrameObject *, int, PyObject *)
 SLP_DEF_INVALID_EXEC(execute_soft_switchable_func)
 
 static PyObject *
-cframe_reduce(PyCFrameObject *cf)
+cframe_reduce(PyCFrameObject *cf, PyObject *value)
 {
     PyObject *res = NULL, *exec_name = NULL;
     PyObject *params = NULL;
     int valid = 1;
     PyObject *obs[3];
     long i, n;
+
+    if (value && !PyLong_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "__reduce_ex__ argument should be an integer");
+        return NULL;
+    }
 
     if (cf->f_execute == execute_soft_switchable_func) {
         exec_name = (PyObject *) cf->any2;
@@ -239,7 +245,7 @@ cframe_setstate(PyObject *self, PyObject *args)
 
 static PyMethodDef cframe_methods[] = {
     {"__reduce__",    (PyCFunction)cframe_reduce, METH_NOARGS, NULL},
-    {"__reduce_ex__", (PyCFunction)cframe_reduce, METH_VARARGS, NULL},
+    {"__reduce_ex__", (PyCFunction)cframe_reduce, METH_O, NULL},
     {"__setstate__",  (PyCFunction)cframe_setstate, METH_O, NULL},
     {NULL, NULL}
 };
@@ -385,8 +391,13 @@ slp_cframe_fini(void)
  */
 
 static PyObject *
-function_declaration_reduce(PyStacklessFunctionDeclarationObject *self)
+function_declaration_reduce(PyStacklessFunctionDeclarationObject *self, PyObject *value)
 {
+    if (value && !PyLong_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "__reduce_ex__ argument should be an integer");
+        return NULL;
+    }
+
     if (self->name == NULL || *self->name == '\0') {
         PyErr_SetString(PyExc_SystemError, "no function name");
         return NULL;
@@ -396,7 +407,7 @@ function_declaration_reduce(PyStacklessFunctionDeclarationObject *self)
 
 static PyMethodDef function_declaration_methods[] = {
     {"__reduce__",    (PyCFunction)function_declaration_reduce, METH_NOARGS, NULL},
-    {"__reduce_ex__", (PyCFunction)function_declaration_reduce, METH_VARARGS, NULL},
+    {"__reduce_ex__", (PyCFunction)function_declaration_reduce, METH_O, NULL},
     {NULL, NULL}
 };
 

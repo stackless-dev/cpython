@@ -197,7 +197,7 @@ exc_state_clear(_PyErr_StackItem *exc_state)
     Py_XDECREF(tb);
 }
 
-static void
+static int
 tasklet_clear(PyTaskletObject *t)
 {
     tasklet_clear_frames(t);
@@ -219,6 +219,7 @@ tasklet_clear(PyTaskletObject *t)
      * the order of calls to tp_clear is undefined.
      */
     t->exc_info = &t->exc_state;
+    return 0;
 }
 
 /*
@@ -539,8 +540,11 @@ tasklet_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     /* we always need a cstate, so be sure to initialize */
     if (ts->st.initial_stub == NULL) {
-        PyMethodDef def = {"__new__", (PyCFunction)tasklet_new, METH_NOARGS};
-        return PyStackless_CallCMethod_Main(&def, (PyObject*)type, NULL);
+        PyMethodDef def = {"__new__", (PyCFunction)(void(*)(void))tasklet_new, METH_VARARGS|METH_KEYWORDS};
+        PyObject *func = PyCFunction_New(&def, (PyObject*)type);
+        PyObject *retval = PyStackless_Call_Main(func, args, kwds);
+        Py_DECREF(func);
+        return retval;
     }
     if (type == NULL)
         type = &PyTasklet_Type;
@@ -609,13 +613,18 @@ simply the tasklet() call without parameters.
 */
 
 static PyObject *
-tasklet_reduce(PyTaskletObject * t)
+tasklet_reduce(PyTaskletObject * t, PyObject *value)
 {
     PyObject *tup = NULL, *lis = NULL;
     PyFrameObject *f;
     PyThreadState *ts = t->cstate->tstate;
     PyObject *exc_type, *exc_value, *exc_traceback, *exc_info;
     PyObject *context = NULL;
+
+    if (value && !PyLong_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "__reduce_ex__ argument should be an integer");
+        return NULL;
+    }
 
     if (ts && t == ts->st.current)
         RUNTIME_ERROR("You cannot __reduce__ the tasklet which is"
@@ -937,7 +946,7 @@ end or to explicitly kill() them.\
 ");
 
 static PyObject *
-tasklet_remove(PyObject *self);
+tasklet_remove(PyObject *self, PyObject *unused);
 
 static int
 PyTasklet_Remove_M(PyTaskletObject *task)
@@ -980,7 +989,7 @@ PyTasklet_Remove(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_remove(PyObject *self)
+tasklet_remove(PyObject *self, PyObject *unused)
 {
     if (impl_tasklet_remove((PyTaskletObject*) self))
         return NULL;
@@ -995,7 +1004,7 @@ given that it isn't blocked.\n\
 Blocked tasklets need to be reactivated by channels.");
 
 static PyObject *
-tasklet_insert(PyObject *self);
+tasklet_insert(PyObject *self, PyObject *unused);
 
 static int
 PyTasklet_Insert_M(PyTaskletObject *task)
@@ -1038,7 +1047,7 @@ PyTasklet_Insert(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_insert(PyObject *self)
+tasklet_insert(PyObject *self, PyObject *unused)
 {
     if (impl_tasklet_insert((PyTaskletObject*) self))
         return NULL;
@@ -1052,7 +1061,7 @@ PyDoc_STRVAR(tasklet_run__doc__,
 Blocked tasks need to be reactivated by channels.");
 
 static PyObject *
-tasklet_run(PyObject *self);
+tasklet_run(PyObject *self, PyObject *unused);
 
 static PyObject *
 PyTasklet_Run_M(PyTaskletObject *task)
@@ -1172,7 +1181,7 @@ impl_tasklet_run_remove(PyTaskletObject *task, int remove)
 }
 
 static PyObject *
-tasklet_run(PyObject *self)
+tasklet_run(PyObject *self, PyObject *unused)
 {
     return impl_tasklet_run_remove((PyTaskletObject *) self, 0);
 }
@@ -1184,7 +1193,7 @@ custom scheduling behaviour.  Only works for tasklets of the\n\
 same thread.");
 
 static PyObject *
-tasklet_switch(PyObject *self);
+tasklet_switch(PyObject *self, PyObject *unused);
 
 static PyObject *
 PyTasklet_Switch_M(PyTaskletObject *task)
@@ -1208,7 +1217,7 @@ PyTasklet_Switch(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_switch(PyObject *self)
+tasklet_switch(PyObject *self, PyObject *unused)
 {
     return impl_tasklet_run_remove((PyTaskletObject *) self, 1);
 }
@@ -1405,7 +1414,7 @@ static PyObject *
 PyTasklet_Throw_M(PyTaskletObject *self, int pending, PyObject *exc,
                            PyObject *val, PyObject *tb)
 {
-    PyMethodDef def = {"throw", (PyCFunction)tasklet_throw, METH_VARARGS|METH_KEYWORDS};
+    PyMethodDef def = {"throw", (PyCFunction)(void(*)(void))tasklet_throw, METH_VARARGS|METH_KEYWORDS};
     if (!val)
         val = Py_None;
     if (!tb)
@@ -1766,7 +1775,7 @@ tasklet_kill(PyObject *self, PyObject *args, PyObject *kwds)
 /* attributes which are hiding in small fields */
 
 static PyObject *
-tasklet_get_blocked(PyTaskletObject *task)
+tasklet_get_blocked(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(task->flags.blocked);
 }
@@ -1778,7 +1787,7 @@ int PyTasklet_GetBlocked(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_atomic(PyTaskletObject *task)
+tasklet_get_atomic(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(task->flags.atomic);
 }
@@ -1790,7 +1799,7 @@ int PyTasklet_GetAtomic(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_ignore_nesting(PyTaskletObject *task)
+tasklet_get_ignore_nesting(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(task->flags.ignore_nesting);
 }
@@ -1802,7 +1811,7 @@ int PyTasklet_GetIgnoreNesting(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_frame(PyTaskletObject *task)
+tasklet_get_frame(PyTaskletObject *task, void *closure)
 {
     PyObject *ret = (PyObject*) PyTasklet_GetFrame(task);
     if (ret)
@@ -1824,7 +1833,7 @@ PyTasklet_GetFrame(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_block_trap(PyTaskletObject *task)
+tasklet_get_block_trap(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(task->flags.block_trap);
 }
@@ -1836,7 +1845,7 @@ int PyTasklet_GetBlockTrap(PyTaskletObject *task)
 
 
 static int
-tasklet_set_block_trap(PyTaskletObject *task, PyObject *value)
+tasklet_set_block_trap(PyTaskletObject *task, PyObject *value, void *closure)
 {
     if (!PyLong_Check(value))
         TYPE_ERROR("block_trap must be set to a bool or integer", -1);
@@ -1851,7 +1860,7 @@ void PyTasklet_SetBlockTrap(PyTaskletObject *task, int value)
 
 
 static PyObject *
-tasklet_is_main(PyTaskletObject *task)
+tasklet_is_main(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     return PyBool_FromLong(ts && task == ts->st.main);
@@ -1866,7 +1875,7 @@ PyTasklet_IsMain(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_is_current(PyTaskletObject *task)
+tasklet_is_current(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     return PyBool_FromLong(ts && task == ts->st.current);
@@ -1881,7 +1890,7 @@ PyTasklet_IsCurrent(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_recursion_depth(PyTaskletObject *task)
+tasklet_get_recursion_depth(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts;
 
@@ -1904,7 +1913,7 @@ PyTasklet_GetRecursionDepth(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_nesting_level(PyTaskletObject *task)
+tasklet_get_nesting_level(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts;
 
@@ -1930,7 +1939,7 @@ PyTasklet_GetNestingLevel(PyTaskletObject *task)
 /* attributes which are handy, but easily computed */
 
 static PyObject *
-tasklet_alive(PyTaskletObject *task)
+tasklet_alive(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(slp_get_frame(task) != NULL);
 }
@@ -1943,7 +1952,7 @@ PyTasklet_Alive(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_paused(PyTaskletObject *task)
+tasklet_paused(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(
         slp_get_frame(task) != NULL && task->next == NULL);
@@ -1957,7 +1966,7 @@ PyTasklet_Paused(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_scheduled(PyTaskletObject *task)
+tasklet_scheduled(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(task->next != NULL);
 }
@@ -1969,7 +1978,7 @@ PyTasklet_Scheduled(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_restorable(PyTaskletObject *task)
+tasklet_restorable(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts;
 
@@ -1992,7 +2001,7 @@ PyTasklet_Restorable(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_get_channel(PyTaskletObject *task)
+tasklet_get_channel(PyTaskletObject *task, void *closure)
 {
     PyTaskletObject *prev = task->prev;
     PyObject *ret = Py_None;
@@ -2007,7 +2016,7 @@ tasklet_get_channel(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_get_next(PyTaskletObject *task)
+tasklet_get_next(PyTaskletObject *task, void *closure)
 {
     PyObject *ret = Py_None;
 
@@ -2018,7 +2027,7 @@ tasklet_get_next(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_get_prev(PyTaskletObject *task)
+tasklet_get_prev(PyTaskletObject *task, void *closure)
 {
     PyObject *ret = Py_None;
 
@@ -2029,7 +2038,7 @@ tasklet_get_prev(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_thread_id(PyTaskletObject *task)
+tasklet_thread_id(PyTaskletObject *task, void *closure)
 {
     if (task->cstate->tstate) {
         return PyLong_FromUnsignedLong(task->cstate->tstate->thread_id);
@@ -2038,7 +2047,7 @@ tasklet_thread_id(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_get_trace_function(PyTaskletObject *task)
+tasklet_get_trace_function(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     PyCFrameObject *f;
@@ -2082,7 +2091,7 @@ tasklet_get_trace_function(PyTaskletObject *task)
 }
 
 static int
-tasklet_set_trace_function(PyTaskletObject *task, PyObject *value)
+tasklet_set_trace_function(PyTaskletObject *task, PyObject *value, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     PyCFrameObject *f;
@@ -2172,7 +2181,7 @@ tasklet_set_trace_function(PyTaskletObject *task, PyObject *value)
 }
 
 static PyObject *
-tasklet_get_profile_function(PyTaskletObject *task)
+tasklet_get_profile_function(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     PyCFrameObject *f;
@@ -2216,7 +2225,7 @@ tasklet_get_profile_function(PyTaskletObject *task)
 }
 
 static int
-tasklet_set_profile_function(PyTaskletObject *task, PyObject *value)
+tasklet_set_profile_function(PyTaskletObject *task, PyObject *value, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     PyCFrameObject *f;
@@ -2433,7 +2442,7 @@ tasklet_context_run(PyTaskletObject *self, PyObject *const *args,
 }
 
 static PyObject *
-tasklet_context_id(PyTaskletObject *self)
+tasklet_context_id(PyTaskletObject *self, void *closure)
 {
     PyObject *ctx = _get_tasklet_context(self);
     PyObject *result = PyLong_FromVoidPtr(ctx);
@@ -2565,25 +2574,25 @@ static PyMethodDef tasklet_methods[] = {
      tasklet_set_atomic__doc__},
     {"set_ignore_nesting", (PCF)tasklet_set_ignore_nesting, METH_O,
      tasklet_set_ignore_nesting__doc__},
-    {"throw",                   (PCF)tasklet_throw,         METH_KS,
+    {"throw",            (PCF)(void(*)(void))tasklet_throw, METH_KS,
     tasklet_throw__doc__},
-    {"raise_exception",         (PCF)tasklet_raise_exception, METH_VS,
+    {"raise_exception",       (PCF)tasklet_raise_exception, METH_VS,
     tasklet_raise_exception__doc__},
-    {"kill",                    (PCF)tasklet_kill,          METH_KS,
+    {"kill",              (PCF)(void(*)(void))tasklet_kill, METH_KS,
      tasklet_kill__doc__},
-    {"bind",                    (PCF)tasklet_bind,          METH_VARARGS | METH_KEYWORDS,
+    {"bind",              (PCF)(void(*)(void))tasklet_bind, METH_VARARGS | METH_KEYWORDS,
      tasklet_bind__doc__},
-    {"setup",                   (PCF)tasklet_setup,         METH_VARARGS | METH_KEYWORDS,
+    {"setup",            (PCF)(void(*)(void))tasklet_setup, METH_VARARGS | METH_KEYWORDS,
      tasklet_setup__doc__},
     {"__reduce__",              (PCF)tasklet_reduce,        METH_NOARGS,
      tasklet_reduce__doc__},
-    {"__reduce_ex__",           (PCF)tasklet_reduce,        METH_VARARGS,
+    {"__reduce_ex__",           (PCF)tasklet_reduce,        METH_O,
      tasklet_reduce__doc__},
     {"__setstate__",            (PCF)tasklet_setstate,      METH_O,
      tasklet_setstate__doc__},
     {"bind_thread",              (PCF)tasklet_bind_thread,  METH_VARARGS,
     tasklet_bind_thread__doc__},
-    {"context_run", (PCF)tasklet_context_run, METH_FASTCALL | METH_KEYWORDS | METH_STACKLESS,
+    {"context_run", (PCF)(void(*)(void))tasklet_context_run, METH_FASTCALL | METH_KEYWORDS | METH_STACKLESS,
             tasklet_context_run__doc__},
     _STACKLESS_TASKLET_SET_CONTEXT_METHODDEF
     {NULL,     NULL}             /* sentinel */

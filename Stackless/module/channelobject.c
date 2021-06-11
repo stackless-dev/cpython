@@ -56,7 +56,7 @@ channel_traverse(PyChannelObject *ch, visitproc visit, void *arg)
     return 0;
 }
 
-static void
+static int
 channel_clear(PyObject *ob)
 {
     PyChannelObject *ch = (PyChannelObject *) ob;
@@ -74,6 +74,7 @@ channel_clear(PyObject *ob)
         ob = (PyObject *) slp_channel_remove(ch, NULL, NULL, NULL);
         Py_DECREF(ob);
     }
+    return 0;
 }
 
 static void
@@ -195,7 +196,7 @@ channel_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 static PyObject *
-channel_get_queue(PyChannelObject *self)
+channel_get_queue(PyChannelObject *self, void *closure)
 {
     PyObject *ret = (PyObject*) self->head;
 
@@ -208,11 +209,11 @@ channel_get_queue(PyChannelObject *self)
 PyObject *
 PyChannel_GetQueue(PyChannelObject *self)
 {
-    return channel_get_queue(self);
+    return channel_get_queue(self, NULL);
 }
 
 static PyObject *
-channel_get_closing(PyChannelObject *self)
+channel_get_closing(PyChannelObject *self, void *closure)
 {
     return PyBool_FromLong(self->flags.closing);
 }
@@ -224,7 +225,7 @@ PyChannel_GetClosing(PyChannelObject *self)
 }
 
 static PyObject *
-channel_get_closed(PyChannelObject *self)
+channel_get_closed(PyChannelObject *self, void *closure)
 {
     return PyBool_FromLong(self->flags.closing && self->balance == 0);
 }
@@ -237,13 +238,13 @@ PyChannel_GetClosed(PyChannelObject *self)
 
 
 static PyObject *
-channel_get_preference(PyChannelObject *self)
+channel_get_preference(PyChannelObject *self, void *closure)
 {
     return PyLong_FromLong(self->flags.preference);
 }
 
 static int
-channel_set_preference(PyChannelObject *self, PyObject *value)
+channel_set_preference(PyChannelObject *self, PyObject *value, void *closure)
 {
     int val;
 
@@ -267,13 +268,13 @@ PyChannel_SetPreference(PyChannelObject *self, int val)
 }
 
 static PyObject *
-channel_get_schedule_all(PyChannelObject *self)
+channel_get_schedule_all(PyChannelObject *self, void *closure)
 {
     return PyLong_FromLong(self->flags.schedule_all);
 }
 
 static int
-channel_set_schedule_all(PyChannelObject *self, PyObject *value)
+channel_set_schedule_all(PyChannelObject *self, PyObject *value, void *closure)
 {
     if (!PyLong_Check(value))
         TYPE_ERROR("preference must be set to a bool or integer", -1);
@@ -426,9 +427,12 @@ be activated immediately, and the sender is put at the end of\n\
 the runnables list.");
 
 static PyObject *
+impl_channel_send(PyChannelObject *self, PyObject *arg);
+
+static PyObject *
 PyChannel_Send_M(PyChannelObject *self, PyObject *arg)
 {
-    PyMethodDef def = {"send", (PyCFunction)PyChannel_Send, METH_O};
+    PyMethodDef def = {"send", (PyCFunction)impl_channel_send, METH_O};
     return PyStackless_CallCMethod_Main(&def, (PyObject *) self, "O", arg);
 }
 
@@ -771,9 +775,15 @@ the runnables list.\n\
 The above policy can be changed by setting channel flags.");
 
 static PyObject *
+PyChannel_Receive_cfunc(PyChannelObject *self, PyObject *unused)
+{
+    return PyChannel_Receive(self);
+}
+
+static PyObject *
 PyChannel_Receive_M(PyChannelObject *self)
 {
-    PyMethodDef def = {"receive", (PyCFunction)PyChannel_Receive, METH_NOARGS};
+    PyMethodDef def = {"receive", (PyCFunction)PyChannel_Receive_cfunc, METH_NOARGS};
     return PyStackless_CallCMethod_Main(&def, (PyObject *) self, NULL);
 }
 
@@ -809,7 +819,7 @@ PyChannel_Receive(PyChannelObject *self)
 }
 
 static PyObject *
-channel_receive(PyObject *self)
+channel_receive(PyObject *self, PyObject *unused)
 {
     return impl_channel_receive((PyChannelObject*)self);
 }
@@ -1059,7 +1069,7 @@ If the channel is not empty, the flag 'closing' becomes true.\n\
 If the channel is empty, the flag 'closed' becomes true.");
 
 static PyObject *
-channel_close(PyChannelObject *self)
+channel_close(PyChannelObject *self, PyObject *unused)
 {
     self->flags.closing = 1;
 
@@ -1077,7 +1087,7 @@ PyDoc_STRVAR(channel_open__doc__,
 "channel.open() -- reopen a channel. See channel.close.");
 
 static PyObject *
-channel_open(PyChannelObject *self)
+channel_open(PyChannelObject *self, PyObject *unused)
 {
     self->flags.closing = 0;
 
@@ -1095,11 +1105,16 @@ PyDoc_STRVAR(channel_reduce__doc__,
 "channel.__reduce__() -- currently does not distinguish threads.");
 
 static PyObject *
-channel_reduce(PyChannelObject * ch)
+channel_reduce(PyChannelObject * ch, PyObject *value)
 {
     PyObject *tup = NULL, *lis = NULL;
     PyTaskletObject *t;
     int i, n;
+
+    if (value && !PyLong_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "__reduce_ex__ argument should be an integer");
+        return NULL;
+    }
 
     lis = PyList_New(0);
     if (lis == NULL) goto err_exit;
@@ -1179,7 +1194,7 @@ channel_methods[] = {
     channel_open__doc__},
     {"__reduce__",              (PCF)channel_reduce,        METH_NOARGS,
      channel_reduce__doc__},
-    {"__reduce_ex__",           (PCF)channel_reduce,        METH_VARARGS,
+    {"__reduce_ex__",           (PCF)channel_reduce,        METH_O,
      channel_reduce__doc__},
     {"__setstate__",            (PCF)channel_setstate,      METH_O,
      channel_setstate__doc__},
