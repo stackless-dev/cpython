@@ -1,6 +1,6 @@
 /*
  * this file was generated from typeobject.c using the script
- * Stackless/core/extract_slp_info.py .
+ * Stackless/Tools/extract_slp_info.py .
  * please don't edit this output, but work on the script.
  */
 

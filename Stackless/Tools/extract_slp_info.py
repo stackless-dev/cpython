@@ -2,13 +2,16 @@
 #
 # extract_slp_info.py
 #
-# extract slotnames from typeonject.c and create a structure
+# extract slotnames from typeobject.c and create a structure
 # for inclusion into PyHeaptypeObject.
 #
 ################################################################
 
-srcname = "../../Objects/typeobject.c"
-dstname = "slp_exttype.h"
+from os.path import abspath, dirname, join, pardir
+from os import chdir
+
+srcname = "Objects/typeobject.c"
+dstname = "Include/cpython/slp_exttype.h.new"
 
 def parse():
     line = ""
@@ -47,7 +50,7 @@ def generate():
     print("""\
 /*
  * this file was generated from typeobject.c using the script
- * Stackless/core/extract_slp_info.py .
+ * Stackless/Tools/extract_slp_info.py .
  * please don't edit this output, but work on the script.
  */
 
@@ -60,4 +63,5 @@ typedef struct _slp_methodflags {\
     print("Found", len(slotnames), "slots")
 
 if __name__ == "__main__":
+    chdir(join(dirname(abspath(__file__)), pardir, pardir))
     generate()
