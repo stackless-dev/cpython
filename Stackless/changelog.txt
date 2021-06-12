@@ -9,6 +9,11 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/268
+  Pickled code objects now contain importlib.util.MAGIC_NUMBER. Unpickling
+  code objects pickled with an incompatible version of Python now raises a
+  ValueError exception.
+
 - https://github.com/stackless-dev/stackless/issues/265
   Fix (invalid) function cast warnings with gcc 8 for method conventions
   different from METH_NOARGS, METH_O and METH_VARARGS excluding Argument Clinic

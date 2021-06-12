@@ -616,16 +616,24 @@ slp_from_tuple_with_nulls(PyObject **start, PyObject *tup)
 
  ******************************************************/
 
-#define codetuplefmt "iiiiiSOOOSSiSOO"
+#define codetuplefmt "liiiiiSOOOSSiSOO"
 
 static struct _typeobject wrap_PyCode_Type;
+static long bytecode_magic = 0;
 
 static PyObject *
 code_reduce(PyCodeObject * co, PyObject *unused)
 {
+    if (0 >= bytecode_magic) {
+        bytecode_magic = PyImport_GetMagicNumber();
+        if (-1 == bytecode_magic)
+            return NULL;
+    }
+
     PyObject *tup = Py_BuildValue(
         "(O(" codetuplefmt ")())",
         &wrap_PyCode_Type,
+        bytecode_magic,
         co->co_argcount,
         co->co_kwonlyargcount,
         co->co_nlocals,
@@ -646,7 +654,42 @@ code_reduce(PyCodeObject * co, PyObject *unused)
     return tup;
 }
 
-MAKE_WRAPPERTYPE(PyCode_Type, code, "code", code_reduce, generic_new,
+static PyObject *
+code_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    if (0 >= bytecode_magic) {
+        bytecode_magic = PyImport_GetMagicNumber();
+        if (-1 == bytecode_magic)
+            return NULL;
+    }
+
+    assert(PyTuple_CheckExact(args));
+    if (PyTuple_GET_SIZE(args) != sizeof(codetuplefmt)-1) {
+        PyErr_SetString(PyExc_IndexError, "Argument tuple has wrong size.");
+        return NULL;
+    }
+
+    long magic = PyLong_AsLong(PyTuple_GET_ITEM(args, 0));
+    if (-1 == magic && PyErr_Occurred()) {
+        return NULL;
+    }
+
+    if (bytecode_magic != magic) {
+        PyErr_SetString(PyExc_ValueError,
+                "Wrong magic number. The pickled code object was pickled with a different Python version.");
+        return NULL;
+    }
+
+    args = PyTuple_GetSlice(args, 1, sizeof(codetuplefmt)-1);
+    if (NULL == args)
+        return NULL;
+
+    PyObject *retval = generic_new(type, args, kwds);
+    Py_DECREF(args);
+    return retval;
+}
+
+MAKE_WRAPPERTYPE(PyCode_Type, code, "code", code_reduce, code_new,
                  generic_setstate)
 
 static int init_codetype(PyObject * mod)

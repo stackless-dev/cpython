@@ -8,6 +8,8 @@ import contextlib
 import threading
 import contextvars
 import ctypes
+import importlib.util
+import struct
 import stackless
 
 from stackless import schedule, tasklet
@@ -1317,6 +1319,27 @@ class TestPickleFlags(unittest.TestCase):
         self.assertEqual(self.pickle_flags, 1)
         self.assertEqual(stackless.pickle_flags(), current)
 
+
+class TestCodePickling(unittest.TestCase):
+    def test_reduce_magic(self):
+        code = (lambda :None).__code__
+        reduce = stackless._stackless._wrap.code.__reduce__
+        reduced = reduce(code)
+        self.assertIsInstance(reduced, tuple)
+        self.assertEqual(len(reduced), 3)
+        self.assertIsInstance(reduced[1], tuple)
+        self.assertGreater(len(reduced[1]), 0)
+        self.assertIsInstance(reduced[1][0], int)
+        # see Python C-API documentation for PyImport_GetMagicNumber()
+        self.assertEqual(reduced[1][0], struct.unpack("<l", importlib.util.MAGIC_NUMBER)[0])
+
+    def test_new_with_wrong_magic(self):
+        code = (lambda :None).__code__
+        reduce = stackless._stackless._wrap.code.__reduce__
+        reduced = reduce(code)
+        args = (reduced[1][0] + 1,) + reduced[1][1:]
+        self.assertIsInstance(reduced[0](*reduced[1]), type(code))
+        self.assertRaisesRegex(ValueError, "Wrong magic number", reduced[0], *args)
 
 if __name__ == '__main__':
     if not sys.argv[1:]:
