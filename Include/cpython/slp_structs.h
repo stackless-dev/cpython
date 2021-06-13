@@ -13,7 +13,6 @@ extern "C" {
 
 #ifdef SLP_BUILD_CORE
 
-#include "frameobject.h"
 #if defined(MS_WIN32) && !defined(MS_WIN64) && defined(_M_IX86)
 #define SLP_SEH32
 #endif
@@ -237,22 +236,40 @@ typedef struct _channel {
     PyObject *chan_weakreflist;
 } PyChannelObject;
 
+struct _cframe;
+typedef PyObject *(PyFrame_ExecFunc) (struct _cframe *, int, PyObject *);
+/*
+ * How to write frame execution functions:
+ *
+ * Special rule for frame execution functions: the function owns a reference to retval!
+ *
+ *  PyObject * example(PyCFrameObject *f, int exc, PyObject *retval)
+ *  {
+ *     PyThreadState *ts = _PyThreadState_GET();
+ *
+ *     do something ....
+ *     if you change retval, use Py_SETREF(retval, new_value) or
+ *     Py_CLEAR(retval)
+ *
+ *     SLP_STORE_NEXT_FRAME(ts, f->f_back);
+ *     return retval;
+ *  }
+ *
+ */
 
 /*** important stuctures: cframe ***/
 
 typedef struct _cframe {
     PyObject_VAR_HEAD
     struct _frame *f_back;      /* previous frame, or NULL */
-    PyFrame_ExecFunc *f_execute;
 
     /*
-     * the above part is compatible with frames.
-     * Note that I have re-arranged some fields in the frames
-     * to keep cframes as small as possible.
+     * the above part is compatible with regular frames.
      */
 
-    /* these can be used as the CFrame likes to */
+    PyFrame_ExecFunc *f_execute;
 
+    /* these can be used as the CFrame likes to */
     PyObject *ob1;
     PyObject *ob2;
     PyObject *ob3;

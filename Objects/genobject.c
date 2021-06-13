@@ -166,7 +166,7 @@ gen_send_ex2(PyGenObject *gen, PyObject *arg, int exc, int closing, PyObject* ob
 
 /* callback for (async) generators and coroutines. */
 static PyObject *
-gen_iternext_callback(PyFrameObject *f, int exc, PyObject *result);
+gen_iternext_callback(PyCFrameObject *f, int exc, PyObject *result);
 
 /* Additional callback-code for async generators. */
 static PyObject *
@@ -310,8 +310,6 @@ gen_send_ex2(PyGenObject *gen, PyObject *arg, int exc, int closing, PyObject * o
     gen->gi_exc_state.previous_item = tstate->exc_info;
     tstate->exc_info = &gen->gi_exc_state;
 
-    f->f_execute = PyEval_EvalFrameEx_slp;
-
     Py_INCREF(gen);
     Py_XINCREF(arg);
     Py_XINCREF(ob3);
@@ -341,10 +339,10 @@ gen_send_ex2(PyGenObject *gen, PyObject *arg, int exc, int closing, PyObject * o
 }
 
 static PyObject*
-gen_iternext_callback(PyFrameObject *f, int exc, PyObject *result)
+gen_iternext_callback(PyCFrameObject *cf, int exc, PyObject *result)
 {
     PyThreadState *ts = _PyThreadState_GET();
-    PyCFrameObject *cf = (PyCFrameObject *) f;
+    PyFrameObject *f = (PyFrameObject *) cf;
     PyGenObject *gen = (PyGenObject *) cf->ob1;
     PyObject *arg = cf->ob2;
     PyObject *ob3 = cf->ob3;

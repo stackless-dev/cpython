@@ -620,9 +620,8 @@ _contextvars_Context_copy_impl(PyContext *self)
 
 
 #ifdef STACKLESS
-PyObject* slp_context_run_callback(PyFrameObject *f, int exc, PyObject *result)
+PyObject* slp_context_run_callback(PyCFrameObject *cf, int exc, PyObject *result)
 {
-    PyCFrameObject *cf = (PyCFrameObject *)f;
     PyObject *context = cf->ob1;
     cf->ob1 = NULL;
 

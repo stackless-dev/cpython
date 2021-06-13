@@ -843,12 +843,12 @@ void PyStackless_kill_tasks_with_stacks(int allthreads)
 /* cstack spilling for recursive calls */
 
 static PyObject *
-eval_frame_callback(PyFrameObject *f, int exc, PyObject *retval)
+eval_frame_callback(PyCFrameObject *cf, int exc, PyObject *retval)
 {
     PyThreadState *ts = _PyThreadState_GET();
     PyTaskletObject *cur = ts->st.current;
     PyCStackObject *cst;
-    PyCFrameObject *cf = (PyCFrameObject *) f;
+    PyFrameObject *f = (PyFrameObject *) cf;
     intptr_t *saved_base;
     Py_ssize_t tmp;
     int in_transfer;

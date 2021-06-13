@@ -19,15 +19,15 @@ int slp_find_execfuncs(PyTypeObject *type, PyObject *exec_name,
                                        PyFrame_ExecFunc **good,
                                        PyFrame_ExecFunc **bad);
 
-PyObject * slp_find_execname(PyFrameObject *f, int *valid);
+PyObject * slp_find_execname(PyCFrameObject *f, int *valid);
 
-PyObject * slp_cannot_execute(PyFrameObject *f, const char *exec_name, PyObject *retval);
+PyObject * slp_cannot_execute(PyCFrameObject *f, const char *exec_name, PyObject *retval);
 
 /* macros to define and use an invalid frame executor */
 
 #define SLP_DEF_INVALID_EXEC(procname) \
 static PyObject *\
-cannot_##procname(PyFrameObject *f, int exc, PyObject *retval) \
+cannot_##procname(PyCFrameObject *f, int exc, PyObject *retval) \
 { \
         return slp_cannot_execute(f, #procname, retval); \
 }

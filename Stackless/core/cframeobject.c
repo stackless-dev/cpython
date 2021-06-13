@@ -130,7 +130,7 @@ slp_cframe_new(PyFrame_ExecFunc *exec, unsigned int linked)
 #define cframetuplefmt "iOOll"
 #define cframetuplenewfmt "iOO!ll:cframe"
 
-static PyObject * execute_soft_switchable_func(PyFrameObject *, int, PyObject *);
+static PyObject * execute_soft_switchable_func(PyCFrameObject *, int, PyObject *);
 SLP_DEF_INVALID_EXEC(execute_soft_switchable_func)
 
 static PyObject *
@@ -153,7 +153,7 @@ cframe_reduce(PyCFrameObject *cf, PyObject *value)
         assert(PyStacklessFunctionDeclarationType_CheckExact(exec_name));
         Py_INCREF(exec_name);
         valid = cf->any1 == NULL;
-    } else if ((exec_name = slp_find_execname((PyFrameObject *) cf, &valid)) == NULL)
+    } else if ((exec_name = slp_find_execname(cf, &valid)) == NULL)
         return NULL;
 
     obs[0] = cf->ob1;
@@ -252,10 +252,10 @@ static PyMethodDef cframe_methods[] = {
 };
 
 
-static PyObject * run_cframe(PyFrameObject *f, int exc, PyObject *retval)
+static PyObject * run_cframe(PyCFrameObject *cf, int exc, PyObject *retval)
 {
     PyThreadState *ts = _PyThreadState_GET();
-    PyCFrameObject *cf = (PyCFrameObject*) f;
+    PyFrameObject *f = (PyFrameObject*) cf;
     PyTaskletObject *task = ts->st.current;
     int done = cf->i;
 
@@ -458,12 +458,11 @@ PyTypeObject PyStacklessFunctionDeclaration_Type = {
 
 static
 PyObject *
-execute_soft_switchable_func(PyFrameObject *f, int exc, PyObject *retval)
+execute_soft_switchable_func(PyCFrameObject *cf, int exc, PyObject *retval)
 {
     /*
      * Special rule for frame execution functions: we now own a reference to retval!
      */
-    PyCFrameObject *cf = (PyCFrameObject *)f;
     PyThreadState *ts = _PyThreadState_GET();
     PyObject *ob1, *ob2, *ob3;
     PyStacklessFunctionDeclarationObject *ssfd =

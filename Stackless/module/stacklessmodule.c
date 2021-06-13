@@ -1031,10 +1031,9 @@ Usage: Cf. test_cframe().");
 
 static
 PyObject *
-_test_cframe_nr_loop(PyFrameObject *f, int exc, PyObject *retval)
+_test_cframe_nr_loop(PyCFrameObject *cf, int exc, PyObject *retval)
 {
     PyThreadState *ts = _PyThreadState_GET();
-    PyCFrameObject *cf = (PyCFrameObject *) f;
 
     if (retval == NULL)
         goto exit_test_cframe_nr_loop;
