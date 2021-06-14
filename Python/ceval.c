@@ -3812,7 +3812,7 @@ exit_eval_frame:
 
 stackless_interrupt_call:
     /* interrupted during unwinding */
-
+    assert(f->f_executing == SLP_FRAME_EXECUTING_VALUE);
     f->f_executing = SLP_FRAME_EXECUTING_NOVAL;
     f->f_stacktop = stack_pointer;
 
