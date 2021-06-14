@@ -248,8 +248,7 @@ typedef PyObject *(PyFrame_ExecFunc) (struct _cframe *, int, PyObject *);
  *     PyThreadState *ts = _PyThreadState_GET();
  *
  *     do something ....
- *     if you change retval, use Py_SETREF(retval, new_value) or
- *     Py_CLEAR(retval)
+ *     If you change retval, use Py_SETREF(retval, new_value) or Py_CLEAR(retval).
  *
  *     SLP_STORE_NEXT_FRAME(ts, f->f_back);
  *     return retval;

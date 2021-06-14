@@ -782,7 +782,8 @@ void slp_head_unlock(void);
 
 long slp_parse_thread_id(PyObject *thread_id, unsigned long *id);
 
-/* Symbolic names for vaules stored in PyFrameObject.f_executing
+/*
+ * Symbolic names for values stored in PyFrameObject.f_executing
  *
  * Regular C-Python only uses two values
  * 0: the frame is not executing
@@ -792,8 +793,8 @@ long slp_parse_thread_id(PyObject *thread_id, unsigned long *id);
  * upon the next invocation of PyEval_EvalFrameEx_slp.
  */
 
-/* Set, if the frame was unpickled and had C-state on the stack. This frame can't
- * continue. PyEval_EvalFrameEx_slp must raise an exception.
+/* Frame is invalid and PyEval_EvalFrameEx_slp must raise an exception.
+ * Only set, if the frame was unpickled and had C-state on the stack.
  */
 #define SLP_FRAME_EXECUTING_INVALID (-1)
 
@@ -803,24 +804,29 @@ long slp_parse_thread_id(PyObject *thread_id, unsigned long *id);
 /* Frame is executing, value in retval is valid and must be pushed onto the stack. */
 #define SLP_FRAME_EXECUTING_VALUE 1
 
-/* Frame is executing, ignore value in retval. */
-#define SLP_FRAME_EXECUTING_NOVAL 2
-
 /* Frame is executing, continue opcode ITER */
-#define SLP_FRAME_EXECUTING_ITER 3
+#define SLP_FRAME_EXECUTING_ITER 2
 
 /* Frame is executing, continue opcode SETUP_WITH */
-#define SLP_FRAME_EXECUTING_SETUP_WITH 4
+#define SLP_FRAME_EXECUTING_SETUP_WITH 3
 
 /* Frame is executing, continue opcode WITH_CLEANUP */
-#define SLP_FRAME_EXECUTING_WITH_CLEANUP 5
+#define SLP_FRAME_EXECUTING_WITH_CLEANUP 4
 
 /* Frame is executing, continue opcode YIELD_FROM */
-#define SLP_FRAME_EXECUTING_YIELD_FROM 6
+#define SLP_FRAME_EXECUTING_YIELD_FROM 5
 
 /* Test, if the frame is executing */
 #define SLP_FRAME_IS_EXECUTING(frame_) \
-    ((frame_)->f_executing > 0 && (frame_)->f_executing <= SLP_FRAME_EXECUTING_YIELD_FROM)
+    ((frame_)->f_executing >= SLP_FRAME_EXECUTING_VALUE && \
+     (frame_)->f_executing <= SLP_FRAME_EXECUTING_YIELD_FROM)
+
+/*
+ * Frame execution just starts, ignore value in retval.
+ * This is a transient state, that shouldn't be observable.
+ */
+#define SLP_FRAME_EXECUTING_NOVAL 100
+
 
 #endif /* #ifdef SLP_BUILD_CORE */
 
