@@ -600,7 +600,8 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 do { \
     if (has_opcode) \
         next_instr -= 1 + EXTENDED_ARG_OFFSET(oparg); \
-    if (frame_func != SLP_FRAME_EXECUTING_NO) { \
+    assert(SLP_FRAME_EXECUTING_VALUE == f->f_executing); \
+    if (frame_func != SLP_FRAME_EXECUTING_VALUE) { \
         f->f_executing = (frame_func); \
     } \
     /* keep the reference to the frame to be called. */ \
@@ -634,7 +635,7 @@ do { \
     if (STACKLESS_UNWINDING(retval__)) \
         STACKLESS_UNPACK(tstate, (retval__)); \
     f->f_stacktop = NULL; \
-    if (frame_func != SLP_FRAME_EXECUTING_NO) { \
+    if (frame_func != SLP_FRAME_EXECUTING_VALUE) { \
         assert(f->f_executing == (frame_func)); \
     } \
     else { \
@@ -3450,7 +3451,7 @@ main_loop:
             }
 #ifdef STACKLESS
             if (STACKLESS_UNWINDING(res)) {
-                HANDLE_UNWINDING(SLP_FRAME_EXECUTING_NO, 0, res);
+                HANDLE_UNWINDING(SLP_FRAME_EXECUTING_VALUE, 0, res);
             }
 #endif
 
@@ -3468,7 +3469,7 @@ main_loop:
             stack_pointer = sp;
 #ifdef STACKLESS
             if (STACKLESS_UNWINDING(res)) {
-                HANDLE_UNWINDING(SLP_FRAME_EXECUTING_NO, 0, res);
+                HANDLE_UNWINDING(SLP_FRAME_EXECUTING_VALUE, 0, res);
             }
 #endif
             PUSH(res);
@@ -3489,7 +3490,7 @@ main_loop:
             Py_DECREF(names);
 #ifdef STACKLESS
             if (STACKLESS_UNWINDING(res)) {
-                HANDLE_UNWINDING(SLP_FRAME_EXECUTING_NO, 0, res);
+                HANDLE_UNWINDING(SLP_FRAME_EXECUTING_VALUE, 0, res);
             }
 #endif
             PUSH(res);
@@ -3542,7 +3543,7 @@ main_loop:
 #ifdef STACKLESS
             if (STACKLESS_UNWINDING(result)) {
                 (void) POP();  /* top of stack causes a GC related assertion error */
-                HANDLE_UNWINDING(SLP_FRAME_EXECUTING_NO, 0, result);
+                HANDLE_UNWINDING(SLP_FRAME_EXECUTING_VALUE, 0, result);
                 PUSH(result);
             } else
 #endif
