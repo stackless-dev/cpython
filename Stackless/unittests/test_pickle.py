@@ -548,8 +548,7 @@ class TestFramePickling(StacklessTestCase):
             self.assertIsInstance(cell, cell_type)
             self.assertIs(cell.cell_contents, result)
 
-    def testSetstateFailure(self):
-        # incomplete, just one of many failure modes of stackless._stackless._wrap.frame.__setstate__
+    def _test_setstate_prepare(self):
         foo = "foo"
 
         def f1(bar="bar"):
@@ -569,13 +568,42 @@ class TestFramePickling(StacklessTestCase):
 
         r = f2()
         self.assertEqual(len(r), 3)
+
+        # r is a tuple (frame_type, (f_code), (state))
+        # state is a tuple of the form
+        # ('f_code', 'valid', 'exec_name', 'f_globals', 'have_locals',
+        #  'f_locals', 'f_trace', 'f_lasti', 'f_lineno',
+        #  'blockstack_as_tuple', 'localsplus_as_tuple')
+        return r
+
+    def test_setstate_OK(self):
+        r = self._test_setstate_prepare()
         wrap_frame = r[0](*r[1])
         self.assertIsInstance(wrap_frame, stackless._stackless._wrap.frame)
-        invalid_state = r[2][:-2] + ((("Not a", "tuple of 3", "integers"),), r[2][-1])
-        self.assertRaisesRegex(TypeError, "an integer is required", wrap_frame.__setstate__, invalid_state)
         # must not raise an assertion
         wrap_frame.__setstate__(r[2])
         self.assertIs(type(wrap_frame), types.FrameType)
+
+    def test_setstate_invalid_blockstack(self):
+        r = self._test_setstate_prepare()
+        # incomplete, just one of many failure modes of stackless._stackless._wrap.frame.__setstate__
+        wrap_frame = r[0](*r[1])
+        invalid_state = r[2][:-2] + ((("Not a", "tuple of 3", "integers"),), r[2][-1])
+        self.assertRaisesRegex(TypeError, "an integer is required", wrap_frame.__setstate__, invalid_state)
+
+    def test_setstate_invalid_state(self):
+        r = self._test_setstate_prepare()
+        # incomplete, just one of many failure modes of stackless._stackless._wrap.frame.__setstate__
+        wrap_frame = r[0](*r[1])
+        invalid_state = ('completely', 'wrong')
+        self.assertRaisesRegex(TypeError, "takes exactly 11 arguments", wrap_frame.__setstate__, invalid_state)
+
+    def test_setstate_different_code(self):
+        r = self._test_setstate_prepare()
+        # incomplete, just one of many failure modes of stackless._stackless._wrap.frame.__setstate__
+        wrap_frame = r[0]((lambda:None).__code__)
+        invalid_state = r[2]
+        self.assertRaisesRegex(TypeError, "invalid code object for frame_setstate", wrap_frame.__setstate__, invalid_state)
 
 
 class TestDictViewPickling(StacklessPickleTestCase):

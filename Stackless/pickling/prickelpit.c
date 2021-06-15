@@ -977,8 +977,8 @@ err_exit:
     return res;
 }
 
-#define frametuplenewfmt "O!"
-#define frametuplesetstatefmt "O!iUO!iO!OiiO!O:frame_new"
+#define frametuplenewfmt "O!:frame.__new__"
+#define frametuplesetstatefmt "O!iUO!iO!OiiO!O:frame.__setstate__"
 
 static PyObject *
 frame_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -1023,7 +1023,6 @@ frame_setstate(PyFrameObject *f, PyObject *args)
 
     if (is_wrong_type(Py_TYPE(f))) return NULL;
 
-    Py_CLEAR(f->f_globals);
     Py_CLEAR(f->f_locals);
 
     if (!PyArg_ParseTuple (args, frametuplesetstatefmt,
@@ -1050,15 +1049,12 @@ frame_setstate(PyFrameObject *f, PyObject *args)
                            &bad_func))
         return NULL;
 
-    Py_CLEAR(f->f_locals);
-    Py_CLEAR(f->f_globals);
-
     if (have_locals) {
         Py_INCREF(f_locals);
         f->f_locals = f_locals;
     }
     Py_INCREF(f_globals);
-    f->f_globals = f_globals;
+    Py_SETREF(f->f_globals, f_globals);
 
     if (trace != Py_None) {
         if (!PyCallable_Check(trace)) {
