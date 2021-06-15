@@ -596,6 +596,18 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 #define LLTRACE_HANDLE_UNWINDING(obj__, msg__) (void)1
 #endif
 
+#if 1
+static inline int
+handle_unwinding(int lineno, PyFrameObject *f,
+        PyObject **stack_pointer, int oparg, PyThreadState *tstate,
+        const _Py_CODEUNIT *first_instr, const _Py_CODEUNIT *next_instr,
+        char frame_func, int has_opcode, PyObject **pretval);
+#define HANDLE_UNWINDING(frame_func, has_opcode, retval__) \
+    if (handle_unwinding(__LINE__, f, stack_pointer, oparg, tstate, \
+            first_instr, next_instr, (frame_func), (has_opcode), &(retval__)))\
+            return (retval__)
+#else
+/* keep the old macro in case of performance problems */
 #define HANDLE_UNWINDING(frame_func, has_opcode, retval__) \
 do { \
     if (has_opcode) \
@@ -623,8 +635,6 @@ do { \
         Py_DECREF(f2); \
         if (SLP_PEEK_NEXT_FRAME(tstate) != f) { \
             assert(SLP_FRAME_IS_EXECUTING(f)); \
-            if (f->f_executing == SLP_FRAME_EXECUTING_NOVAL) \
-                f->f_executing = SLP_FRAME_EXECUTING_VALUE; \
             LLTRACE_HANDLE_UNWINDING(STACKLESS_RETVAL((tstate), (retval__)), "handle_unwinding return from next frame:");\
             return (retval__); \
         } \
@@ -635,17 +645,13 @@ do { \
     if (STACKLESS_UNWINDING(retval__)) \
         STACKLESS_UNPACK(tstate, (retval__)); \
     f->f_stacktop = NULL; \
-    if (frame_func != SLP_FRAME_EXECUTING_VALUE) { \
-        assert(f->f_executing == (frame_func)); \
-    } \
-    else { \
-        assert(f->f_executing == SLP_FRAME_EXECUTING_VALUE || f->f_executing == SLP_FRAME_EXECUTING_NOVAL); \
-    } \
+    assert(f->f_executing == (frame_func)); \
     f->f_executing = SLP_FRAME_EXECUTING_VALUE; \
     if (has_opcode) \
         next_instr += 1 + EXTENDED_ARG_OFFSET(oparg); \
     LLTRACE_HANDLE_UNWINDING((retval__), "handle_unwinding end:");\
 } while(0)
+#endif
 
 /* To be called in the slp_continue_<xxxx> block, if
  * HANDLE_UNWINDING is used with has_opcode==1
@@ -3828,6 +3834,52 @@ stackless_interrupt_call:
 
 
 #ifdef STACKLESS
+static inline int
+handle_unwinding(int lineno, PyFrameObject *f,
+        PyObject **stack_pointer, int oparg, PyThreadState *tstate,
+        const _Py_CODEUNIT *first_instr, const _Py_CODEUNIT *next_instr,
+        char frame_func, int has_opcode, PyObject **pretval)
+{
+    if (has_opcode)
+        next_instr -= 1 + EXTENDED_ARG_OFFSET(oparg);
+    assert(SLP_FRAME_EXECUTING_VALUE == f->f_executing);
+    if (frame_func != SLP_FRAME_EXECUTING_VALUE) {
+        f->f_executing = frame_func;
+    }
+    /* keep the reference to the frame to be called. */
+    f->f_stacktop = stack_pointer;
+    /* Set f->f_lasti to the instruction before the current one or to the */
+    /* first instruction (-1). See "f->f_lasti refers to ..." above.      */
+    f->f_lasti = INSTR_OFFSET() != 0 ?
+            assert(INSTR_OFFSET() >= sizeof(_Py_CODEUNIT)),
+            (int)(INSTR_OFFSET() - sizeof(_Py_CODEUNIT)) : -1;
+    if (SLP_PEEK_NEXT_FRAME(tstate)->f_back != f) {
+        LLTRACE_HANDLE_UNWINDING(STACKLESS_RETVAL(tstate, *pretval), "handle_unwinding return:");
+        return 1;
+    }
+    STACKLESS_UNPACK(tstate, *pretval);
+    {
+        LLTRACE_HANDLE_UNWINDING(*pretval, "handle_unwinding call next frame:");
+        PyFrameObject *f2 = SLP_CLAIM_NEXT_FRAME(tstate);
+        *pretval = CALL_FRAME_FUNCTION(f2, 0, *pretval);
+        Py_DECREF(f2);
+        if (SLP_PEEK_NEXT_FRAME(tstate) != f) {
+            assert(SLP_FRAME_IS_EXECUTING(f));
+            LLTRACE_HANDLE_UNWINDING(STACKLESS_RETVAL(tstate, *pretval), "handle_unwinding return from next frame:");
+            return 1;
+        }
+        f2 = SLP_CLAIM_NEXT_FRAME(tstate);
+        assert(f == f2);
+        Py_DECREF(f2);
+    }
+    if (STACKLESS_UNWINDING(*pretval))
+        STACKLESS_UNPACK(tstate, *pretval);
+    f->f_stacktop = NULL;
+    assert(f->f_executing == frame_func);
+    f->f_executing = SLP_FRAME_EXECUTING_VALUE;
+    LLTRACE_HANDLE_UNWINDING(*pretval, "handle_unwinding end:");
+    return 0;
+}
 
 static PyObject *
 run_frame_dispatch(PyCFrameObject *cf, int exc, PyObject *retval)
