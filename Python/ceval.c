@@ -637,7 +637,7 @@ do { \
         (retval__) = CALL_FRAME_FUNCTION(f2, 0, (retval__)); \
         Py_DECREF(f2); \
         if (SLP_PEEK_NEXT_FRAME(tstate) != f) { \
-            assert(SLP_FRAME_IS_EXECUTING(f)); \
+            assert(f->f_executing == (frame_func)); \
             LLTRACE_HANDLE_UNWINDING(STACKLESS_RETVAL((tstate), (retval__)), "handle_unwinding return from next frame:");\
             return (retval__); \
         } \
@@ -3871,7 +3871,7 @@ handle_unwinding(int lineno, PyFrameObject *f,
         *pretval = CALL_FRAME_FUNCTION(f2, 0, *pretval);
         Py_DECREF(f2);
         if (SLP_PEEK_NEXT_FRAME(tstate) != f) {
-            assert(SLP_FRAME_IS_EXECUTING(f));
+            assert(f->f_executing == (frame_func));
             LLTRACE_HANDLE_UNWINDING(STACKLESS_RETVAL(tstate, *pretval), "handle_unwinding return from next frame:");
             return 1;
         }
