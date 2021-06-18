@@ -615,6 +615,9 @@ do { \
     assert(SLP_FRAME_EXECUTING_VALUE == f->f_executing); \
     if (frame_func != SLP_FRAME_EXECUTING_VALUE) { \
         f->f_executing = (frame_func); \
+        /* check argument: must be an executing frame with retval */ \
+        assert(frame_func != SLP_FRAME_EXECUTING_NOVAL); \
+        assert(SLP_FRAME_IS_EXECUTING(f)); \
     } \
     /* keep the reference to the frame to be called. */ \
     f->f_stacktop = stack_pointer; \
@@ -3840,11 +3843,15 @@ handle_unwinding(int lineno, PyFrameObject *f,
         const _Py_CODEUNIT *first_instr, const _Py_CODEUNIT *next_instr,
         char frame_func, int has_opcode, PyObject **pretval)
 {
+    assert(*pretval); /* check argument */
     if (has_opcode)
         next_instr -= 1 + EXTENDED_ARG_OFFSET(oparg);
     assert(SLP_FRAME_EXECUTING_VALUE == f->f_executing);
     if (frame_func != SLP_FRAME_EXECUTING_VALUE) {
         f->f_executing = frame_func;
+        /* check argument: must be an executing frame with retval */
+        assert(frame_func != SLP_FRAME_EXECUTING_NOVAL);
+        assert(SLP_FRAME_IS_EXECUTING(f));
     }
     /* keep the reference to the frame to be called. */
     f->f_stacktop = stack_pointer;
