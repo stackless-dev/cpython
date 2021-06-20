@@ -1536,7 +1536,9 @@ class Frame(object):
             try:
                 gdb.lookup_type("PyCFrameObject")
                 # it is Stackless Python
-                EVALFRAMEEX_FUNCTION_NAME = ('slp_eval_frame_value', 'PyEval_EvalFrame_value')
+                # - 'PyEval_EvalFrameEx_slp': Stackless starting from version 3.8.0a1
+                # - 'slp_eval_frame_value': versions released after Dec 2016
+                EVALFRAMEEX_FUNCTION_NAME = ('PyEval_EvalFrameEx_slp', 'slp_eval_frame_value')
             except gdb.error:
                 # regular CPython
                 EVALFRAMEEX_FUNCTION_NAME = (EVALFRAME,)

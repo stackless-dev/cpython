@@ -11,6 +11,11 @@ What's New in Stackless 3.X.X?
 
 - https://github.com/stackless-dev/stackless/issues/270
   Stackless now uses an unmodified PyFrameObject structure.
+  The internal C-function "slp_eval_frame_value" has been integrated into the
+  C-function "PyEval_EvalFrameEx_slp". As a consequence a gdb backtrace shows
+  "PyEval_EvalFrameEx_slp" instead of "slp_eval_frame_value". Because
+  "PyEval_EvalFrameEx_slp" invokes itself recursively to setup the C-stack,
+  you may observe two C stack frames for the first Python frame.
 
 - https://github.com/stackless-dev/stackless/issues/269
   A failure to unpickle a frame could cause a NULL pointer access when
