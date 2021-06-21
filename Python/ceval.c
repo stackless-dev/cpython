@@ -989,19 +989,22 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
     if (executing == SLP_FRAME_EXECUTING_INVALID) {
         --tstate->recursion_depth;
         return slp_cannot_execute((PyCFrameObject *)f, "PyEval_EvalFrameEx_slp", retval_arg);
-    } else if (f->f_executing != SLP_FRAME_EXECUTING_NO) {
+    } else if (f->f_executing != SLP_FRAME_EXECUTING_NO &&
+            f->f_executing != SLP_FRAME_EXECUTING_HOOK) {
         goto slp_setup_completed;
     }
 
     /* Check, if an extension module has changed tstate->interp->eval_frame.
      * PEP 523 defines this function pointer as an API to customise the frame
-     * evaluation. Stackless can not support this API. In order to prevent
-     * undefined behavior, we terminate the interpreter.
+     * evaluation. Stackless support this API and calls it, if it starts the
+     * evaluation of a frame.
      */
-    if (tstate->interp->eval_frame != _PyEval_EvalFrameDefault)
-        Py_FatalError("An extension module has set a custom frame evaluation function (see PEP 523).\n"
-                      "Stackless Python does not support the frame evaluation API defined by PEP 523.\n"
-                      "The programm now terminates to prevent undefined behavior.\n");
+    if (f->f_executing == SLP_FRAME_EXECUTING_NO &&
+            tstate->interp->eval_frame != _PyEval_EvalFrameDefault) {
+        Py_XDECREF(retval_arg);
+        f->f_executing = SLP_FRAME_EXECUTING_HOOK;
+        return PyEval_EvalFrameEx(f, throwflag);
+    }
 
     if (SLP_CSTACK_SAVE_NOW(tstate, f))
         return slp_eval_frame_newstack(f, throwflag, retval_arg);
@@ -3966,6 +3969,7 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
     }
     if (PyFrame_Check(f)) {
         if (!(f->f_executing == SLP_FRAME_EXECUTING_NO ||
+              f->f_executing == SLP_FRAME_EXECUTING_HOOK ||
                 SLP_FRAME_IS_EXECUTING(f))) {
             PyErr_BadInternalCall();
             return NULL;
@@ -3986,6 +3990,10 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
         Py_INCREF(Py_None);
         retval = Py_None;
     }
+
+    if (f->f_executing == SLP_FRAME_EXECUTING_HOOK)
+        /* Used, if a eval_frame-hook is installed */
+        return PyEval_EvalFrameEx_slp(f, throwflag, retval);
 
     /* test, if the stackless system has been initialized. */
     if (tstate->st.main == NULL) {
