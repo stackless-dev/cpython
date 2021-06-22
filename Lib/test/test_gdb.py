@@ -741,11 +741,8 @@ $''')
     @unittest.skipUnless(HAS_PYUP_PYDOWN, "test requires py-up/py-down commands")
     def test_up_at_top(self):
         'Verify handling of "py-up" at the top of the stack'
-        n = 5
-        if support.stackless:
-            n += 1
         bt = self.get_stack_trace(script=self.get_sample_script(),
-                                  cmds_after_breakpoint=['py-up'] * n)
+                                  cmds_after_breakpoint=['py-up'] * 5)
         self.assertEndsWith(bt,
                             'Unable to find an older python frame\n')
 
