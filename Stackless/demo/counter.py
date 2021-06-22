@@ -10,9 +10,9 @@
 import random
 from stackless import *
 
-numbers = range(20)
+numbers = list(range(20))
 random.shuffle(numbers)
-print numbers
+print(numbers)
 # [16, 13, 12, 5, 6, 4, 7, 1, 9, 17, 15, 14, 10, 8, 0, 3, 11, 18, 2, 19]
 
 
@@ -28,4 +28,4 @@ for each in numbers:
 stackless.run()
 # now we should have a sorted chain of results in ch
 while ch.queue:
-    print ch.receive()
+    print(ch.receive())
