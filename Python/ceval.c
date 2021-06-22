@@ -989,7 +989,7 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
     if (executing == SLP_FRAME_EXECUTING_INVALID) {
         --tstate->recursion_depth;
         return slp_cannot_execute((PyCFrameObject *)f, "PyEval_EvalFrameEx_slp", retval_arg);
-    } else if (f->f_executing != SLP_FRAME_EXECUTING_NO) {
+    } else if (executing != SLP_FRAME_EXECUTING_NO) {
         goto slp_setup_completed;
     }
 
