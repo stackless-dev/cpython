@@ -57,7 +57,7 @@ Tasklets
 
   Binds a tasklet to a function and/or to parameters, making it ready to run. This is the C equivalent to
   method :py:meth:`tasklet.bind`. The arguments *func*, *args* and *kwargs* are optional and
-  may be ``NULL`` or `Py_None`. Returns ``0`` if successful or ``-1`` in the case of failure.
+  may be ``NULL`` or :c:data:`Py_None`. Returns ``0`` if successful or ``-1`` in the case of failure.
 
 .. c:function:: int PyTasklet_BindThread(PyTaskletObject *task, unsigned long thread_id)
 
@@ -337,7 +337,7 @@ Module :py:mod:`stackless`
 
   Runs the scheduler until there are no tasklets remaining within it, or until
   one of the scheduled tasklets runs for *timeout* VM instructions without
-  blocking.  Returns *None* if the scheduler is empty, a tasklet object if that
+  blocking.  Returns :c:data:`Py_None` if the scheduler is empty, a tasklet object if that
   tasklet timed out, or *NULL* in the case of failure.  If a timed out tasklet
   is returned, it should be killed or reinserted.
 
@@ -361,7 +361,7 @@ Module :py:mod:`stackless`
   ``PY_WATCHDOG_SOFT``
      Instead of interrupting a tasklet, we wait until the
      next tasklet scheduling moment to return.  Always returns
-     *Py_None*, as everything is in order.
+     :c:data:`Py_None`, as everything is in order.
 
   ``PY_WATCHDOG_IGNORE_NESTING``
      Allows interrupts at all levels, effectively acting as

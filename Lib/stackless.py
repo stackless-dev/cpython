@@ -7,14 +7,6 @@ import types
 
 import _stackless
 from _stackless import *
-# various debugging things starting with underscore
-from _stackless import _test_nostacklesscall, _pickle_moduledict, _gc_track, _gc_untrack
-try:
-    from _stackless import _peek  # defined if compiled with STACKLESS_SPY
-except ImportError: pass
-try:
-    from _stackless import _get_refinfo, _get_all_objects  # defined if compiled with Py_TRACE_REFS
-except ImportError: pass
 
 def __reduce__():
     return "stackless"
@@ -24,6 +16,7 @@ def __reduce_ex__(*args):
 PICKLEFLAGS_PRESERVE_TRACING_STATE = 1
 PICKLEFLAGS_PRESERVE_AG_FINALIZER = 2
 PICKLEFLAGS_RESET_AG_FINALIZER = 4
+PICKLEFLAGS_PICKLE_CONTEXT = 8
 
 # Backwards support for unpickling older pickles, even from 2.7
 from _stackless import _wrap
@@ -71,6 +64,37 @@ __all__ = ['atomic',
 # these definitions have no function, but they help IDEs (i.e. PyDev) to recognise
 # expressions like "stackless.current" as well defined.
 current = runcount = main = debug = uncollectables = threads = pickle_with_tracing_state = None
+
+def _tasklet_get_unpicklable_state(tasklet):
+    """Get a dict with additional state, that can't be pickled
+
+    The method tasklet.__reduce_ex__() returns the picklable state and this
+    function returns a tuple containing the rest.
+
+    The items in the return value are:
+    'context': the context of the tasklet
+
+    Additional items may be added later.
+
+    Note: this function has been added on a provisional basis (see :pep:`411` for details.)
+    """
+    if not isinstance(tasklet, _stackless.tasklet):
+        raise TypeError("Argument must be a tasklet")
+
+    with atomic():
+        if tasklet.is_current or tasklet.thread_id != _stackless.current.thread_id:
+            # - A current tasklet can't be reduced.
+            # - We can't set pickle_flags for a foreign thread
+            # To mitigate these problems, we copy the context to a new tasklet
+            # (implicit copy by tasklet.__init__(callable, ...)) and reduce the new
+            # context instead
+            tasklet = tasklet.context_run(_stackless.tasklet, id)  # "id" is just an arbitrary callable
+
+        flags = pickle_flags(PICKLEFLAGS_PICKLE_CONTEXT, PICKLEFLAGS_PICKLE_CONTEXT)
+        try:
+            return {'context': tasklet.__reduce__()[2][8]}
+        finally:
+            pickle_flags(flags, PICKLEFLAGS_PICKLE_CONTEXT)
 
 def transmogrify():
     """
@@ -165,7 +189,7 @@ def transmogrify():
 
     m = StacklessModuleType("stackless", __doc__)
     m.__dict__.update(globals())
-    del m.transmogrify, m.types, m.sys
+    del m.transmogrify, m.types, m.sys, m._wrap
 
     # odd curiosity, the stackless module contains a reference to itself
     # deprecated, of course

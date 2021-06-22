@@ -118,7 +118,7 @@ Ensuring the interrupted tasklet resumes::
 
     if t is not None:
         t.insert()
-    
+
 Interrupted tasklets are no longer in the scheduler.  We do not know what this
 tasklet was doing, and to leave it uncompleted may depending on our application
 be unacceptable.  The call to :meth:`tasklet.insert` puts the it at the
@@ -282,15 +282,15 @@ Run the scheduler for ``100`` instructions::
 
     t = stackless.run(100)
 
-There are two things to note here, if *t* is ``None`` then there are no
-tasklets in the scheduler to run.  If *t* is not ``None``, then it is an
+There are two things to note here, if *t* is :data:`None` then there are no
+tasklets in the scheduler to run.  If *t* is not :data:`None`, then it is an
 interrupted tasklet that needs to be reinserted into the scheduler.
 
 Detect an empty scheduler::
 
     if t is None:
         break
-        
+
 It may be that an empty scheduler indicates that all the work is done, or it
 may not.  How this work is actually handled depends on the implementation
 details of your solution.
@@ -298,7 +298,7 @@ details of your solution.
 Reinsert the interrupted tasklet::
 
     t.insert()
-    
+
 .. note::
 
     You are not running the scheduler for ``100`` instructions, you are
@@ -404,7 +404,7 @@ Example - monkey-patching the tasklet creation process::
 
          self.tempval = new_f
          stackless.tasklet.setup(self, f, args, kwargs)
-        
+
     stackless.tasklet.__call__ = __call__
 
     stackless.tasklet(some_function)(1, 2, 3, key=value)

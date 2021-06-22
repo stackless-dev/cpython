@@ -10,4 +10,4 @@ For other changes see :ref:`whatsnew-index`.
 .. include:: ../../Stackless/changelog.txt
    :literal:
    :encoding: utf-8
-   
+

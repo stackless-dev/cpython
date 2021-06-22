@@ -108,12 +108,32 @@ different address than *t1*, which was displayed earlier.
     objects and frame objects contain code objects. And code objects are
     usually incompatible between different minor versions of |CPY|.
 
+.. note::
+
+    If you pickle a tasklet, its :class:`~contextvars.Context` won't be pickled,
+    because :class:`~contextvars.Context` objects can't be pickled. See
+    :pep:`567` for an explanation.
+
+    It is sometimes possible enable pickling of :class:`~contextvars.Context` objects
+    in an application specific way (see for instance: :func:`copyreg.pickle` or
+    :attr:`pickle.Pickler.dispatch_table` or :attr:`pickle.Pickler.persistent_id`).
+    Such an application can set the pickle flag
+    :const:`~stackless.PICKLEFLAGS_PICKLE_CONTEXT` to include the
+    context in the pickled state of a tasklet.
+
+    Another option is to subclass :class:`tasklet` and overload the methods
+    :meth:`tasklet.__reduce_ex__` and :meth:`tasklet.__setstate__` to
+    pickle the values of particular :class:`~contextvars.ContextVar` objects together
+    with the tasklet.
+
+
 ======================
 Pickling other objects
 ======================
 
 In order to be able to pickle tasklets |SLP| needs to be able to pickle
-several other objects, which can't be pickled by |CPY|. |SLP|
+several other objects, which can't be pickled by |CPY|. If the module
+:mod:`stackless` gets imported for the first time, |SLP|
 uses :func:`copyreg.pickle` to register “reduction” functions for the following
 types:
 :data:`~types.AsyncGeneratorType`,

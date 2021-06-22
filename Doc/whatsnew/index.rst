@@ -12,6 +12,7 @@ anyone wishing to stay up-to-date after a new release.
    :maxdepth: 2
 
    stackless.rst
+   3.8.rst
    3.7.rst
    3.6.rst
    3.5.rst

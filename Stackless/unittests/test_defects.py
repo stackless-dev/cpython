@@ -12,7 +12,7 @@ try:
 except:
     withThreads = False
 
-from stackless import _test_nostacklesscall as apply_not_stackless
+from _stackless import _test_nostacklesscall as apply_not_stackless
 from support import test_main  # @UnusedImport
 from support import (StacklessTestCase, captured_stderr, require_one_thread,
                      get_reduce_frame)
@@ -91,7 +91,7 @@ class TestTaskletDel(StacklessTestCase):
 
     @unittest.skipUnless(withThreads, "requires thread support")
     def test_tasklet_dealloc_in_thread_shutdown(self):
-        # Test for https://bitbucket.org/stackless-dev/stackless/issues/89
+        # Test for https://github.com/stackless-dev/stackless/issues/89
         def other_thread_main():
             # print("other thread started")
             self.assertIs(stackless.main, stackless.current)
@@ -214,7 +214,7 @@ class TestInfiniteRecursion(StacklessTestCase):
 class TestExceptionInScheduleCallback(StacklessTestCase):
     # Problem
     # Assertion failed: ts->st.current == NULL, file ..\Stackless\module\taskletobject.c, line 51
-    # See https://bitbucket.org/stackless-dev/stackless/issue/38
+    # See https://github.com/stackless-dev/stackless/issue/38
 
     def scheduleCallback(self, prev, next):
         if next.is_main:
@@ -249,7 +249,7 @@ class TestCrashUponFrameUnpickling(StacklessTestCase):
         self.assertIsNone(f_back)
 
     def testMissingLocalsplusCrasher(self):
-        # A test case for issue #61 https://bitbucket.org/stackless-dev/stackless/issue/61
+        # A test case for issue #61 https://github.com/stackless-dev/stackless/issue/61
         #
         # Some versions of stackless create pickles of frames with the localsplus tuple set to None.
         # This test creates a frame with localsplus=None and ensures that Python does not crash upon
@@ -258,13 +258,13 @@ class TestCrashUponFrameUnpickling(StacklessTestCase):
             result = []
 
             def func(current):
-                result.append(stackless._wrap.frame.__reduce__(current.frame))
+                result.append(stackless._stackless._wrap.frame.__reduce__(current.frame))
             stackless.tasklet().bind(func, (stackless.current,)).run()
             return result[0]
 
         func, args, state = reduce_current()
         # state is a tuple of the form
-        # ('f_code', 'valid', 'exec_name', 'f_globals', 'have_locals',
+        # ('f_code', 'valid', 'f_executing', 'f_globals', 'have_locals',
         #  'f_locals', 'f_trace', 'f_lasti', 'f_lineno',
         #  'blockstack_as_tuple', 'localsplus_as_tuple')
         self.assertEqual(len(state), 11)
@@ -290,11 +290,11 @@ class TestCrashUponFrameUnpickling(StacklessTestCase):
 class TestShutdown(StacklessTestCase):
 
     def test_cstack_new(self):
-        # test for issue #80 https://bitbucket.org/stackless-dev/stackless/issues/80/
+        # test for issue #80 https://github.com/stackless-dev/stackless/issues/80/
         import subprocess
         rc = subprocess.call([sys.executable, "-s", "-S", "-E", "-c", """if 1:
             import stackless, sys
-            from stackless import _test_nostacklesscall as apply_not_stackless
+            from _stackless import _test_nostacklesscall as apply_not_stackless
 
             def func():
                 global channel
@@ -311,7 +311,7 @@ class TestShutdown(StacklessTestCase):
 
     @unittest.skipUnless(withThreads, "requires thread support")
     def test_interthread_kill(self):
-        # test for issue #87 https://bitbucket.org/stackless-dev/stackless/issues/87/
+        # test for issue #87 https://github.com/stackless-dev/stackless/issues/87/
         import subprocess
         rc = subprocess.call([sys.executable, "-s", "-S", "-E", "-c", """from __future__ import print_function, absolute_import\nif 1:
             import sys
@@ -319,7 +319,7 @@ class TestShutdown(StacklessTestCase):
             import stackless
             import os
             import time
-            from stackless import _test_nostacklesscall as apply_not_stackless
+            from _stackless import _test_nostacklesscall as apply_not_stackless
 
             # This lock is used as a simple event variable.
             ready = thread.allocate_lock()
@@ -372,7 +372,7 @@ class TestShutdown(StacklessTestCase):
 
     @unittest.skipUnless(withThreads, "requires thread support")
     def test_tasklet_end_with_wrong_recursion_level(self):
-        # test for issue #91 https://bitbucket.org/stackless-dev/stackless/issues/91/
+        # test for issue #91 https://github.com/stackless-dev/stackless/issues/91/
         """A test for issue #91, wrong recursion level after tasklet re-binding
 
         Assertion failed: ts->recursion_depth == 0 || (ts->st.main == NULL && prev == next), file ../Stackless/module/scheduling.c, line 1291
@@ -421,7 +421,7 @@ class TestShutdown(StacklessTestCase):
 class TestStacklessProtokoll(StacklessTestCase):
     """Various tests for violations of the STACKLESS_GETARG() STACKLESS_ASSERT() protocol
 
-    See https://bitbucket.org/stackless-dev/stackless/issues/84
+    See https://github.com/stackless-dev/stackless/issues/84
     """
     def test_invalid_args_channel_next(self):
         """test of typeobject.c wrap_next(...)"""
@@ -470,7 +470,7 @@ class TestCPickleBombHandling(StacklessTestCase):
         # which is fast-pickling a recursive structure. This leads to an
         # infinite recursion, which gets interrupted by a bomb thrown from
         # main-thread. Until issue #98 got fixed, this caused a crash.
-        # See https://bitbucket.org/stackless-dev/stackless/issues/98
+        # See https://github.com/stackless-dev/stackless/issues/98
         buf = BytesIO()
         import _pickle as pickle
         pickler = pickle.Pickler(buf, protocol=-1)
@@ -498,7 +498,7 @@ class TestCPickleBombHandling(StacklessTestCase):
 class TestFrameClear(StacklessTestCase):
     def test_frame_clear(self):
         # a test for Stackless issue #66
-        # https://bitbucket.org/stackless-dev/stackless/issues/66
+        # https://github.com/stackless-dev/stackless/issues/66
         def generator():
             yield None
 
@@ -544,7 +544,7 @@ class TestContextManager(StacklessTestCase):
 
 
 class TestUnwinding(StacklessTestCase):
-    # a test case for https://bitbucket.org/stackless-dev/stackless/issues/119
+    # a test case for https://github.com/stackless-dev/stackless/issues/119
     # The macros STACKLESS_PACK(retval) / STACKLESS_UNPACK(retval) are not thread
     # safe. And thread switching can occur, if a destructor runs during stack unwinding.
 
@@ -644,6 +644,32 @@ class TestUnwinding(StacklessTestCase):
             t.join(.5)
             # print("called func", file=sys.stderr)
         self.assertEqual(r, 4711)
+
+
+class TestTaskletSetstate(StacklessTestCase):
+    # a test case for https://github.com/stackless-dev/stackless/issues/241
+
+    def test_setstate_not_alive(self):
+        state = stackless.tasklet().__reduce__()[2]
+        t = stackless.tasklet()
+        self.assertFalse(t.alive)
+        self.assertIs(t.__setstate__(state), t)
+        t.bind()  # unbind t
+
+    def test_setstate_alive(self):
+        state = stackless.tasklet().__reduce__()[2]
+        t = stackless.tasklet(lambda: None,())
+        self.assertTrue(t.alive)
+        self.assertRaisesRegex(RuntimeError, "tasklet is alive", t.__setstate__, state)
+
+
+class TestTaskletBindArgumentTypes(StacklessTestCase):
+    # a test case for https://github.com/stackless-dev/stackless/issues/245
+    def test_bind_args(self):
+        self.assertRaisesRegex(TypeError, "tasklet args must be a tuple or None", stackless.tasklet, lambda:None, 123)
+
+    def test_bind_kwargs(self):
+        self.assertRaisesRegex(TypeError, "tasklet kwargs must be a dictionary or None", stackless.tasklet, lambda:None, None, 456)
 
 
 if __name__ == '__main__':

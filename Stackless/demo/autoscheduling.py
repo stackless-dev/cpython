@@ -24,7 +24,7 @@ if __name__ == "__main__":
         return rval
 
     def print_name(name, count):
-        print name, count
+        print(name, count)
 
     # Helpers
     def runtask(name):

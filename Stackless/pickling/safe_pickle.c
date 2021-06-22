@@ -4,20 +4,20 @@
 #include "compile.h"
 
 #define SLP_BUILD_CORE
-#include "internal/stackless_impl.h"
-#include "internal/slp_platformselect.h"
+#include "pycore_stackless.h"
+#include "pycore_slp_platformselect.h"
 
 /* safe pickling */
 
 static int(*cPickle_save)(PyObject *, PyObject *, int) = NULL;
 
 static PyObject *
-pickle_callback(PyFrameObject *f, int exc, PyObject *retval)
+pickle_callback(PyCFrameObject *cf, int exc, PyObject *retval)
 {
     PyThreadState *ts = PyThreadState_GET();
     PyTaskletObject *cur = ts->st.current;
     PyCStackObject *cst;
-    PyCFrameObject *cf = (PyCFrameObject *) f;
+    PyFrameObject *f = (PyFrameObject *) cf;
     intptr_t *saved_base;
 
     /* store and update thread state */
@@ -108,7 +108,7 @@ static PyObject *_self, *_args;
 static int _pers_save;
 
 static PyObject *
-pickle_runmain(PyFrameObject *f, int exc, PyObject *retval)
+pickle_runmain(PyCFrameObject *f, int exc, PyObject *retval)
 {
     PyThreadState *ts = PyThreadState_GET();
     Py_XDECREF(retval);

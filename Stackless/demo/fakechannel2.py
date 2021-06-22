@@ -39,16 +39,16 @@ class MyChannel:
 def f1(ch):
     for i in range(5):
         ch.send(i)
-    print "done sending"
+    print("done sending")
 
 
 def f2(ch):
     while 1:
         data = ch.receive()
         if data is None:
-            print "done receiving"
+            print("done receiving")
             return
-        print "received", data
+        print("received", data)
 
 
 def test():

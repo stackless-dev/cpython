@@ -494,11 +494,11 @@ exit:
 static PyMethodDef _teststackless_methods[] = {
     {"softswitchablefunc",             _teststackless_softswitchabledemo,         METH_VARARGS | METH_STACKLESS,
     _teststackless_softswitchabledemo_doc},
-    { "test_cframe", (PyCFunction) test_cframe, METH_VARARGS | METH_KEYWORDS,
+    { "test_cframe", (PyCFunction)(void(*)(void))test_cframe, METH_VARARGS | METH_KEYWORDS,
     test_cframe__doc__ },
     { "test_cstate", (PyCFunction) test_cstate, METH_O,
     test_cstate__doc__ },
-    { "test_PyEval_EvalFrameEx", (PyCFunction) test_PyEval_EvalFrameEx, METH_VARARGS | METH_KEYWORDS,
+    { "test_PyEval_EvalFrameEx", (PyCFunction)(void(*)(void))test_PyEval_EvalFrameEx, METH_VARARGS | METH_KEYWORDS,
     test_PyEval_EvalFrameEx__doc__ },
     {NULL,              NULL}           /* sentinel */
 };

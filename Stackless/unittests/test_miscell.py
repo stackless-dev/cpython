@@ -12,7 +12,8 @@ import time
 import os
 import struct
 import gc
-from stackless import _test_nostacklesscall as apply_not_stackless
+import contextvars
+from _stackless import _test_nostacklesscall as apply_not_stackless
 import _teststackless
 
 try:
@@ -168,7 +169,7 @@ class TestTaskletSwitching(StacklessTestCase):
         self.assertEqual(flag[0], True)
 
     def test_switch_to_current(self):
-        # See https://bitbucket.org/stackless-dev/stackless/issues/88
+        # See https://github.com/stackless-dev/stackless/issues/88
         current = stackless.current
         current.switch()
         current.switch()  # this second switch used to trigger an assertion violation
@@ -1136,7 +1137,7 @@ class TestBind(StacklessTestCase):
     @unittest.skipUnless(withThreads, "requires thread support")
     @testcase_leaks_references("Tasklet chatches TaskletExit and refuses to die in its thread")
     def test_unbind_fail_cstate_no_thread(self):
-        # https://bitbucket.org/stackless-dev/stackless/issues/92
+        # https://github.com/stackless-dev/stackless/issues/92
         loop = True
 
         def task():
@@ -1166,7 +1167,7 @@ class TestBind(StacklessTestCase):
 
     def test_setup_fail_alive(self):
         # make sure, that you can't bind a tasklet, which is alive
-        # https://bitbucket.org/stackless-dev/stackless/issues/106
+        # https://github.com/stackless-dev/stackless/issues/106
 
         def task():
             t = stackless.current
@@ -1328,6 +1329,484 @@ class TestTaskletFinalizer(StacklessTestCase):
         # clean up
         loop = False
         t.kill()
+
+
+class TestTaskletContext(AsTaskletTestCase):
+    cvar = contextvars.ContextVar('TestTaskletContext', default='unset')
+
+    def test_contexct_id(self):
+        ct = stackless.current
+
+        # prepare a context
+        sentinel = object()
+        self.cvar.set(sentinel)  # make sure, a context is active
+        self.assertIsInstance(ct.context_id, int)
+
+        # no context
+        t = stackless.tasklet()  # new tasklet without context
+        self.assertEqual(t.context_run(self.cvar.get), "unset")
+
+        # known context
+        ctx = contextvars.Context()
+        self.assertNotEqual(id(ctx), ct.context_id)
+        self.assertIs(ctx.run(stackless.getcurrent), ct)
+        cid = ctx.run(getattr, ct, "context_id")
+        self.assertEqual(id(ctx), cid)
+
+    def test_set_context_same_thread_not_current(self):
+        # same thread, tasklet is not current
+
+        # prepare a context
+        ctx = contextvars.Context()
+        sentinel = object()
+        ctx.run(self.cvar.set, sentinel)
+
+        tasklet_started = False
+        t = stackless.tasklet()
+        def task():
+            nonlocal tasklet_started
+            self.assertEqual(t.context_id, id(ctx))
+            tasklet_started = True
+
+        t.bind(task)()
+
+        # set the context
+        t.set_context(ctx)
+
+        # validate the context
+        stackless.run()
+        self.assertTrue(tasklet_started)
+
+    def test_set_context_same_thread_not_current_entered(self):
+        # prepare a context
+        sentinel = object()
+        ctx = contextvars.Context()
+        ctx.run(self.cvar.set, sentinel)
+        tasklet_started = False
+
+        t = stackless.tasklet()
+        def task():
+            nonlocal tasklet_started
+            self.assertEqual(t.context_id, id(ctx))
+            tasklet_started = True
+            stackless.schedule_remove()
+            self.assertEqual(t.context_id, id(ctx))
+
+        t.bind(ctx.run)(task)
+        stackless.run()
+        self.assertTrue(tasklet_started)
+        self.assertTrue(t.alive)
+        self.assertIsNot(t, stackless.current)
+        self.assertRaisesRegex(RuntimeError, "the current context of the tasklet has been entered",
+                               t.set_context, contextvars.Context())
+        t.insert()
+        stackless.run()
+
+    def test_set_context_same_thread_current(self):
+        # same thread, current tasklet
+
+        # make sure a context exists
+        sentinel = object()
+        self.cvar.set(sentinel)
+        self.assertIs(self.cvar.get(), sentinel)
+        self.assertIsInstance(stackless.current.context_id, int)
+
+        # prepare another context
+        sentinel2 = object()
+        ctx = contextvars.Context()
+        ctx.run(self.cvar.set, sentinel2)
+        self.assertNotEqual(stackless.current.context_id, id(ctx))
+
+        # change the context of the current tasklet
+        stackless.current.set_context(ctx)
+
+        # check that the new context is the context of the current tasklet
+        self.assertEqual(stackless.current.context_id, id(ctx))
+        self.assertIs(self.cvar.get(), sentinel2)
+
+    def test_set_context_same_thread_current_entered(self):
+        # entered current context on the same thread
+        sentinel = object()
+        self.cvar.set(sentinel)
+        cid = stackless.current.context_id
+        self.assertRaisesRegex(RuntimeError, "the current context of the tasklet has been entered",
+                               contextvars.Context().run, stackless.current.set_context, contextvars.Context())
+        self.assertEqual(stackless.current.context_id, cid)
+        self.assertIs(self.cvar.get(), sentinel)
+
+    def test_set_context_other_thread_paused(self):
+        # other thread, tasklet is not current
+        # prepare a context
+        ctx = contextvars.Context()
+        sentinel = object()
+        ctx.run(self.cvar.set, sentinel)
+
+        tasklet_started = False
+        t = stackless.tasklet()
+        def task():
+            nonlocal tasklet_started
+            self.assertEqual(t.context_id, id(ctx))
+            tasklet_started = True
+
+        t.bind(task, ())  # paused
+
+        # set the context
+        thr = threading.Thread(target=t.set_context, args=(ctx,), name="other thread")
+        thr.start()
+        thr.join()
+
+        # validate the context
+        t.insert()
+        stackless.run()
+        self.assertTrue(tasklet_started)
+
+    def test_set_context_other_thread_scheduled(self):
+        # other thread, tasklet is not current
+        # prepare a context
+        ctx = contextvars.Context()
+        sentinel = object()
+        ctx.run(self.cvar.set, sentinel)
+
+        tasklet_started = False
+        t = stackless.tasklet()
+        def task():
+            nonlocal tasklet_started
+            self.assertEqual(t.context_id, id(ctx))
+            tasklet_started = True
+
+        t.bind(task)()  # scheduled
+        t.set_context(ctx)
+
+        # set the context
+        got_exception = None
+        def other_thread():
+            nonlocal got_exception
+            try:
+                t.set_context(contextvars.Context())
+            except RuntimeError as e:
+                got_exception = e
+        thr = threading.Thread(target=other_thread, name="other thread")
+        thr.start()
+        thr.join()
+
+        # validate the result
+        self.assertIsInstance(got_exception, RuntimeError)
+        with self.assertRaisesRegex(RuntimeError, "tasklet belongs to a different thread"):
+            raise got_exception
+
+        stackless.run()
+        self.assertTrue(tasklet_started)
+
+    def test_set_context_other_thread_not_current_entered(self):
+        # prepare a context
+        sentinel = object()
+        ctx = contextvars.Context()
+        ctx.run(self.cvar.set, sentinel)
+        tasklet_started = False
+
+        t = stackless.tasklet()
+        def task():
+            nonlocal tasklet_started
+            self.assertEqual(t.context_id, id(ctx))
+            tasklet_started = True
+            stackless.schedule_remove()
+            self.assertEqual(t.context_id, id(ctx))
+
+        t.bind(ctx.run)(task)
+        stackless.run()
+        self.assertTrue(tasklet_started)
+        self.assertTrue(t.alive)
+        self.assertIsNot(t, stackless.current)
+
+        # set the context
+        got_exception = None
+        def other_thread():
+            nonlocal got_exception
+            try:
+                t.set_context(contextvars.Context())
+            except RuntimeError as e:
+                got_exception = e
+        thr = threading.Thread(target=other_thread, name="other thread")
+        thr.start()
+        thr.join()
+
+        # validate the result
+        self.assertIsInstance(got_exception, RuntimeError)
+        with self.assertRaisesRegex(RuntimeError, "the current context of the tasklet has been entered"):
+            raise got_exception
+        t.insert()
+        stackless.run()
+
+    def test_set_context_other_thread_current(self):
+        # other thread, current tasklet
+
+        # make sure a context exists
+        sentinel = object()
+        self.cvar.set(sentinel)
+        self.assertIs(self.cvar.get(), sentinel)
+        cid = stackless.current.context_id
+
+        t = stackless.current
+        # set the context
+        got_exception = None
+        def other_thread():
+            nonlocal got_exception
+            try:
+                t.set_context(contextvars.Context())
+            except RuntimeError as e:
+                got_exception = e
+
+        thr = threading.Thread(target=other_thread, name="other thread")
+        thr.start()
+        thr.join()
+
+        self.assertIsInstance(got_exception, RuntimeError)
+        with self.assertRaisesRegex(RuntimeError, "tasklet belongs to a different thread"):
+            raise got_exception
+        self.assertEqual(stackless.current.context_id, cid)
+
+    def test_set_context_other_thread_current_entered(self):
+        # entered current context on other thread
+
+        t = stackless.current
+        # set the context
+        got_exception = None
+        def other_thread():
+            nonlocal got_exception
+            try:
+                t.set_context(contextvars.Context())
+            except RuntimeError as e:
+                got_exception = e
+
+        thr = threading.Thread(target=other_thread, name="other thread")
+
+        # prepare a context
+        sentinel = object()
+        ctx = contextvars.Context()
+        ctx.run(self.cvar.set, sentinel)
+
+        def in_ctx():
+            self.assertEqual(stackless.current.context_id, id(ctx))
+            thr.start()
+            thr.join()
+            self.assertEqual(stackless.current.context_id, id(ctx))
+
+        ctx.run(in_ctx)
+        self.assertIsInstance(got_exception, RuntimeError)
+        with self.assertRaisesRegex(RuntimeError, "tasklet belongs to a different thread"):
+            raise got_exception
+
+
+    def test_context_init_null_main(self):
+        # test the set_context in tasklet.bind, if the current context is NULL in main tasklet
+
+        cid = None
+        t = stackless.tasklet()
+
+        def other_thread():
+            nonlocal cid
+            self.assertIs(stackless.current, stackless.main)
+
+            # this creates a context, because all tasklets initialized by the main-tasklet
+            # shall share a common context
+            t.bind(lambda: None)
+            cid = stackless.current.context_id
+
+        thr = threading.Thread(target=other_thread, name="other thread")
+        thr.start()
+        thr.join()
+        self.assertIsInstance(cid, int)
+        self.assertEqual(t.context_id, cid)
+
+    def test_context_init_main(self):
+        # test the set_context in tasklet.bind, in main tasklet
+
+        sentinel = object()
+        cid = None
+        t = stackless.tasklet()
+
+        def other_thread():
+            nonlocal cid
+            self.cvar.set(sentinel)
+            self.assertIs(stackless.current, stackless.main)
+            cid = stackless.current.context_id
+            self.assertIsInstance(cid, int)
+            t.bind(lambda: None)
+            self.assertEqual(stackless.current.context_id, cid)
+
+        thr = threading.Thread(target=other_thread, name="other thread")
+        thr.start()
+        thr.join()
+        self.assertEqual(t.context_id, cid)
+
+    def test_context_init_nonmain(self):
+        # test the set_context in tasklet.bind
+        # make sure a context exists
+        sentinel = object()
+        self.cvar.set(sentinel)
+        self.assertIs(self.cvar.get(), sentinel)
+
+        cid = stackless.current.context_id
+        t = stackless.tasklet()
+
+        # this creates
+        t.bind(lambda: None)
+
+        self.assertEqual(stackless.current.context_id, cid)
+        self.assertEqual(t.context_id, cid)
+
+    @staticmethod
+    def _test_context_setstate_alive_task():
+        stackless.schedule_remove(100)
+        return 200
+
+    def test_context_setstate_alive(self):
+        # prepare a state of a half executed tasklet
+        t = stackless.tasklet(self._test_context_setstate_alive_task)()
+        stackless.run()
+        self.assertEqual(t.tempval, 100)
+        self.assertTrue(t.paused)
+
+        state = t.__reduce__()[2]
+        for i, fw in enumerate(state[3]):
+            frame_factory, frame_args, frame_state = fw.__reduce__()
+            state[3][i] = frame_factory(*frame_args)
+            state[3][i].__setstate__(frame_state)
+        # from pprint import pprint ; pprint(state)
+
+        # make sure a context exists
+        sentinel = object()
+        self.cvar.set(sentinel)
+        self.assertIs(self.cvar.get(), sentinel)
+
+        cid = stackless.current.context_id
+        t = stackless.tasklet()
+
+        # this creates
+        t.__setstate__(state)
+
+        self.assertTrue(t.alive)
+        self.assertEqual(stackless.current.context_id, cid)
+        self.assertEqual(t.context_id, cid)
+        t.bind(None)
+
+    def test_context_setstate_notalive(self):
+        # prepare a state of a new tasklet
+        state = stackless.tasklet().__reduce__()[2]
+        self.assertEqual(state[3], [])  # no frames
+
+        # make sure a context exists
+        sentinel = object()
+        self.cvar.set(sentinel)
+        self.assertIs(self.cvar.get(), sentinel)
+
+        cid = stackless.current.context_id
+        t = stackless.tasklet()
+
+        # this creates
+        t.__setstate__(state)
+
+        self.assertFalse(t.alive)
+        self.assertEqual(stackless.current.context_id, cid)
+        self.assertEqual(t.context_run(self.cvar.get), "unset")
+        t.bind(None)
+
+    def test_context_run_no_context(self):
+        # make sure a context exists
+        sentinel = object()
+        self.cvar.set(sentinel)
+        self.assertIs(self.cvar.get(), sentinel)
+        cid0 = stackless.current.context_id
+
+        t = stackless.tasklet()
+        def get_cid():
+            self.assertEqual(self.cvar.get(), "unset")
+            return stackless.current.context_id
+
+        cid = t.context_run(get_cid)
+
+        self.assertEqual(stackless.current.context_id, cid0)
+        self.assertIsInstance(cid, int)
+        self.assertNotEqual(cid0, cid)
+        self.assertEqual(t.context_id, cid)
+
+    def test_context_run(self):
+        # make sure a context exists
+        sentinel = object()
+        self.cvar.set(sentinel)
+        self.assertIs(self.cvar.get(), sentinel)
+        cid0 = stackless.current.context_id
+
+        t = stackless.tasklet()
+        ctx = contextvars.Context()
+        t.set_context(ctx)
+
+        def get_cid():
+            self.assertEqual(self.cvar.get(), "unset")
+            return stackless.current.context_id
+
+        cid = t.context_run(get_cid)
+
+        self.assertEqual(stackless.current.context_id, cid0)
+        self.assertIsInstance(cid, int)
+        self.assertNotEqual(cid0, cid)
+        self.assertEqual(id(ctx), cid)
+
+    def test_main_tasklet_init(self):
+        # This test succeeds, if Stackless copies ts->context to into the main
+        # tasklet, when Stackless creates the main tasklet.
+        # This is important, if there is already a context set, when the interpreter
+        # gets called. Example: an interactive python prompt.
+        # See also: test_main_tasklet_fini
+        ctx_holder1 = None  # use a tasklet to keep the context alive
+        ctx_holder2 = None
+        def task():
+            nonlocal ctx_holder2
+            ctx_holder2 = stackless.main.context_run(stackless.tasklet, id)
+            self.assertEqual(ctx_holder2.context_id, stackless.main.context_id)
+
+        t = stackless.tasklet(task, ())
+        def other_thread():
+            nonlocal ctx_holder1
+            t.bind_thread()
+            t.insert()
+            ctx_holder1 = stackless.tasklet(id)
+            self.assertEqual(ctx_holder1.context_id, stackless.current.context_id)
+            stackless._stackless._test_outside()
+
+        tr = threading.Thread(target=other_thread, name="other thread")
+        tr.start()
+        tr.join()
+        self.assertIsNot(ctx_holder1, ctx_holder2)
+        self.assertEqual(ctx_holder1.context_id, ctx_holder2.context_id)
+
+    def test_main_tasklet_fini(self):
+        # for a main tasklet of a thread initially ts->context == NULL
+        # This test succeeds, if Stackless copies the context of the main
+        # tasklet to ts->context after the main tasklet exits
+        # This way the last context of the main tasklet is preserved and available
+        # on the next invocation of the interpreter.
+        ctx_holder1 = None  # use a tasklet to keep the context alive
+        ctx_holder2 = None
+        def task():
+            nonlocal ctx_holder1
+            ctx_holder1 = stackless.main.context_run(stackless.tasklet, id)
+            self.assertEqual(ctx_holder1.context_id, stackless.main.context_id)
+
+        t = stackless.tasklet(task, ())
+        def other_thread():
+            nonlocal ctx_holder2
+            t.bind_thread()
+            t.insert()
+            stackless._stackless._test_outside()
+            ctx_holder2 = stackless.tasklet(id)
+            self.assertEqual(ctx_holder2.context_id, stackless.current.context_id)
+
+        tr = threading.Thread(target=other_thread, name="other thread")
+        tr.start()
+        tr.join()
+        self.assertIsNot(ctx_holder1, ctx_holder2)
+        self.assertEqual(ctx_holder1.context_id, ctx_holder2.context_id)
 
 
 #///////////////////////////////////////////////////////////////////////////////

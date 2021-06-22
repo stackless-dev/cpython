@@ -34,9 +34,9 @@ The ``channel`` class
    the channel, the sender will be blocked.  Otherwise, the receiver will be
    activated immediately, and the sender is put at the end of the runnables
    list.
-   
+
    Example - sending a value over a channel::
-   
+
        >>> c = stackless.channel()
        >>> def sender(chan, value):
        ...     chan.send(value)
@@ -52,9 +52,9 @@ The ``channel`` class
    on the channel, the receiver will be blocked. Otherwise, the sender will be
    activated immediately, and the receiver is put at the end of the runnables
    list.
-   
+
    Example - receiving a value over a channel::
-   
+
        >>> c = stackless.channel()
        >>> def receiver(chan):
        ...     value = chan.receive()
@@ -93,7 +93,7 @@ The ``channel`` class
    over a channel, and the traceback to be propagated
 
    Example::
-   
+
        try:
            foo()
        except Exception:
@@ -103,7 +103,7 @@ The ``channel`` class
 
    Send a stream of values over the channel.  Combined with a generator, this
    is a very efficient way to build fast pipes. This method returns the length
-   of *seq*. 
+   of *seq*.
 
    This method is equivalent to::
 
@@ -144,7 +144,7 @@ The ``channel`` class
 
    Channels can work as an iterator.  When they are used in this way, call
    overhead is removed on the receiving side, making it an efficient approach.
-   
+
    The receiver does not know, if the sender will send further objects
    or not. Therefore the sender must notify the receiver about the
    end-of-iteration condition. Currently this requires sending a
@@ -155,9 +155,9 @@ The ``channel`` class
 
       A future version of Stackless may send a :exc:`StopIteration` automatically,
       if you close the channel.
-   
+
    Example - iterating over a channel::
-   
+
        >>> def sender(channel):
        ...     for value in sequence:
        ...         channel.send(value)
@@ -179,10 +179,10 @@ The ``channel`` class
        0
        1
        2
-       3       
+       3
 
    Of course you can combine :meth:`send_sequence` with iterating over a channel::
-   
+
       >>> def sender(channel, sequence):
       ...     channel.send_sequence(sequence)
       ...     channel.send_exception(StopIteration)
@@ -212,7 +212,7 @@ The ``channel`` class
    Reopen a channel, see :meth:`close`.
 
    .. note::
-   
+
       This functionality is rarely used in practice.
 
 .. method:: channel.close()
@@ -222,7 +222,7 @@ The ``channel`` class
    :attr:`closed` becomes ``True``.
 
    .. note::
-   
+
       This functionality is rarely used in practice.
 
 The following attributes can be used to select how the channel should behave
@@ -252,7 +252,7 @@ tasklets.
    :attr:`send` action, the sending tasklet returns immediately to continue
    execution while the receiving tasklet is rescheduled.  It might even
    be that both tasklets are scheduled.
-   
+
    The key to getting channel actions to work the way you want is to
    understand what "prefer" means.  The tasklet that is preferred is simply
    the one whose execution resumes immediately, while the other tasklet
@@ -263,30 +263,30 @@ tasklets.
    send to all waiting receivers without blocking, as shown in the
    :ref:`pumping the scheduler <slp-chan-pref-ex1>` idiom described
    elsewhere in this documentation.
-   
+
    On the other hand, if you have a channel you are receiving a lot of data
    through, you might want to collect all the waiting data in the most
    efficient way - without blocking.
-   
+
    Example - receiving it all, without blocking::
-   
+
        channel.preference = -1
-       
+
        while channel.balance > 0:
            total += channel.receive()
 
    In fact, by using the handy :attr:`tasklet.block_trap` attribute, that
    this does not block can be easy verified.
-   
+
    Example - verified receiving without blocking::
-   
+
        channel.preference = -1
-       
+
        old_value = stackless.current.block_trap
        stackless.current.block_trap = True
        try:
            while channel.balance > 0:
-               total += channel.receive()           
+               total += channel.receive()
        finally:
            stackless.current.block_trap = old_value
 
@@ -302,9 +302,9 @@ Read-only attributes are provided for checking channel state and contents.
 .. attribute:: channel.balance
 
    The number of tasklets waiting to send (>0) or receive (<0).
-   
+
    Example - reawakening all blocked senders::
-   
+
        >>> while channel.balance > 0:
        ...     channel.send(None)
 
@@ -320,11 +320,11 @@ Read-only attributes are provided for checking channel state and contents.
 .. attribute:: channel.queue
 
    This value of this attribute is the first tasklet in the chain of tasklets
-   that are blocked on the channel.  If the value is ``None``, then the
+   that are blocked on the channel.  If the value is :data:`None`, then the
    channel is empty.
-   
+
    Example - printing out the chain of tasklets blocked on the channel::
-   
+
        >>> t = channel.queue
        >>> idx = 0
        >>> while t is not None:

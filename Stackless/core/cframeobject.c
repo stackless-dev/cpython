@@ -26,10 +26,12 @@
 
 #include "Python.h"
 #include "structmember.h"
+#include "pycore_context.h"
+#include "pycore_object.h"
 
 #ifdef STACKLESS
-#include "internal/stackless_impl.h"
-#include "internal/slp_prickelpit.h"
+#include "pycore_stackless.h"
+#include "pycore_slp_prickelpit.h"
 
 static PyCFrameObject *free_list = NULL;
 static int numfree = 0;         /* number of cframes currently in free_list */
@@ -64,7 +66,7 @@ cframe_traverse(PyCFrameObject *cf, visitproc visit, void *arg)
 
 /* clearing a cframe while the object still exists */
 
-static void
+static int
 cframe_clear(PyCFrameObject *cf)
 {
     /* The Python C-API documentation recomends to use Py_CLEAR() to release
@@ -84,13 +86,14 @@ cframe_clear(PyCFrameObject *cf)
     Py_XDECREF(tmp_ob1);
     Py_XDECREF(tmp_ob2);
     Py_XDECREF(tmp_ob3);
+    return 0;
 }
 
 
 PyCFrameObject *
 slp_cframe_new(PyFrame_ExecFunc *exec, unsigned int linked)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyCFrameObject *cf;
     PyFrameObject *back;
 
@@ -127,15 +130,22 @@ slp_cframe_new(PyFrame_ExecFunc *exec, unsigned int linked)
 #define cframetuplefmt "iOOll"
 #define cframetuplenewfmt "iOO!ll:cframe"
 
-static PyObject * execute_soft_switchable_func(PyFrameObject *, int, PyObject *);
+static PyObject * execute_soft_switchable_func(PyCFrameObject *, int, PyObject *);
 SLP_DEF_INVALID_EXEC(execute_soft_switchable_func)
 
 static PyObject *
-cframe_reduce(PyCFrameObject *cf)
+cframe_reduce(PyCFrameObject *cf, PyObject *value)
 {
     PyObject *res = NULL, *exec_name = NULL;
     PyObject *params = NULL;
     int valid = 1;
+    PyObject *obs[3];
+    long i, n;
+
+    if (value && !PyLong_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "__reduce_ex__ argument should be an integer");
+        return NULL;
+    }
 
     if (cf->f_execute == execute_soft_switchable_func) {
         exec_name = (PyObject *) cf->any2;
@@ -143,10 +153,27 @@ cframe_reduce(PyCFrameObject *cf)
         assert(PyStacklessFunctionDeclarationType_CheckExact(exec_name));
         Py_INCREF(exec_name);
         valid = cf->any1 == NULL;
-    } else if ((exec_name = slp_find_execname((PyFrameObject *) cf, &valid)) == NULL)
+    } else if ((exec_name = slp_find_execname(cf, &valid)) == NULL)
         return NULL;
 
-    params = slp_into_tuple_with_nulls(&cf->ob1, 3);
+    obs[0] = cf->ob1;
+    obs[1] = cf->ob2;
+    obs[2] = cf->ob3;
+    i = cf->i;
+    n = cf->n;
+
+    if (cf->f_execute == slp_context_run_callback && 0 == i) {
+        /*
+         * Replace a logical PyContext_Exit(context) with the equivalent
+         * stackless.current.set_context().
+         */
+        assert(PyContext_CheckExact(obs[0]));
+        assert(((PyContext *) obs[0])->ctx_entered);
+        obs[0] = (PyObject *)((PyContext *) obs[0])->ctx_prev;
+        i = 1;
+    }
+
+    params = slp_into_tuple_with_nulls(obs, 3);
     if (params == NULL) goto err_exit;
 
     res = Py_BuildValue ("(O()(" cframetuplefmt "))",
@@ -154,8 +181,8 @@ cframe_reduce(PyCFrameObject *cf)
                          valid,
                          exec_name,
                          params,
-                         cf->i,
-                         cf->n);
+                         i,
+                         n);
 
 err_exit:
     Py_XDECREF(exec_name);
@@ -219,16 +246,16 @@ cframe_setstate(PyObject *self, PyObject *args)
 
 static PyMethodDef cframe_methods[] = {
     {"__reduce__",    (PyCFunction)cframe_reduce, METH_NOARGS, NULL},
-    {"__reduce_ex__", (PyCFunction)cframe_reduce, METH_VARARGS, NULL},
+    {"__reduce_ex__", (PyCFunction)cframe_reduce, METH_O, NULL},
     {"__setstate__",  (PyCFunction)cframe_setstate, METH_O, NULL},
     {NULL, NULL}
 };
 
 
-static PyObject * run_cframe(PyFrameObject *f, int exc, PyObject *retval)
+static PyObject * run_cframe(PyCFrameObject *cf, int exc, PyObject *retval)
 {
-    PyThreadState *ts = PyThreadState_GET();
-    PyCFrameObject *cf = (PyCFrameObject*) f;
+    PyThreadState *ts = _PyThreadState_GET();
+    PyFrameObject *f = (PyFrameObject*) cf;
     PyTaskletObject *task = ts->st.current;
     int done = cf->i;
 
@@ -365,8 +392,13 @@ slp_cframe_fini(void)
  */
 
 static PyObject *
-function_declaration_reduce(PyStacklessFunctionDeclarationObject *self)
+function_declaration_reduce(PyStacklessFunctionDeclarationObject *self, PyObject *value)
 {
+    if (value && !PyLong_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "__reduce_ex__ argument should be an integer");
+        return NULL;
+    }
+
     if (self->name == NULL || *self->name == '\0') {
         PyErr_SetString(PyExc_SystemError, "no function name");
         return NULL;
@@ -376,7 +408,7 @@ function_declaration_reduce(PyStacklessFunctionDeclarationObject *self)
 
 static PyMethodDef function_declaration_methods[] = {
     {"__reduce__",    (PyCFunction)function_declaration_reduce, METH_NOARGS, NULL},
-    {"__reduce_ex__", (PyCFunction)function_declaration_reduce, METH_VARARGS, NULL},
+    {"__reduce_ex__", (PyCFunction)function_declaration_reduce, METH_O, NULL},
     {NULL, NULL}
 };
 
@@ -426,13 +458,12 @@ PyTypeObject PyStacklessFunctionDeclaration_Type = {
 
 static
 PyObject *
-execute_soft_switchable_func(PyFrameObject *f, int exc, PyObject *retval)
+execute_soft_switchable_func(PyCFrameObject *cf, int exc, PyObject *retval)
 {
     /*
      * Special rule for frame execution functions: we now own a reference to retval!
      */
-    PyCFrameObject *cf = (PyCFrameObject *)f;
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyObject *ob1, *ob2, *ob3;
     PyStacklessFunctionDeclarationObject *ssfd =
             (PyStacklessFunctionDeclarationObject*)cf->any2;
@@ -484,7 +515,7 @@ PyStackless_CallFunction(PyStacklessFunctionDeclarationObject *ssfd, PyObject *a
         PyObject *ob1, PyObject *ob2, PyObject *ob3, long n, void *any)
 {
     STACKLESS_GETARG();
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyObject *et=NULL, *ev=NULL, *tb=NULL;
 
     assert(ssfd);

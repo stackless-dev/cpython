@@ -4,11 +4,11 @@
 #include <stddef.h>  /* for offsetof() */
 #include "compile.h"
 
-#include "internal/stackless_impl.h"
-#include "internal/slp_prickelpit.h"
+#include "pycore_stackless.h"
+#include "pycore_slp_prickelpit.h"
 
 /* platform specific constants */
-#include "internal/slp_platformselect.h"
+#include "pycore_slp_platformselect.h"
 
 /******************************************************
 
@@ -129,12 +129,13 @@ _wrap_traverse(PyObject *ob, visitproc visit, void *arg)
     return ret;
 }
 
-static void
+static int
 _wrap_clear(PyObject *ob)
 {
     Py_TYPE(ob) = Py_TYPE(ob)->tp_base;
     if (Py_TYPE(ob)->tp_clear != NULL)
         Py_TYPE(ob)->tp_clear(ob);
+    return 0;
 }
 
 
@@ -143,7 +144,7 @@ _wrap_clear(PyObject *ob)
 static PyMethodDef prefix##_methods[] = { \
     {"__reduce__",     (PyCFunction)reduce,             METH_NOARGS,    NULL}, \
     {"__setstate__",   (PyCFunction)setstate,           METH_O,         NULL}, \
-    {"__new__",            (PyCFunction)_new_wrapper,   METH_VARARGS | METH_KEYWORDS, \
+    {"__new__",        (PyCFunction)(void(*)(void))_new_wrapper, METH_VARARGS | METH_KEYWORDS, \
      PyDoc_STR("wwwwwaaaaaT.__new__(S, ...) -> " \
                "a new object with type S, a subtype of T")}, \
     {NULL, NULL} \
@@ -199,7 +200,7 @@ PyDoc_STRVAR(set_reduce_frame__doc__,
 static PyObject *
 set_reduce_frame(PyObject *self, PyObject *func)
 {
-    PyThreadState * ts = PyThreadState_GET();
+    PyThreadState * ts = _PyThreadState_GET();
     if (func == Py_None) {
         Py_CLEAR(ts->interp->st.reduce_frame_func);
     } else {
@@ -214,7 +215,7 @@ set_reduce_frame(PyObject *self, PyObject *func)
 
 PyObject *
 slp_reduce_frame(PyFrameObject * frame) {
-    PyThreadState * ts = PyThreadState_GET();
+    PyThreadState * ts = _PyThreadState_GET();
     if (!PyFrame_Check(frame) || ts->interp->st.reduce_frame_func == NULL) {
         Py_INCREF(frame);
         return (PyObject *)frame;
@@ -232,7 +233,7 @@ slp_reduce_frame(PyFrameObject * frame) {
  */
 static PyObject *
 unwrap_frame_arg(PyObject * args) {
-    PyThreadState * ts = PyThreadState_GET();
+    PyThreadState * ts = _PyThreadState_GET();
     PyObject *wrapper_type, *arg0, *result;
     int is_instance;
     Py_ssize_t len, i;
@@ -288,7 +289,7 @@ unwrap_frame_arg(PyObject * args) {
 }
 
 static struct PyMethodDef _new_methoddef[] = {
-    {"__new__", (PyCFunction)_new_wrapper, METH_VARARGS | METH_KEYWORDS,
+    {"__new__", (PyCFunction)(void(*)(void))_new_wrapper, METH_VARARGS | METH_KEYWORDS,
      PyDoc_STR("T.__new__(S, ...) -> "
                "a new object with type S, a subtype of T.__base__")},
     {0}
@@ -365,7 +366,7 @@ run_script(char *src, char *retname)
  */
 
 PyObject *
-slp_cannot_execute(PyFrameObject *f, const char *exec_name, PyObject *retval)
+slp_cannot_execute(PyCFrameObject *f, const char *exec_name, PyObject *retval)
 {
     /*
      * Special rule for frame execution functions: we now own a reference to retval!
@@ -374,7 +375,7 @@ slp_cannot_execute(PyFrameObject *f, const char *exec_name, PyObject *retval)
     /*
      * show an error message and raise exception.
      */
-    PyThreadState *tstate = PyThreadState_GET();
+    PyThreadState *tstate = _PyThreadState_GET();
 
     /* if we already have an exception, we keep it */
     if (retval != NULL) {
@@ -386,12 +387,6 @@ slp_cannot_execute(PyFrameObject *f, const char *exec_name, PyObject *retval)
     }
 
     SLP_STORE_NEXT_FRAME(tstate, f->f_back);
-
-    if(PyFrame_Check(f)) {
-        /* Only real frames contribute to the recursion count.
-         * C-frames don't contribute, see tasklet_setstate(...) */
-        --tstate->recursion_depth;
-    }
 
     return NULL;
 }
@@ -453,8 +448,8 @@ slp_register_execute(PyTypeObject *t, char *name, PyFrame_ExecFunc *good,
         || (o = PyDict_SetDefault(dp->dict, b, nameobj)) == NULL
         || !PyObject_RichCompareBool(o, nameobj, Py_EQ)
         ) {
-		if (! PyErr_Occurred())
-	        PyErr_SetString(PyExc_SystemError, "duplicate/ambiguous exec func");
+                if (! PyErr_Occurred())
+                PyErr_SetString(PyExc_SystemError, "duplicate/ambiguous exec func");
         goto err_exit;
     }
     PyErr_Clear();
@@ -496,13 +491,13 @@ slp_find_execfuncs(PyTypeObject *type, PyObject *exec_name,
 }
 
 PyObject *
-slp_find_execname(PyFrameObject *f, int *valid)
+slp_find_execname(PyCFrameObject *cf, int *valid)
 {
     PyObject *exec_name = NULL;
     proxyobject *dp = (proxyobject *)
-                      PyDict_GetItemString(Py_TYPE(f)->tp_dict, "_exec_map");
+                      PyDict_GetItemString(Py_TYPE(cf)->tp_dict, "_exec_map");
     PyObject *dic = dp ? dp->dict : NULL;
-    PyObject *exec_addr = PyLong_FromVoidPtr(f->f_execute);
+    PyObject *exec_addr = PyLong_FromVoidPtr(cf->f_execute);
 
     assert(valid != NULL);
 
@@ -512,19 +507,19 @@ slp_find_execname(PyFrameObject *f, int *valid)
         char msg[500];
         PyErr_Clear();
         sprintf(msg, "frame exec function at %p is not registered!",
-            (void *)f->f_execute);
+            (void *)cf->f_execute);
         PyErr_SetString(PyExc_ValueError, msg);
         *valid = 0;
     }
     else {
         PyFrame_ExecFunc *good, *bad;
-        if (slp_find_execfuncs(Py_TYPE(f), exec_name, &good, &bad)) {
+        if (slp_find_execfuncs(Py_TYPE(cf), exec_name, &good, &bad)) {
             exec_name = NULL;
             goto err_exit;
         }
-        if (f->f_execute == bad)
+        if (cf->f_execute == bad)
             *valid = 0;
-        else if (f->f_execute != good) {
+        else if (cf->f_execute != good) {
             PyErr_SetString(PyExc_SystemError,
                 "inconsistent c?frame function registration");
             goto err_exit;
@@ -620,7 +615,7 @@ slp_from_tuple_with_nulls(PyObject **start, PyObject *tup)
 static struct _typeobject wrap_PyCode_Type;
 
 static PyObject *
-code_reduce(PyCodeObject * co)
+code_reduce(PyCodeObject * co, PyObject *unused)
 {
     PyObject *tup = Py_BuildValue(
         "(O(" codetuplefmt ")())",
@@ -676,7 +671,7 @@ static PyTypeObject wrap_PyCell_Type;
 PyTypeObject *_Pywrap_PyCell_Type = &wrap_PyCell_Type;
 
 static PyObject *
-cell_reduce(PyCellObject *cell)
+cell_reduce(PyCellObject *cell, PyObject *unused)
 {
     PyObject *tup = NULL;
 
@@ -743,7 +738,7 @@ static int init_celltype(PyObject * mod)
 static PyTypeObject wrap_PyFunction_Type;
 
 static PyObject *
-func_reduce(PyFunctionObject * func)
+func_reduce(PyFunctionObject * func, PyObject *unused)
 {
     PyObject *tup = Py_BuildValue(
         "(O()(" functuplefmt "))",
@@ -830,15 +825,8 @@ static int init_functype(PyObject * mod)
 
  ******************************************************/
 
-#define frametuplefmt "O)(OiSOiOOiiOO"
+#define frametuplefmt "O)(OibOiOOiiOO"
 
-SLP_DEF_INVALID_EXEC(eval_frame)
-SLP_DEF_INVALID_EXEC(eval_frame_value)
-SLP_DEF_INVALID_EXEC(eval_frame_noval)
-SLP_DEF_INVALID_EXEC(eval_frame_iter)
-SLP_DEF_INVALID_EXEC(eval_frame_setup_with)
-SLP_DEF_INVALID_EXEC(eval_frame_with_cleanup)
-SLP_DEF_INVALID_EXEC(eval_frame_yield_from)
 SLP_DEF_INVALID_EXEC(slp_channel_seq_callback)
 SLP_DEF_INVALID_EXEC(slp_restore_tracing)
 SLP_DEF_INVALID_EXEC(slp_tp_init_callback)
@@ -846,24 +834,21 @@ SLP_DEF_INVALID_EXEC(slp_tp_init_callback)
 static PyTypeObject wrap_PyFrame_Type;
 
 static PyObject *
-frameobject_reduce(PyFrameObject *f)
+frameobject_reduce(PyFrameObject *f, PyObject *unused)
 {
     int i;
     PyObject **f_stacktop;
     PyObject *blockstack_as_tuple = NULL, *localsplus_as_tuple = NULL,
-    *res = NULL, *exec_name = NULL;
+    *res = NULL;
     int valid = 1;
     int have_locals = f->f_locals != NULL;
     PyObject * dummy_locals = NULL;
     PyObject * f_trace = NULL;
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
 
     if (!have_locals)
         if ((dummy_locals = PyDict_New()) == NULL)
             return NULL;
-
-    if ((exec_name = slp_find_execname(f, &valid)) == NULL)
-        return NULL;
 
     blockstack_as_tuple = PyTuple_New (f->f_iblock);
     if (blockstack_as_tuple == NULL) goto err_exit;
@@ -913,7 +898,7 @@ frameobject_reduce(PyFrameObject *f)
                          f->f_code,
                          f->f_code,
                          valid,
-                         exec_name,
+                         f->f_executing,
                          f->f_globals,
                          have_locals,
                          have_locals ? f->f_locals : dummy_locals,
@@ -925,7 +910,6 @@ frameobject_reduce(PyFrameObject *f)
                  );
 
 err_exit:
-    Py_XDECREF(exec_name);
     Py_XDECREF(blockstack_as_tuple);
     Py_XDECREF(localsplus_as_tuple);
     Py_XDECREF(dummy_locals);
@@ -933,13 +917,13 @@ err_exit:
     return res;
 }
 
-#define frametuplenewfmt "O!"
-#define frametuplesetstatefmt "O!iUO!iO!OiiO!O:frame_new"
+#define frametuplenewfmt "O!:frame.__new__"
+#define frametuplesetstatefmt "O!ibO!iO!OiiO!O:frame.__setstate__"
 
 static PyObject *
 frame_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyFrameObject *f;
     PyCodeObject *f_code;
     PyObject *globals;
@@ -957,7 +941,6 @@ frame_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (globals == NULL)
         return NULL;
     f = PyFrame_New(ts, (PyCodeObject *) f_code, globals, globals);
-    assert(f->f_execute == NULL); /* frame is not executable */
     if (f != NULL)
         Py_TYPE(f) = &wrap_PyFrame_Type;
     Py_DECREF(globals);
@@ -972,29 +955,26 @@ frame_setstate(PyFrameObject *f, PyObject *args)
     Py_ssize_t i;
     PyObject *f_globals, *f_locals, *blockstack_as_tuple;
     PyObject *localsplus_as_tuple, *trace, *f_code;
-    PyObject *exec_name = NULL;
-    PyFrame_ExecFunc *good_func, *bad_func;
     int valid, have_locals;
+    char f_executing;
     Py_ssize_t tmp;
 
     if (is_wrong_type(Py_TYPE(f))) return NULL;
 
-    Py_CLEAR(f->f_globals);
     Py_CLEAR(f->f_locals);
 
     if (!PyArg_ParseTuple (args, frametuplesetstatefmt,
-                           &PyCode_Type, &f_code,
-                           &valid,
-                           &exec_name,
-                           &PyDict_Type, &f_globals,
-                           &have_locals,
-                           &PyDict_Type, &f_locals,
-                           &trace,
-                   &f_lasti,
-                   &f_lineno,
-                   &PyTuple_Type, &blockstack_as_tuple,
-                   &localsplus_as_tuple
-                   ))
+            &PyCode_Type, &f_code,
+            &valid,
+            &f_executing,
+            &PyDict_Type, &f_globals,
+            &have_locals,
+            &PyDict_Type, &f_locals,
+            &trace,
+            &f_lasti,
+            &f_lineno,
+            &PyTuple_Type, &blockstack_as_tuple,
+            &localsplus_as_tuple))
         return NULL;
 
     if (f->f_code != (PyCodeObject *) f_code) {
@@ -1002,19 +982,13 @@ frame_setstate(PyFrameObject *f, PyObject *args)
                         "invalid code object for frame_setstate");
         return NULL;
     }
-    if (slp_find_execfuncs(Py_TYPE(f)->tp_base, exec_name, &good_func,
-                           &bad_func))
-        return NULL;
-
-    Py_CLEAR(f->f_locals);
-    Py_CLEAR(f->f_globals);
 
     if (have_locals) {
         Py_INCREF(f_locals);
         f->f_locals = f_locals;
     }
     Py_INCREF(f_globals);
-    f->f_globals = f_globals;
+    Py_SETREF(f->f_globals, f_globals);
 
     if (trace != Py_None) {
         if (!PyCallable_Check(trace)) {
@@ -1100,14 +1074,12 @@ frame_setstate(PyFrameObject *f, PyObject *args)
     }
 
     /* See if this frame is valid to be run. */
-    f->f_execute = valid ? good_func : bad_func;
+    f->f_executing = valid ? f_executing : SLP_FRAME_EXECUTING_INVALID;
 
     Py_TYPE(f) = &PyFrame_Type;
     Py_INCREF(f);
     return (PyObject *) f;
 err_exit:
-    /* Make sure that the frame is not executable. */
-    f->f_execute = NULL;
     /* Clear members that could leak. */
     PyFrame_Type.tp_clear((PyObject*)f);
 
@@ -1121,7 +1093,7 @@ slp_clone_frame(PyFrameObject *f)
     PyFrameObject *fnew;
 
     if (PyFrame_Check(f))
-        tup = frameobject_reduce(f);
+        tup = frameobject_reduce(f, NULL);
     else
         tup = PyObject_CallMethod((PyObject *) f, "__reduce__", "");
     if (tup == NULL)
@@ -1190,21 +1162,7 @@ MAKE_WRAPPERTYPE(PyFrame_Type, frame, "frame", frameobject_reduce, frame_new, fr
 
 static int init_frametype(PyObject * mod)
 {
-    return slp_register_execute(&PyFrame_Type, "eval_frame",
-                             PyEval_EvalFrameEx_slp, SLP_REF_INVALID_EXEC(eval_frame))
-        || slp_register_execute(&PyFrame_Type, "eval_frame_value",
-                             slp_eval_frame_value, SLP_REF_INVALID_EXEC(eval_frame_value))
-        || slp_register_execute(&PyFrame_Type, "eval_frame_noval",
-                             slp_eval_frame_noval, SLP_REF_INVALID_EXEC(eval_frame_noval))
-        || slp_register_execute(&PyFrame_Type, "eval_frame_iter",
-                             slp_eval_frame_iter, SLP_REF_INVALID_EXEC(eval_frame_iter))
-        || slp_register_execute(&PyFrame_Type, "eval_frame_setup_with",
-                             slp_eval_frame_setup_with, SLP_REF_INVALID_EXEC(eval_frame_setup_with))
-        || slp_register_execute(&PyFrame_Type, "eval_frame_with_cleanup",
-                             slp_eval_frame_with_cleanup, SLP_REF_INVALID_EXEC(eval_frame_with_cleanup))
-        || slp_register_execute(&PyFrame_Type, "eval_frame_yield_from",
-                             slp_eval_frame_yield_from, SLP_REF_INVALID_EXEC(eval_frame_yield_from))
-        || slp_register_execute(&PyCFrame_Type, "channel_seq_callback",
+    return slp_register_execute(&PyCFrame_Type, "channel_seq_callback",
                              slp_channel_seq_callback, SLP_REF_INVALID_EXEC(slp_channel_seq_callback))
         || slp_register_execute(&PyCFrame_Type, "slp_restore_tracing",
                              slp_restore_tracing, SLP_REF_INVALID_EXEC(slp_restore_tracing))
@@ -1232,7 +1190,7 @@ typedef PyTracebackObject tracebackobject;
 static PyTypeObject wrap_PyTraceBack_Type;
 
 static PyObject *
-tb_reduce(tracebackobject * tb)
+tb_reduce(tracebackobject * tb, PyObject *unused)
 {
     PyObject *tup = NULL;
     PyObject *frame_reducer;
@@ -1331,7 +1289,7 @@ static PyTypeObject wrap_PyModule_Type;
 
 
 static PyObject *
-module_reduce(PyObject * m)
+module_reduce(PyObject * m, PyObject *unused)
 {
     static PyObject *import = NULL;
     PyObject *modules = PyImport_GetModuleDict();
@@ -1440,7 +1398,7 @@ dictview_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 static PyObject *
-dictkeysview_reduce(_PyDictViewObject *di)
+dictkeysview_reduce(_PyDictViewObject *di, PyObject *unused)
 {
     PyObject *tup;
 
@@ -1455,7 +1413,7 @@ dictkeysview_reduce(_PyDictViewObject *di)
 static PyTypeObject wrap_PyDictValues_Type;
 
 static PyObject *
-dictvaluesview_reduce(_PyDictViewObject *di)
+dictvaluesview_reduce(_PyDictViewObject *di, PyObject *unused)
 {
     PyObject *tup;
 
@@ -1470,7 +1428,7 @@ dictvaluesview_reduce(_PyDictViewObject *di)
 static PyTypeObject wrap_PyDictItems_Type;
 
 static PyObject *
-dictitemsview_reduce(_PyDictViewObject *di)
+dictitemsview_reduce(_PyDictViewObject *di, PyObject *unused)
 {
     PyObject *tup;
 
@@ -1602,7 +1560,7 @@ reduce_to_gen_obj_head(gen_obj_head_ty *goh, PyFrameObject * frame, const _PyErr
 
     assert(exc_state != NULL);
     if (exc_state->previous_item != NULL) {
-        assert(exc_state->previous_item != &(PyThreadState_GET()->exc_state));
+        assert(exc_state->previous_item != &(_PyThreadState_GET()->exc_state));
         goh->exc_info_obj = slp_get_obj_for_exc_state(exc_state->previous_item);
         if (goh->exc_info_obj == NULL) {
             Py_DECREF(goh->frame);
@@ -1747,7 +1705,7 @@ setstate_from_gen_obj_head(const gen_obj_head_ty *goh,
 /* The usual reduce method.
  */
 static PyObject *
-gen_reduce(PyGenObject *gen)
+gen_reduce(PyGenObject *gen, PyObject *unused)
 {
     PyObject *tup;
     gen_obj_head_ty goh;
@@ -1841,8 +1799,9 @@ static int init_generatortype(PyObject * mod)
     if (gen == NULL || gen->gi_frame->f_back == NULL)
         return -1;
     cbframe = gen->gi_frame->f_back;
+    assert(PyCFrame_Check(cbframe));
     res = slp_register_execute(Py_TYPE(cbframe), "gen_iternext_callback",
-              gen->gi_frame->f_back->f_execute,
+              ((PyCFrameObject *)cbframe)->f_execute,
               SLP_REF_INVALID_EXEC(gen_iternext_callback))
           || init_type(&wrap_PyGen_Type, initchain, mod);
 
@@ -1869,7 +1828,7 @@ static int init_generatortype(PyObject * mod)
 #define initchain init_generatortype
 
 static PyObject *
-coro_reduce(PyCoroObject *coro)
+coro_reduce(PyCoroObject *coro, PyObject *unused)
 {
     PyObject *tup;
     gen_obj_head_ty goh;
@@ -1976,9 +1935,9 @@ static int init_coroutinetype(PyObject * mod)
 #define initchain init_coroutinetype
 
 static PyObject *
-async_gen_reduce(PyAsyncGenObject *async_gen)
+async_gen_reduce(PyAsyncGenObject *async_gen, PyObject *unused)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyObject *tup;
     gen_obj_head_ty goh;
     PyObject *finalizer;
@@ -2046,7 +2005,7 @@ async_gen_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static PyObject *
 async_gen_setstate(PyObject *self, PyObject *args)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyAsyncGenObject *async_gen = (PyAsyncGenObject *)self;
     gen_obj_head_ty goh;
     PyObject *finalizer;
@@ -2128,7 +2087,7 @@ init_async_gentype(PyObject * mod)
 #define initchain init_async_gentype
 
 static PyObject *
-async_generator_asend_reduce(PyObject *o)
+async_generator_asend_reduce(PyObject *o, PyObject *unused)
 {
     return slp_async_gen_asend_reduce(o, &wrap__PyAsyncGenASend_Type);
 }
@@ -2165,7 +2124,7 @@ init_async_generator_asend_type(PyObject * mod)
 #define initchain init_async_generator_asend_type
 
 static PyObject *
-async_generator_athrow_reduce(PyObject *o)
+async_generator_athrow_reduce(PyObject *o, PyObject *unused)
 {
     return slp_async_gen_athrow_reduce(o, &wrap__PyAsyncGenAThrow_Type);
 }
@@ -2202,7 +2161,7 @@ init_async_generator_athrow_type(PyObject * mod)
 #define initchain init_async_generator_athrow_type
 
 static PyObject *
-coro_wrapper_reduce(PyObject *o)
+coro_wrapper_reduce(PyObject *o, PyObject *unused)
 {
     return slp_coro_wrapper_reduce(o, &wrap__PyCoroWrapper_Type);
 }

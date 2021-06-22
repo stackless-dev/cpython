@@ -1,11 +1,11 @@
 /* Abstract Object Interface (many thanks to Jim Fulton) */
 
 #include "Python.h"
-#include "internal/pystate.h"
+#include "pycore_pystate.h"
 #include <ctype.h>
 #include "structmember.h" /* we need the offsetof() macro from there */
 #include "longintrepr.h"
-#include "internal/stackless_impl.h"
+#include "pycore_stackless.h"
 
 
 
@@ -1245,6 +1245,15 @@ PyNumber_Absolute(PyObject *o)
     return type_error("bad operand type for abs(): '%.200s'", o);
 }
 
+#undef PyIndex_Check
+
+int
+PyIndex_Check(PyObject *obj)
+{
+    return obj->ob_type->tp_as_number != NULL &&
+           obj->ob_type->tp_as_number->nb_index != NULL;
+}
+
 /* Return a Python int from the object item.
    Raise TypeError if the result is not an int
    or if the object cannot be interpreted as an index.
@@ -1502,7 +1511,7 @@ PySequence_Check(PyObject *s)
 {
     if (PyDict_Check(s))
         return 0;
-    return s != NULL && s->ob_type->tp_as_sequence &&
+    return s->ob_type->tp_as_sequence &&
         s->ob_type->tp_as_sequence->sq_item != NULL;
 }
 
@@ -1523,6 +1532,10 @@ PySequence_Size(PyObject *s)
         return len;
     }
 
+    if (s->ob_type->tp_as_mapping && s->ob_type->tp_as_mapping->mp_length) {
+        type_error("%.200s is not a sequence", s);
+        return -1;
+    }
     type_error("object of type '%.200s' has no len()", s);
     return -1;
 }
@@ -1669,6 +1682,9 @@ PySequence_GetItem(PyObject *s, Py_ssize_t i)
         return m->sq_item(s, i);
     }
 
+    if (s->ob_type->tp_as_mapping && s->ob_type->tp_as_mapping->mp_subscript) {
+        return type_error("%.200s is not a sequence", s);
+    }
     return type_error("'%.200s' object does not support indexing", s);
 }
 
@@ -1720,6 +1736,10 @@ PySequence_SetItem(PyObject *s, Py_ssize_t i, PyObject *o)
         return m->sq_ass_item(s, i, o);
     }
 
+    if (s->ob_type->tp_as_mapping && s->ob_type->tp_as_mapping->mp_ass_subscript) {
+        type_error("%.200s is not a sequence", s);
+        return -1;
+    }
     type_error("'%.200s' object does not support item assignment", s);
     return -1;
 }
@@ -1749,6 +1769,10 @@ PySequence_DelItem(PyObject *s, Py_ssize_t i)
         return m->sq_ass_item(s, i, (PyObject *)NULL);
     }
 
+    if (s->ob_type->tp_as_mapping && s->ob_type->tp_as_mapping->mp_ass_subscript) {
+        type_error("%.200s is not a sequence", s);
+        return -1;
+    }
     type_error("'%.200s' object doesn't support item deletion", s);
     return -1;
 }
@@ -2085,6 +2109,11 @@ PyMapping_Size(PyObject *o)
         return len;
     }
 
+    if (o->ob_type->tp_as_sequence && o->ob_type->tp_as_sequence->sq_length) {
+        type_error("%.200s is not a mapping", o);
+        return -1;
+    }
+    /* PyMapping_Size() can be called from PyObject_Size(). */
     type_error("object of type '%.200s' has no len()", o);
     return -1;
 }
@@ -2536,6 +2565,14 @@ PyObject_GetIter(PyObject *o)
     }
 }
 
+#undef PyIter_Check
+
+int PyIter_Check(PyObject *obj)
+{
+    return obj->ob_type->tp_iternext != NULL &&
+           obj->ob_type->tp_iternext != &_PyObject_NextNotImplemented;
+}
+
 /* Return next item.
  * If an error occurs, return NULL.  PyErr_Occurred() will be true.
  * If the iteration terminates normally, return NULL and clear the
@@ -2554,7 +2591,7 @@ PyIter_Next(PyObject *iter)
     STACKLESS_PROMOTE_METHOD(iter, tp_iternext);
     result = (*iter->ob_type->tp_iternext)(iter);
     STACKLESS_ASSERT();
-    STACKLESS_ASSERT_UNWINDING_VALUE_IS_NOT(PyThreadState_GET(), result, NULL);
+    STACKLESS_ASSERT_UNWINDING_VALUE_IS_NOT(_PyThreadState_GET(), result, NULL);
     if (result == NULL &&
         PyErr_Occurred() &&
         PyErr_ExceptionMatches(PyExc_StopIteration))

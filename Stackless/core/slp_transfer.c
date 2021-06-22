@@ -3,7 +3,7 @@
 
 #ifdef STACKLESS
 
-#include "internal/stackless_impl.h"
+#include "pycore_stackless.h"
 
 /*
  * the following macros are spliced into the OS/compiler
@@ -34,12 +34,16 @@
         slp_cstack_restore(_cst); \
     }
 
-/* This define is no longer needed now? */
+/*
+ * Include pycore_slp_platformselect.h with SLP_EVAL defined.
+ * If the macro SLP_EVAL is defined, pycore_slp_platformselect.h defines
+ * the static function int slp_switch(void).
+ */
 #define SLP_EVAL
-#ifdef STACKLESS_SLP_PLATFORM_SELECT_H
-#undef STACKLESS_SLP_PLATFORM_SELECT_H
+#ifdef PYCORE_SLP_PLATFORMSELECT_H
+#undef PYCORE_SLP_PLATFORMSELECT_H
 #endif
-#include "internal/slp_platformselect.h"
+#include "pycore_slp_platformselect.h"
 
 #ifndef STACKLESS
 **********
@@ -97,7 +101,7 @@ climb_stack_and_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
      * need to switch from a higher stacklevel, and the
      * needed stack size becomes *negative* :-))
      */
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     intptr_t probe;
     register ptrdiff_t needed = &probe - ts->st.cstack_base;
     /* in rare cases, the need might have vanished due to the recursion */
@@ -120,7 +124,7 @@ int
 slp_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
              PyTaskletObject *prev)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     int result;
     /* Use a volatile pointer to prevent inlining of slp_switch().
      * See Stackless issue 183

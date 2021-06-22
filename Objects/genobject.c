@@ -1,9 +1,10 @@
 /* Generator object implementation */
 
-#include "internal/stackless_impl.h"
+#include "pycore_stackless.h"
 
 #include "Python.h"
-#include "internal/pystate.h"
+#include "pycore_object.h"
+#include "pycore_pystate.h"
 #include "frameobject.h"
 #include "structmember.h"
 #include "opcode.h"
@@ -165,7 +166,7 @@ gen_send_ex2(PyGenObject *gen, PyObject *arg, int exc, int closing, PyObject* ob
 
 /* callback for (async) generators and coroutines. */
 static PyObject *
-gen_iternext_callback(PyFrameObject *f, int exc, PyObject *result);
+gen_iternext_callback(PyCFrameObject *f, int exc, PyObject *result);
 
 /* Additional callback-code for async generators. */
 static PyObject *
@@ -186,7 +187,7 @@ gen_send_ex2(PyGenObject *gen, PyObject *arg, int exc, int closing, PyObject * o
     STACKLESS_GETARG();
     PyFrameObject *stopframe;
 #endif
-    PyThreadState *tstate = PyThreadState_GET();
+    PyThreadState *tstate = _PyThreadState_GET();
     PyFrameObject *f = gen->gi_frame;
     PyObject *result;
 
@@ -309,8 +310,6 @@ gen_send_ex2(PyGenObject *gen, PyObject *arg, int exc, int closing, PyObject * o
     gen->gi_exc_state.previous_item = tstate->exc_info;
     tstate->exc_info = &gen->gi_exc_state;
 
-    f->f_execute = PyEval_EvalFrameEx_slp;
-
     Py_INCREF(gen);
     Py_XINCREF(arg);
     Py_XINCREF(ob3);
@@ -340,10 +339,10 @@ gen_send_ex2(PyGenObject *gen, PyObject *arg, int exc, int closing, PyObject * o
 }
 
 static PyObject*
-gen_iternext_callback(PyFrameObject *f, int exc, PyObject *result)
+gen_iternext_callback(PyCFrameObject *cf, int exc, PyObject *result)
 {
-    PyThreadState *ts = PyThreadState_GET();
-    PyCFrameObject *cf = (PyCFrameObject *) f;
+    PyThreadState *ts = _PyThreadState_GET();
+    PyFrameObject *f = (PyFrameObject *) cf;
     PyGenObject *gen = (PyGenObject *) cf->ob1;
     PyObject *arg = cf->ob2;
     PyObject *ob3 = cf->ob3;
@@ -796,14 +795,14 @@ gen_repr(PyGenObject *gen)
 }
 
 static PyObject *
-gen_get_name(PyGenObject *op)
+gen_get_name(PyGenObject *op, void *Py_UNUSED(ignored))
 {
     Py_INCREF(op->gi_name);
     return op->gi_name;
 }
 
 static int
-gen_set_name(PyGenObject *op, PyObject *value)
+gen_set_name(PyGenObject *op, PyObject *value, void *Py_UNUSED(ignored))
 {
     /* Not legal to del gen.gi_name or to set it to anything
      * other than a string object. */
@@ -818,14 +817,14 @@ gen_set_name(PyGenObject *op, PyObject *value)
 }
 
 static PyObject *
-gen_get_qualname(PyGenObject *op)
+gen_get_qualname(PyGenObject *op, void *Py_UNUSED(ignored))
 {
     Py_INCREF(op->gi_qualname);
     return op->gi_qualname;
 }
 
 static int
-gen_set_qualname(PyGenObject *op, PyObject *value)
+gen_set_qualname(PyGenObject *op, PyObject *value, void *Py_UNUSED(ignored))
 {
     /* Not legal to del gen.__qualname__ or to set it to anything
      * other than a string object. */
@@ -840,7 +839,7 @@ gen_set_qualname(PyGenObject *op, PyObject *value)
 }
 
 static PyObject *
-gen_getyieldfrom(PyGenObject *gen)
+gen_getyieldfrom(PyGenObject *gen, void *Py_UNUSED(ignored))
 {
     PyObject *yf = _PyGen_yf(gen);
     if (yf == NULL)
@@ -981,18 +980,16 @@ PyGen_New(PyFrameObject *f)
 int
 PyGen_NeedsFinalizing(PyGenObject *gen)
 {
-    int i;
     PyFrameObject *f = gen->gi_frame;
 
     if (f == NULL || f->f_stacktop == NULL)
         return 0; /* no frame or empty blockstack == no finalization */
 
-    /* Any block type besides a loop requires cleanup. */
-    for (i = 0; i < f->f_iblock; i++)
-        if (f->f_blockstack[i].b_type != SETUP_LOOP)
-            return 1;
+    /* Any (exception-handling) block type requires cleanup. */
+    if (f->f_iblock > 0)
+        return 1;
 
-    /* No blocks except loops, it's safe to skip finalization. */
+    /* No blocks, it's safe to skip finalization. */
     return 0;
 }
 
@@ -1086,7 +1083,7 @@ coro_await(PyCoroObject *coro)
 }
 
 static PyObject *
-coro_get_cr_await(PyCoroObject *coro)
+coro_get_cr_await(PyCoroObject *coro, void *Py_UNUSED(ignored))
 {
     PyObject *yf = _PyGen_yf((PyGenObject *) coro);
     if (yf == NULL)
@@ -1296,6 +1293,9 @@ compute_cr_origin(int origin_depth)
 
     /* Now collect them */
     PyObject *cr_origin = PyTuple_New(frame_count);
+    if (cr_origin == NULL) {
+        return NULL;
+    }
     frame = PyEval_GetFrame();
     for (int i = 0; i < frame_count; ++i) {
         PyObject *frameinfo = Py_BuildValue(
@@ -1328,18 +1328,18 @@ PyCoro_New(PyFrameObject *f, PyObject *name, PyObject *qualname)
         return NULL;
     }
 
-    PyThreadState *tstate = PyThreadState_GET();
+    PyThreadState *tstate = _PyThreadState_GET();
     int origin_depth = tstate->coroutine_origin_tracking_depth;
 
     if (origin_depth == 0) {
         ((PyCoroObject *)coro)->cr_origin = NULL;
     } else {
         PyObject *cr_origin = compute_cr_origin(origin_depth);
+        ((PyCoroObject *)coro)->cr_origin = cr_origin;
         if (!cr_origin) {
             Py_DECREF(coro);
             return NULL;
         }
-        ((PyCoroObject *)coro)->cr_origin = cr_origin;
     }
 
     return coro;
@@ -1438,7 +1438,7 @@ async_gen_init_hooks(PyAsyncGenObject *o)
 
     o->ag_hooks_inited = 1;
 
-    tstate = PyThreadState_GET();
+    tstate = _PyThreadState_GET();
 
     finalizer = tstate->async_gen_finalizer;
     if (finalizer) {
@@ -2078,20 +2078,19 @@ yield_close:
     return NULL;
 
 check_error:
-    if (PyErr_ExceptionMatches(PyExc_StopAsyncIteration)) {
+    if (PyErr_ExceptionMatches(PyExc_StopAsyncIteration) ||
+            PyErr_ExceptionMatches(PyExc_GeneratorExit))
+    {
         o->agt_state = AWAITABLE_STATE_CLOSED;
         if (o->agt_args == NULL) {
             /* when aclose() is called we don't want to propagate
-               StopAsyncIteration; just raise StopIteration, signalling
-               that 'aclose()' is done. */
+               StopAsyncIteration or GeneratorExit; just raise
+               StopIteration, signalling that this 'aclose()' await
+               is done.
+            */
             PyErr_Clear();
             PyErr_SetNone(PyExc_StopIteration);
         }
-    }
-    else if (PyErr_ExceptionMatches(PyExc_GeneratorExit)) {
-        o->agt_state = AWAITABLE_STATE_CLOSED;
-        PyErr_Clear();          /* ignore these errors */
-        PyErr_SetNone(PyExc_StopIteration);
     }
     return NULL;
 }

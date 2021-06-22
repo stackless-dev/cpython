@@ -8,7 +8,16 @@
 #include "structmember.h"
 
 #ifdef STACKLESS
-#include "internal/stackless_impl.h"
+#include "pycore_stackless.h"
+#include "pycore_context.h"
+
+/*[clinic input]
+module _stackless
+class _stackless.tasklet "PyTaskletObject *" "&PyTasklet_Type"
+[clinic start generated code]*/
+/*[clinic end generated code: output=da39a3ee5e6b4b0d input=81570dcf604e6e6d]*/
+#include "clinic/taskletobject.c.h"
+
 
 /*
  * Convert C-bitfield
@@ -86,7 +95,7 @@ slp_current_uninsert(PyTaskletObject *task)
 PyTaskletObject *
 slp_current_remove(void)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyTaskletObject **chain = &ts->st.current, *ret;
 
     /* Make sure that the tasklet belongs to this thread.
@@ -162,6 +171,7 @@ tasklet_traverse(PyTaskletObject *t, visitproc visit, void *arg)
     Py_VISIT(t->exc_state.exc_type);
     Py_VISIT(t->exc_state.exc_value);
     Py_VISIT(t->exc_state.exc_traceback);
+    Py_VISIT(t->context);
     return 0;
 }
 
@@ -187,12 +197,13 @@ exc_state_clear(_PyErr_StackItem *exc_state)
     Py_XDECREF(tb);
 }
 
-static void
+static int
 tasklet_clear(PyTaskletObject *t)
 {
     tasklet_clear_frames(t);
     Py_CLEAR(t->tempval);
     Py_CLEAR(t->def_globals);
+    Py_CLEAR(t->context);
 
     /* unlink task from cstate */
     if (t->cstate != NULL && t->cstate->task == t)
@@ -208,6 +219,7 @@ tasklet_clear(PyTaskletObject *t)
      * the order of calls to tp_clear is undefined.
      */
     t->exc_info = &t->exc_state;
+    return 0;
 }
 
 /*
@@ -224,7 +236,7 @@ tasklet_clear(PyTaskletObject *t)
 static void
 kill_finally (PyObject *ob)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyTaskletObject *self = (PyTaskletObject *) ob;
     int is_mine = ts == self->cstate->tstate;
     int i;
@@ -328,6 +340,66 @@ PyTasklet_New(PyTypeObject *type, PyObject *func)
         return (PyTaskletObject*)PyObject_CallFunction((PyObject*)type, NULL);
 }
 
+Py_LOCAL_INLINE(PyObject *)
+_get_tasklet_context(PyTaskletObject *self)
+{
+    PyThreadState *ts = self->cstate->tstate;
+    PyThreadState *cts = PyThreadState_Get();
+    PyObject *ctx;
+    assert(cts);
+
+    /* Get the context for the tasklet *self.
+     * If the tasklet has no context, set a new empty one.
+     */
+    if (ts && self == ts->st.current) {
+        /* the tasklet *self is current */
+        ctx = ts->context;
+        if (NULL == ctx) {
+            if (ts == cts) {
+                /* *self belongs to the current thread. Call a C-API function, that
+                 * initializes ts->context as a side effect */
+                ctx = PyContext_CopyCurrent();
+                if (NULL == ctx)
+                    return NULL;
+                Py_DECREF(ctx);
+                ctx = ts->context;
+                assert(NULL != ctx);
+            } else {
+                slp_runtime_error("The tasklet has no context and you can't set one from a foreign thread.");
+            }
+        }
+    } else {
+        /* the tasklet *self is not current */
+        ctx = self->context;
+        if (NULL == ctx) {
+            ctx = PyContext_New();
+            if (NULL == ctx)
+                return NULL;
+            self->context = ctx;
+        }
+    }
+    Py_INCREF(ctx);
+    return ctx;
+}
+
+Py_LOCAL_INLINE(int)
+_tasklet_init_context(PyTaskletObject *task)
+{
+    PyThreadState *cts = PyThreadState_Get();
+    assert(cts);
+
+    PyObject *ctx = _get_tasklet_context(cts->st.current);
+    if (NULL == ctx)
+        return -1;
+
+    PyObject *obj = _stackless_tasklet_set_context_impl(task, ctx);
+    Py_DECREF(ctx);
+    if (NULL == obj)
+        return -1;
+    Py_DECREF(obj);
+    return 0;
+}
+
 static int
 impl_tasklet_setup(PyTaskletObject *task, PyObject *args, PyObject *kwds, int insert);
 
@@ -344,6 +416,10 @@ PyTasklet_BindEx(PyTaskletObject *task, PyObject *func, PyObject *args, PyObject
 
     if (func != NULL && !PyCallable_Check(func))
         TYPE_ERROR("tasklet function must be a callable or None", -1);
+    if (args != NULL && !PyTuple_Check(args))
+        TYPE_ERROR("tasklet args must be a tuple or None", -1);
+    if (kwargs != NULL && !PyDict_Check(kwargs))
+        TYPE_ERROR("tasklet kwargs must be a dictionary or None", -1);
     if (ts && ts->st.current == task) {
         RUNTIME_ERROR("can't (re)bind the current tasklet", -1);
     }
@@ -356,6 +432,13 @@ PyTasklet_BindEx(PyTaskletObject *task, PyObject *func, PyObject *args, PyObject
     if (ts && task == ts->st.main && args == NULL && kwargs == NULL) {
         RUNTIME_ERROR("can't unbind the main tasklet", -1);
     }
+
+    /*
+     * Set the context to the current context. It can be changed later on.
+     */
+    if (func)
+        if (_tasklet_init_context(task))
+            return -1;
 
     tasklet_clear_frames(task);
     task->recursion_depth = 0;
@@ -452,13 +535,16 @@ tasklet_bind(PyObject *self, PyObject *args, PyObject *kwargs)
 static PyObject *
 tasklet_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyTaskletObject *t;
 
     /* we always need a cstate, so be sure to initialize */
     if (ts->st.initial_stub == NULL) {
-        PyMethodDef def = {"__new__", (PyCFunction)tasklet_new, METH_NOARGS};
-        return PyStackless_CallCMethod_Main(&def, (PyObject*)type, NULL);
+        PyMethodDef def = {"__new__", (PyCFunction)(void(*)(void))tasklet_new, METH_VARARGS|METH_KEYWORDS};
+        PyObject *func = PyCFunction_New(&def, (PyObject*)type);
+        PyObject *retval = PyStackless_Call_Main(func, args, kwds);
+        Py_DECREF(func);
+        return retval;
     }
     if (type == NULL)
         type = &PyTasklet_Type;
@@ -475,6 +561,7 @@ tasklet_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     Py_INCREF(Py_None);
     t->tempval = Py_None;
     t->tsk_weakreflist = NULL;
+    t->context = NULL;
     Py_INCREF(ts->st.initial_stub);
     t->cstate = ts->st.initial_stub;
     t->def_globals = PyEval_GetGlobals();
@@ -526,12 +613,18 @@ simply the tasklet() call without parameters.
 */
 
 static PyObject *
-tasklet_reduce(PyTaskletObject * t)
+tasklet_reduce(PyTaskletObject * t, PyObject *value)
 {
     PyObject *tup = NULL, *lis = NULL;
     PyFrameObject *f;
     PyThreadState *ts = t->cstate->tstate;
     PyObject *exc_type, *exc_value, *exc_traceback, *exc_info;
+    PyObject *context = NULL;
+
+    if (value && !PyLong_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "__reduce_ex__ argument should be an integer");
+        return NULL;
+    }
 
     if (ts && t == ts->st.current)
         RUNTIME_ERROR("You cannot __reduce__ the tasklet which is"
@@ -564,6 +657,10 @@ tasklet_reduce(PyTaskletObject * t)
         goto err_exit;
     }
 
+    context = _get_tasklet_context(t);
+    if (NULL == context)
+        goto err_exit;
+
     assert(!ts || t->exc_info != &ts->exc_state);
     /* Because of the test a few lines above, it is guaranteed that t is not the current tasklet.
      * Therefore we can simplify the line
@@ -592,7 +689,8 @@ tasklet_reduce(PyTaskletObject * t)
     Py_INCREF(exc_type);
     Py_INCREF(exc_value);
     Py_INCREF(exc_traceback);
-    tup = Py_BuildValue("(O()(" TASKLET_TUPLEFMT "))",
+    tup = Py_BuildValue((ts && (ts->st.pickleflags & SLP_PICKLEFLAGS_PICKLE_CONTEXT)) ?
+                        "(O()(" TASKLET_TUPLEFMT "O))" : "(O()(" TASKLET_TUPLEFMT "))",
                         Py_TYPE(t),
                         tasklet_flags_as_integer(t->flags),
                         t->tempval,
@@ -601,7 +699,8 @@ tasklet_reduce(PyTaskletObject * t)
                         exc_type,
                         exc_value,
                         exc_traceback,
-                        exc_info
+                        exc_info,
+                        context
                         );
     Py_DECREF(exc_info);
     Py_DECREF(exc_type);
@@ -609,6 +708,7 @@ tasklet_reduce(PyTaskletObject * t)
     Py_DECREF(exc_traceback);
 err_exit:
     Py_XDECREF(lis);
+    Py_XDECREF(context);
     return tup;
 }
 
@@ -630,11 +730,17 @@ tasklet_setstate(PyObject *self, PyObject *args)
     PyObject *exc_type, *exc_value, *exc_traceback;
     PyObject *old_type, *old_value, *old_traceback;
     PyObject *exc_info_obj;
+    PyObject *context = NULL;
     PyFrameObject *f;
     Py_ssize_t i, nframes;
     int j;
 
-    if (!PyArg_ParseTuple(args, "iOiO!OOOO:tasklet",
+    assert(t && PyTasklet_Check(t));
+
+    if (PyTasklet_Alive(t))
+        RUNTIME_ERROR("tasklet is alive", NULL);
+
+    if (!PyArg_ParseTuple(args, "iOiO!OOOO|O:tasklet",
                           &flags,
                           &tempval,
                           &nesting_level,
@@ -642,13 +748,19 @@ tasklet_setstate(PyObject *self, PyObject *args)
                           &exc_type,
                           &exc_value,
                           &exc_traceback,
-                          &exc_info_obj))
+                          &exc_info_obj,
+                          &context))
         return NULL;
+
+    if (Py_None == context)
+        context = NULL;
+    if (context != NULL && !PyContext_CheckExact(context))
+        TYPE_ERROR("tasklet state[8] must be a contextvars.Context or None", NULL);
 
     nframes = PyList_GET_SIZE(lis);
     TASKLET_SETVAL(t, tempval);
 
-    /* There is a unpickling race condition.  While it is rare,
+    /* There is an unpickling race condition.  While it is rare,
      * sometimes tasklets get their setstate call after the
      * channel they are blocked on.  If this happens and we
      * do not account for it, they will be left in a broken
@@ -693,10 +805,19 @@ tasklet_setstate(PyObject *self, PyObject *args)
             back = f;
         }
         t->f.frame = f;
+        if(NULL == context && _tasklet_init_context(t))
+            return NULL;
     }
+    if (context) {
+        PyObject *obj = _stackless_tasklet_set_context_impl(t, context);
+        if (NULL == obj)
+            return NULL;
+        Py_DECREF(obj);
+    }
+
     /* walk frames again and calculate recursion_depth */
     for (f = t->f.frame; f != NULL; f = f->f_back) {
-        if (PyFrame_Check(f) && f->f_execute != PyEval_EvalFrameEx_slp) {
+        if (PyFrame_Check(f) && f->f_executing != SLP_FRAME_EXECUTING_NO) {
             /*
              * we count running frames which *have* added
              * to recursion_depth
@@ -726,7 +847,7 @@ tasklet_setstate(PyObject *self, PyObject *args)
     assert(t->exc_state.previous_item == NULL);
 
     /* t must not be current, otherwise we would have to assign to ts->exc_info_obj */
-    assert(t != PyThreadState_GET()->st.current);
+    assert(t != _PyThreadState_GET()->st.current);
     if (exc_info_obj == Py_None) {
         t->exc_info = &t->exc_state;
     } else {
@@ -779,7 +900,7 @@ int
 PyTasklet_BindThread(PyTaskletObject *task, unsigned long thread_id)
 {
     PyThreadState *ts = task->cstate->tstate;
-    PyThreadState *cts = PyThreadState_GET();
+    PyThreadState *cts = _PyThreadState_GET();
     PyObject *old;
     assert(PyTasklet_Check(task));
 
@@ -825,7 +946,7 @@ end or to explicitly kill() them.\
 ");
 
 static PyObject *
-tasklet_remove(PyObject *self);
+tasklet_remove(PyObject *self, PyObject *unused);
 
 static int
 PyTasklet_Remove_M(PyTaskletObject *task)
@@ -839,7 +960,7 @@ PyTasklet_Remove_M(PyTaskletObject *task)
 static int
 impl_tasklet_remove(PyTaskletObject *task)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
 
     assert(PyTasklet_Check(task));
     if (ts->st.main == NULL) return PyTasklet_Remove_M(task);
@@ -868,7 +989,7 @@ PyTasklet_Remove(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_remove(PyObject *self)
+tasklet_remove(PyObject *self, PyObject *unused)
 {
     if (impl_tasklet_remove((PyTaskletObject*) self))
         return NULL;
@@ -883,7 +1004,7 @@ given that it isn't blocked.\n\
 Blocked tasklets need to be reactivated by channels.");
 
 static PyObject *
-tasklet_insert(PyObject *self);
+tasklet_insert(PyObject *self, PyObject *unused);
 
 static int
 PyTasklet_Insert_M(PyTaskletObject *task)
@@ -896,7 +1017,7 @@ PyTasklet_Insert_M(PyTaskletObject *task)
 static int
 impl_tasklet_insert(PyTaskletObject *task)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
 
     assert(PyTasklet_Check(task));
     if (ts->st.main == NULL)
@@ -926,7 +1047,7 @@ PyTasklet_Insert(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_insert(PyObject *self)
+tasklet_insert(PyObject *self, PyObject *unused)
 {
     if (impl_tasklet_insert((PyTaskletObject*) self))
         return NULL;
@@ -940,7 +1061,7 @@ PyDoc_STRVAR(tasklet_run__doc__,
 Blocked tasks need to be reactivated by channels.");
 
 static PyObject *
-tasklet_run(PyObject *self);
+tasklet_run(PyObject *self, PyObject *unused);
 
 static PyObject *
 PyTasklet_Run_M(PyTaskletObject *task)
@@ -955,7 +1076,7 @@ impl_tasklet_run_remove(PyTaskletObject *task, int remove);
 int
 PyTasklet_Run_nr(PyTaskletObject *task)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     STACKLESS_PROPOSE_ALL(ts);
     return slp_return_wrapper(impl_tasklet_run_remove(task, 0));
 }
@@ -973,7 +1094,7 @@ static PyObject *
 impl_tasklet_run_remove(PyTaskletObject *task, int remove)
 {
     STACKLESS_GETARG();
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyObject *ret;
     int inserted, fail, switched, removed=0;
     PyTaskletObject *prev = ts->st.current;
@@ -1048,9 +1169,10 @@ impl_tasklet_run_remove(PyTaskletObject *task, int remove)
         }
         if (inserted) {
             /* we must undo the insertion that we did, but we don't know the state */
-            if (task->next != NULL)
+            if (task->next != NULL) {
                 slp_current_uninsert(task);
-            Py_DECREF(task);
+                Py_DECREF(task);
+            }
         }
     } else if (!switched) {
         Py_CLEAR(ts->st.del_post_switch);
@@ -1059,7 +1181,7 @@ impl_tasklet_run_remove(PyTaskletObject *task, int remove)
 }
 
 static PyObject *
-tasklet_run(PyObject *self)
+tasklet_run(PyObject *self, PyObject *unused)
 {
     return impl_tasklet_run_remove((PyTaskletObject *) self, 0);
 }
@@ -1071,7 +1193,7 @@ custom scheduling behaviour.  Only works for tasklets of the\n\
 same thread.");
 
 static PyObject *
-tasklet_switch(PyObject *self);
+tasklet_switch(PyObject *self, PyObject *unused);
 
 static PyObject *
 PyTasklet_Switch_M(PyTaskletObject *task)
@@ -1083,7 +1205,7 @@ PyTasklet_Switch_M(PyTaskletObject *task)
 int
 PyTasklet_Switch_nr(PyTaskletObject *task)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     STACKLESS_PROPOSE_ALL(ts);
     return slp_return_wrapper(impl_tasklet_run_remove(task, 1));
 }
@@ -1095,7 +1217,7 @@ PyTasklet_Switch(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_switch(PyObject *self)
+tasklet_switch(PyObject *self, PyObject *unused)
 {
     return impl_tasklet_run_remove((PyTaskletObject *) self, 1);
 }
@@ -1120,7 +1242,7 @@ PyTasklet_SetAtomic(PyTaskletObject *task, int flag)
     int ret = task->flags.atomic;
 
     task->flags.atomic = flag ? 1 : 0;
-    if (task->flags.pending_irq && task == PyThreadState_GET()->st.current)
+    if (task->flags.pending_irq && task == _PyThreadState_GET()->st.current)
         slp_check_pending_irq();
     return ret;
 }
@@ -1153,7 +1275,7 @@ PyTasklet_SetIgnoreNesting(PyTaskletObject *task, int flag)
     int ret = task->flags.ignore_nesting;
 
     task->flags.ignore_nesting = flag ? 1 : 0;
-    if (task->flags.pending_irq && task == PyThreadState_GET()->st.current)
+    if (task->flags.pending_irq && task == _PyThreadState_GET()->st.current)
         slp_check_pending_irq();
     return ret;
 }
@@ -1213,7 +1335,7 @@ int PyTasklet_Setup(PyTaskletObject *task, PyObject *args, PyObject *kwds)
 static int
 impl_tasklet_setup(PyTaskletObject *task, PyObject *args, PyObject *kwds, int insert)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyFrameObject *frame;
     PyObject *func;
 
@@ -1280,7 +1402,7 @@ tasklet_setup(PyObject *self, PyObject *args, PyObject *kwds)
 
 
 PyDoc_STRVAR(tasklet_throw__doc__,
-             "tasklet.throw(exc, val=None, tb=None, immediate=True) -- raise an exception for the tasklet.\n\
+             "tasklet.throw(exc, val=None, tb=None, pending=False) -- raise an exception for the tasklet.\n\
              'exc', 'val' and 'tb' have the same semantics as the 'raise' statement of the Python(r) language.\n\
              If 'pending' is True, the tasklet is not immediately activated, just\n\
              merely made runnable, ready to raise the exception when run.");
@@ -1292,7 +1414,7 @@ static PyObject *
 PyTasklet_Throw_M(PyTaskletObject *self, int pending, PyObject *exc,
                            PyObject *val, PyObject *tb)
 {
-    PyMethodDef def = {"throw", (PyCFunction)tasklet_throw, METH_VARARGS|METH_KEYWORDS};
+    PyMethodDef def = {"throw", (PyCFunction)(void(*)(void))tasklet_throw, METH_VARARGS|METH_KEYWORDS};
     if (!val)
         val = Py_None;
     if (!tb)
@@ -1310,7 +1432,7 @@ _impl_tasklet_throw_bomb(PyTaskletObject *self, int pending, PyObject *bomb)
 #endif
 {
     STACKLESS_GETARG();
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyObject *ret, *tmpval;
     int fail;
 
@@ -1373,7 +1495,7 @@ _impl_tasklet_throw_bomb(PyTaskletObject *self, int pending, PyObject *bomb)
          *    because a dead tasklet must not be scheduled.
          */
 
-#if 0   /* disabled until https://bitbucket.org/stackless-dev/stackless/issues/81 is resolved */
+#if 0   /* disabled until https://github.com/stackless-dev/stackless/issues/81 is resolved */
         assert(self->next == NULL && self->prev == NULL);
 #endif
 
@@ -1444,7 +1566,7 @@ static PyObject *
 impl_tasklet_throw(PyTaskletObject *self, int pending, PyObject *exc, PyObject *val, PyObject *tb)
 {
     STACKLESS_GETARG();
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyObject *ret, *bomb;
 
     if (ts->st.main == NULL)
@@ -1513,7 +1635,7 @@ impl_tasklet_raise_exception(PyTaskletObject *self, PyObject *klass, PyObject *a
 
 {
     STACKLESS_GETARG();
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyObject *ret, *bomb;
 
     if (ts->st.main == NULL)
@@ -1653,7 +1775,7 @@ tasklet_kill(PyObject *self, PyObject *args, PyObject *kwds)
 /* attributes which are hiding in small fields */
 
 static PyObject *
-tasklet_get_blocked(PyTaskletObject *task)
+tasklet_get_blocked(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(task->flags.blocked);
 }
@@ -1665,7 +1787,7 @@ int PyTasklet_GetBlocked(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_atomic(PyTaskletObject *task)
+tasklet_get_atomic(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(task->flags.atomic);
 }
@@ -1677,7 +1799,7 @@ int PyTasklet_GetAtomic(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_ignore_nesting(PyTaskletObject *task)
+tasklet_get_ignore_nesting(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(task->flags.ignore_nesting);
 }
@@ -1689,7 +1811,7 @@ int PyTasklet_GetIgnoreNesting(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_frame(PyTaskletObject *task)
+tasklet_get_frame(PyTaskletObject *task, void *closure)
 {
     PyObject *ret = (PyObject*) PyTasklet_GetFrame(task);
     if (ret)
@@ -1711,7 +1833,7 @@ PyTasklet_GetFrame(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_block_trap(PyTaskletObject *task)
+tasklet_get_block_trap(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(task->flags.block_trap);
 }
@@ -1723,7 +1845,7 @@ int PyTasklet_GetBlockTrap(PyTaskletObject *task)
 
 
 static int
-tasklet_set_block_trap(PyTaskletObject *task, PyObject *value)
+tasklet_set_block_trap(PyTaskletObject *task, PyObject *value, void *closure)
 {
     if (!PyLong_Check(value))
         TYPE_ERROR("block_trap must be set to a bool or integer", -1);
@@ -1738,7 +1860,7 @@ void PyTasklet_SetBlockTrap(PyTaskletObject *task, int value)
 
 
 static PyObject *
-tasklet_is_main(PyTaskletObject *task)
+tasklet_is_main(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     return PyBool_FromLong(ts && task == ts->st.main);
@@ -1753,7 +1875,7 @@ PyTasklet_IsMain(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_is_current(PyTaskletObject *task)
+tasklet_is_current(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     return PyBool_FromLong(ts && task == ts->st.current);
@@ -1768,7 +1890,7 @@ PyTasklet_IsCurrent(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_recursion_depth(PyTaskletObject *task)
+tasklet_get_recursion_depth(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts;
 
@@ -1791,7 +1913,7 @@ PyTasklet_GetRecursionDepth(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_get_nesting_level(PyTaskletObject *task)
+tasklet_get_nesting_level(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts;
 
@@ -1817,7 +1939,7 @@ PyTasklet_GetNestingLevel(PyTaskletObject *task)
 /* attributes which are handy, but easily computed */
 
 static PyObject *
-tasklet_alive(PyTaskletObject *task)
+tasklet_alive(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(slp_get_frame(task) != NULL);
 }
@@ -1830,7 +1952,7 @@ PyTasklet_Alive(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_paused(PyTaskletObject *task)
+tasklet_paused(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(
         slp_get_frame(task) != NULL && task->next == NULL);
@@ -1844,7 +1966,7 @@ PyTasklet_Paused(PyTaskletObject *task)
 
 
 static PyObject *
-tasklet_scheduled(PyTaskletObject *task)
+tasklet_scheduled(PyTaskletObject *task, void *closure)
 {
     return PyBool_FromLong(task->next != NULL);
 }
@@ -1856,7 +1978,7 @@ PyTasklet_Scheduled(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_restorable(PyTaskletObject *task)
+tasklet_restorable(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts;
 
@@ -1879,7 +2001,7 @@ PyTasklet_Restorable(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_get_channel(PyTaskletObject *task)
+tasklet_get_channel(PyTaskletObject *task, void *closure)
 {
     PyTaskletObject *prev = task->prev;
     PyObject *ret = Py_None;
@@ -1894,7 +2016,7 @@ tasklet_get_channel(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_get_next(PyTaskletObject *task)
+tasklet_get_next(PyTaskletObject *task, void *closure)
 {
     PyObject *ret = Py_None;
 
@@ -1905,7 +2027,7 @@ tasklet_get_next(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_get_prev(PyTaskletObject *task)
+tasklet_get_prev(PyTaskletObject *task, void *closure)
 {
     PyObject *ret = Py_None;
 
@@ -1916,7 +2038,7 @@ tasklet_get_prev(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_thread_id(PyTaskletObject *task)
+tasklet_thread_id(PyTaskletObject *task, void *closure)
 {
     if (task->cstate->tstate) {
         return PyLong_FromUnsignedLong(task->cstate->tstate->thread_id);
@@ -1925,7 +2047,7 @@ tasklet_thread_id(PyTaskletObject *task)
 }
 
 static PyObject *
-tasklet_get_trace_function(PyTaskletObject *task)
+tasklet_get_trace_function(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     PyCFrameObject *f;
@@ -1969,7 +2091,7 @@ tasklet_get_trace_function(PyTaskletObject *task)
 }
 
 static int
-tasklet_set_trace_function(PyTaskletObject *task, PyObject *value)
+tasklet_set_trace_function(PyTaskletObject *task, PyObject *value, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     PyCFrameObject *f;
@@ -1985,7 +2107,7 @@ tasklet_set_trace_function(PyTaskletObject *task, PyObject *value)
     }
     if (ts && ts->st.current == task) {
         /* current tasklet */
-        if (PyThreadState_GET() != ts)
+        if (_PyThreadState_GET() != ts)
             RUNTIME_ERROR("You cannot set the trace function of the current tasklet of another thread", -1);
         PyEval_SetTrace(tf, value);
         return 0;
@@ -2059,7 +2181,7 @@ tasklet_set_trace_function(PyTaskletObject *task, PyObject *value)
 }
 
 static PyObject *
-tasklet_get_profile_function(PyTaskletObject *task)
+tasklet_get_profile_function(PyTaskletObject *task, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     PyCFrameObject *f;
@@ -2103,7 +2225,7 @@ tasklet_get_profile_function(PyTaskletObject *task)
 }
 
 static int
-tasklet_set_profile_function(PyTaskletObject *task, PyObject *value)
+tasklet_set_profile_function(PyTaskletObject *task, PyObject *value, void *closure)
 {
     PyThreadState *ts = task->cstate->tstate;
     PyCFrameObject *f;
@@ -2119,7 +2241,7 @@ tasklet_set_profile_function(PyTaskletObject *task, PyObject *value)
     }
     if (ts && ts->st.current == task) {
         /* current tasklet */
-        if (PyThreadState_GET() != ts)
+        if (_PyThreadState_GET() != ts)
             RUNTIME_ERROR("You cannot set the profile function of the current tasklet of another thread", -1);
         PyEval_SetProfile(tf, value);
         return 0;
@@ -2191,6 +2313,143 @@ tasklet_set_profile_function(PyTaskletObject *task, PyObject *value)
 
     RUNTIME_ERROR("tasklet is not alive", -1);
 }
+
+/*[clinic input]
+_stackless.tasklet.set_context
+
+    context: object(subclass_of='&PyContext_Type')
+
+Set the context to be used while this tasklet runs.
+
+Every tasklet has a private context attribute. When the tasklet runs,
+this context becomes the current context of the thread.
+
+This method raises RuntimeError, if the tasklet is bound to a foreign thread and is current or scheduled.
+This method raises RuntimeError, if called from within Context.run().
+This method returns the tasklet it is called on.
+[clinic start generated code]*/
+
+static PyObject *
+_stackless_tasklet_set_context_impl(PyTaskletObject *self, PyObject *context)
+/*[clinic end generated code: output=23061bb958da0ff9 input=3c29aedc0d51481c]*/
+{
+    PyThreadState *ts = self->cstate->tstate;
+    PyThreadState *cts = PyThreadState_Get();
+    PyObject *ctx;
+
+    assert(context);
+    assert(PyContext_CheckExact(context));
+
+    if (ts && self == ts->st.current) {
+        /* the tasklet is the current tasklet. */
+
+        /* I'm not sure, if setting the context for a current tasklet is really relevant,
+         * but it can be implemented. Therefore I'm going to implement it. */
+        if (ts != cts)
+            goto fail_other_thread;
+
+        /* Its context is in ts->context */
+        ctx = ts->context;
+        if (ctx && ((PyContext *) ctx)->ctx_entered)
+            goto fail_ctx_entered;
+        Py_INCREF(context);
+        Py_XSETREF(ts->context, context);
+        ts->context_ver++;
+    } else {
+        /* the tasklet is not the current tasklet. Its context is in self->context */
+        if (ts != cts && PyTasklet_Scheduled(self) && !self->flags.blocked)
+            goto fail_other_thread;
+        ctx = self->context;
+        if (ctx && ((PyContext *) ctx)->ctx_entered)
+            goto fail_ctx_entered;
+        Py_INCREF(context);
+        Py_XSETREF(self->context, context);
+    }
+    Py_INCREF(self);
+    return (PyObject *) self;
+fail_ctx_entered:
+    return slp_runtime_error("the current context of the tasklet has been entered.");
+fail_other_thread:
+    return slp_runtime_error("tasklet belongs to a different thread");
+}
+
+/* AFAIK argument clinic currently does not support the signature of context_run(callable, *args, **kwargs). */
+PyDoc_STRVAR(tasklet_context_run__doc__,"context_run(callable, *args, **kwargs)\n\
+\n\
+Execute callable(*args, **kwargs) code in the context object of the tasklet the contest_run method is called on.\n\
+Return the result of the execution or propagate an exception if one occurred.");
+
+static PyObject *
+tasklet_context_run(PyTaskletObject *self, PyObject *const *args,
+            Py_ssize_t nargs, PyObject *kwnames)
+{
+    STACKLESS_GETARG();
+    PyThreadState *ts = self->cstate->tstate;
+    PyThreadState *cts = PyThreadState_Get();
+    PyObject *ctx;
+    assert(cts);
+
+    if (nargs < 1) {
+        PyErr_SetString(PyExc_TypeError,
+                        "run() missing 1 required positional argument");
+        return NULL;
+    }
+
+    ctx = _get_tasklet_context(self);  /* returns an new reference */
+
+    PyObject * saved_context = cts->context;
+    cts->context = ctx;
+    cts->context_ver++;
+    ctx = NULL;
+
+    PyCFrameObject *f = NULL;
+    if (stackless) {
+        f = slp_cframe_new(slp_context_run_callback, 1);
+        if (f == NULL) {
+            Py_XSETREF(cts->context, saved_context);
+            return NULL;
+        }
+        f->i = 1;
+        Py_XINCREF(saved_context);
+        f->ob1 = saved_context;
+        SLP_SET_CURRENT_FRAME(ts, (PyFrameObject *)f);
+        /* f contains the only counted reference to current frame. This reference
+         * keeps the fame alive during the following _PyObject_FastCallKeywords().
+         */
+    }
+    STACKLESS_PROMOTE_ALL();
+    PyObject *call_result = _PyObject_FastCallKeywords(
+        args[0], args + 1, nargs - 1, kwnames);
+    STACKLESS_ASSERT();
+
+    if (stackless && !STACKLESS_UNWINDING(call_result)) {
+        /* required, because we added a C-frame */
+        assert(f);
+        assert((PyFrameObject *)f == SLP_CURRENT_FRAME(ts));
+        SLP_STORE_NEXT_FRAME(ts, (PyFrameObject *)f);
+        Py_DECREF(f);
+        Py_XDECREF(saved_context);
+        return STACKLESS_PACK(ts, call_result);
+    }
+    Py_XDECREF(f);
+    if (STACKLESS_UNWINDING(call_result)) {
+        Py_XDECREF(saved_context);
+        return call_result;
+    }
+    Py_XSETREF(cts->context, saved_context);
+    cts->context_ver++;
+    return call_result;
+}
+
+static PyObject *
+tasklet_context_id(PyTaskletObject *self, void *closure)
+{
+    PyObject *ctx = _get_tasklet_context(self);
+    PyObject *result = PyLong_FromVoidPtr(ctx);
+    Py_DECREF(ctx);
+    return result;
+}
+
 
 static PyMemberDef tasklet_members[] = {
     {"cstate", T_OBJECT, offsetof(PyTaskletObject, cstate), READONLY,
@@ -2291,6 +2550,9 @@ static PyGetSetDef tasklet_getsetlist[] = {
      "For the current tasklet this property is equivalent to sys.gettrace()\n"
      "and sys.settrace().")},
 
+     {"context_id", (getter)tasklet_context_id, NULL,
+      PyDoc_STR("The id of the context object of this tasklet.")},
+
     {0},
 };
 
@@ -2312,24 +2574,27 @@ static PyMethodDef tasklet_methods[] = {
      tasklet_set_atomic__doc__},
     {"set_ignore_nesting", (PCF)tasklet_set_ignore_nesting, METH_O,
      tasklet_set_ignore_nesting__doc__},
-    {"throw",                   (PCF)tasklet_throw,         METH_KS,
+    {"throw",            (PCF)(void(*)(void))tasklet_throw, METH_KS,
     tasklet_throw__doc__},
-    {"raise_exception",         (PCF)tasklet_raise_exception, METH_VS,
+    {"raise_exception",       (PCF)tasklet_raise_exception, METH_VS,
     tasklet_raise_exception__doc__},
-    {"kill",                    (PCF)tasklet_kill,          METH_KS,
+    {"kill",              (PCF)(void(*)(void))tasklet_kill, METH_KS,
      tasklet_kill__doc__},
-    {"bind",                    (PCF)tasklet_bind,          METH_VARARGS | METH_KEYWORDS,
+    {"bind",              (PCF)(void(*)(void))tasklet_bind, METH_VARARGS | METH_KEYWORDS,
      tasklet_bind__doc__},
-    {"setup",                   (PCF)tasklet_setup,         METH_VARARGS | METH_KEYWORDS,
+    {"setup",            (PCF)(void(*)(void))tasklet_setup, METH_VARARGS | METH_KEYWORDS,
      tasklet_setup__doc__},
     {"__reduce__",              (PCF)tasklet_reduce,        METH_NOARGS,
      tasklet_reduce__doc__},
-    {"__reduce_ex__",           (PCF)tasklet_reduce,        METH_VARARGS,
+    {"__reduce_ex__",           (PCF)tasklet_reduce,        METH_O,
      tasklet_reduce__doc__},
     {"__setstate__",            (PCF)tasklet_setstate,      METH_O,
      tasklet_setstate__doc__},
     {"bind_thread",              (PCF)tasklet_bind_thread,  METH_VARARGS,
     tasklet_bind_thread__doc__},
+    {"context_run", (PCF)(void(*)(void))tasklet_context_run, METH_FASTCALL | METH_KEYWORDS | METH_STACKLESS,
+            tasklet_context_run__doc__},
+    _STACKLESS_TASKLET_SET_CONTEXT_METHODDEF
     {NULL,     NULL}             /* sentinel */
 };
 

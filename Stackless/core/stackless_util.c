@@ -1,7 +1,7 @@
 #include "Python.h"
 
 #ifdef STACKLESS
-#include "internal/stackless_impl.h"
+#include "pycore_stackless.h"
 
 int * const _PyStackless__TryStacklessPtr = &_PyStackless_TRY_STACKLESS;
 
@@ -58,7 +58,7 @@ slp_get_frame(PyTaskletObject *task)
 
 void slp_check_pending_irq()
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyTaskletObject *current = ts->st.current;
 
     /* act only if hard irq is in effect */
@@ -80,7 +80,7 @@ slp_return_wrapper(PyObject *retval)
     if (retval == NULL)
         return -1;
     if (STACKLESS_UNWINDING(retval)) {
-        STACKLESS_UNPACK(PyThreadState_GET(), retval);
+        STACKLESS_UNPACK(_PyThreadState_GET(), retval);
         Py_XDECREF(retval);
         return 1;
     }
@@ -115,7 +115,7 @@ slp_int_wrapper(PyObject *retval)
 int
 slp_current_wrapper( int(*func)(PyTaskletObject*), PyTaskletObject *task )
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
 
     int ret;
     ts->st.main = (PyTaskletObject*)Py_None;

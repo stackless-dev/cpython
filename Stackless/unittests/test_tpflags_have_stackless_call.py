@@ -121,7 +121,7 @@ class TestStacklessCallFlag(StacklessTestCase):
             pass
 
         class SuperClassNoSlpCallable(object):
-            __call__ = stackless._test_nostacklesscall
+            __call__ = stackless._stackless._test_nostacklesscall
 
         class SubClassNoSlpCallable(SuperClassNoSlpCallable):
             pass
@@ -134,7 +134,7 @@ class TestStacklessCallFlag(StacklessTestCase):
         self.SubClassNoSlpCallable = SubClassNoSlpCallable
 
     def testInitialFlags(self):
-        self.assertNotStacklessCall(type(stackless._test_nostacklesscall))
+        self.assertNotStacklessCall(type(stackless._stackless._test_nostacklesscall))
 
         self.assertNotStacklessCall(self.SuperClass)
         self.assertNotStacklessCall(self.SubClass)
@@ -162,7 +162,7 @@ class TestStacklessCallFlag(StacklessTestCase):
         self.assertStacklessCall(self.SubClassNoSlpCallable)
 
     def testMakeNotSlpCallable(self):
-        self.SuperClassCallable.__call__ = stackless._test_nostacklesscall
+        self.SuperClassCallable.__call__ = stackless._stackless._test_nostacklesscall
 
         self.assertStacklessCall(self.SuperClassCallable)
         self.assertStacklessCall(self.SubClassCallable)
@@ -202,7 +202,7 @@ class TestNonStacklessCall(StacklessTestCase):
 
         class B(object):
             __call__ = a
-        A.__call__ = stackless._test_nostacklesscall
+        A.__call__ = stackless._stackless._test_nostacklesscall
         self.B = B
 
     def callDirect(self):
@@ -295,10 +295,10 @@ class TestInitIsStackless(StacklessTestCase):
     CNewSyn.__init__ = C__init__
 
     class CNonStackless:
-        __init__ = stackless._test_nostacklesscall
+        __init__ = stackless._stackless._test_nostacklesscall
 
     class CNewNonStackless(object):
-        __init__ = stackless._test_nostacklesscall
+        __init__ = stackless._stackless._test_nostacklesscall
 
     def testNestingLevelNew(self):
         self.nestingLevelTest(self.CNew)

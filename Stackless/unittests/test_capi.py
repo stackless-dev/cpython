@@ -34,7 +34,6 @@ import subprocess
 import glob
 import pickle
 import _teststackless
-
 from support import test_main  # @UnusedImport
 from support import (StacklessTestCase, withThreads, require_one_thread,
                      testcase_leaks_references)
@@ -48,6 +47,12 @@ if withThreads:
         import _thread
 else:
     _thread = None
+
+try:
+    from stackless._stackless import _with_old_cython_hack
+except ImportError:
+    _with_old_cython_hack = False
+
 
 
 class Test_PyEval_EvalFrameEx(StacklessTestCase):
@@ -169,6 +174,7 @@ class Test_PyEval_EvalFrameEx(StacklessTestCase):
         self.assertIn(str(exc), msg)
         #print(msg)
 
+    @unittest.skipUnless(_with_old_cython_hack, "feature not enabled at compile time")
     def test_oldcython_frame(self):
         # A test for Stackless issue #168
         self.assertEqual(self.call_PyEval_EvalFrameEx(47110816, oldcython=True), 47110816)
@@ -182,7 +188,8 @@ class Test_PyEval_EvalFrameEx(StacklessTestCase):
             return code
 
         self.assertIs(_teststackless.test_PyEval_EvalFrameEx(f.__code__, f.__globals__, (f.__code__,), oldcython=False), f.__code__)
-        self.assertIs(_teststackless.test_PyEval_EvalFrameEx(f.__code__, f.__globals__, (f2.__code__,), oldcython=True), f2.__code__)
+        if _with_old_cython_hack:
+            self.assertIs(_teststackless.test_PyEval_EvalFrameEx(f.__code__, f.__globals__, (f2.__code__,), oldcython=True), f2.__code__)
 
     @testcase_leaks_references("f->f_code get overwritten without Py_DECREF")
     def test_oldcython_frame_code_is_1st_arg_bad(self):

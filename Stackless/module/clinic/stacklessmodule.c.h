@@ -19,7 +19,7 @@ PyDoc_STRVAR(_stackless_pickle_flags_default__doc__,
 "without changing them, omit the arguments.");
 
 #define _STACKLESS_PICKLE_FLAGS_DEFAULT_METHODDEF    \
-    {"pickle_flags_default", (PyCFunction)_stackless_pickle_flags_default, METH_FASTCALL|METH_KEYWORDS, _stackless_pickle_flags_default__doc__},
+    {"pickle_flags_default", (PyCFunction)(void(*)(void))_stackless_pickle_flags_default, METH_FASTCALL|METH_KEYWORDS, _stackless_pickle_flags_default__doc__},
 
 static PyObject *
 _stackless_pickle_flags_default_impl(PyObject *module, long new_default,
@@ -71,7 +71,7 @@ PyDoc_STRVAR(_stackless_pickle_flags__doc__,
 "All other bits must be set to 0.");
 
 #define _STACKLESS_PICKLE_FLAGS_METHODDEF    \
-    {"pickle_flags", (PyCFunction)_stackless_pickle_flags, METH_FASTCALL|METH_KEYWORDS, _stackless_pickle_flags__doc__},
+    {"pickle_flags", (PyCFunction)(void(*)(void))_stackless_pickle_flags, METH_FASTCALL|METH_KEYWORDS, _stackless_pickle_flags__doc__},
 
 static PyObject *
 _stackless_pickle_flags_impl(PyObject *module, long new_flags, long mask);
@@ -104,4 +104,4 @@ exit:
 #ifndef _STACKLESS_PICKLE_FLAGS_METHODDEF
     #define _STACKLESS_PICKLE_FLAGS_METHODDEF
 #endif /* !defined(_STACKLESS_PICKLE_FLAGS_METHODDEF) */
-/*[clinic end generated code: output=4ad6a9f914110629 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=e59f426d5b04d0fe input=a9049054013a1b77]*/

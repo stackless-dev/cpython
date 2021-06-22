@@ -41,7 +41,7 @@ import time
 import collections
 import unittest
 import subprocess
-from stackless import _test_nostacklesscall as apply_not_stackless
+from _stackless import _test_nostacklesscall as apply_not_stackless
 try:
     import _thread as thread
     import threading
@@ -130,7 +130,7 @@ class TestThreadShutdown(StacklessTestCase):
 class TestShutdown(StacklessTestCase):
     @unittest.skipUnless(withThreads, "requires thread support")
     def test_deep_thread(self):
-        # test for issue #103 https://bitbucket.org/stackless-dev/stackless/issues/103/
+        # test for issue #103 https://github.com/stackless-dev/stackless/issues/103/
 
         args = []
         if not stackless.enable_softswitch(None):
@@ -143,7 +143,7 @@ class TestShutdown(StacklessTestCase):
             import stackless
             import time
             import sys
-            from stackless import _test_nostacklesscall as apply
+            from _stackless import _test_nostacklesscall as apply
 
             if "--hard" in sys.argv:
                 stackless.enable_softswitch(False)
@@ -170,7 +170,7 @@ class TestShutdown(StacklessTestCase):
         self.assertEqual(rc, 42)
 
     def test_deep_tasklets(self):
-        # test for issue #103 https://bitbucket.org/stackless-dev/stackless/issues/103/
+        # test for issue #103 https://github.com/stackless-dev/stackless/issues/103/
 
         args = []
         if not stackless.enable_softswitch(None):
@@ -181,7 +181,7 @@ class TestShutdown(StacklessTestCase):
 
             import stackless
             import sys
-            from stackless import _test_nostacklesscall as apply
+            from _stackless import _test_nostacklesscall as apply
 
             if "--hard" in sys.argv:
                 stackless.enable_softswitch(False)
@@ -208,7 +208,7 @@ class TestShutdown(StacklessTestCase):
         self.assertEqual(rc, 42)
 
     def test_exit_in_deep_tasklet1(self):
-        # test for issue #103 https://bitbucket.org/stackless-dev/stackless/issues/103/
+        # test for issue #103 https://github.com/stackless-dev/stackless/issues/103/
 
         args = []
         if not stackless.enable_softswitch(None):
@@ -219,7 +219,7 @@ class TestShutdown(StacklessTestCase):
 
             import stackless
             import sys
-            from stackless import _test_nostacklesscall as apply
+            from _stackless import _test_nostacklesscall as apply
 
             if "--hard" in sys.argv:
                 stackless.enable_softswitch(False)
@@ -252,7 +252,7 @@ class TestShutdown(StacklessTestCase):
         self.assertEqual(rc, 42)
 
     def test_exit_in_deep_tasklet2(self):
-        # test for issue #103 https://bitbucket.org/stackless-dev/stackless/issues/103/
+        # test for issue #103 https://github.com/stackless-dev/stackless/issues/103/
 
         args = []
         if not stackless.enable_softswitch(None):
@@ -263,7 +263,7 @@ class TestShutdown(StacklessTestCase):
 
             import stackless
             import sys
-            from stackless import _test_nostacklesscall as apply
+            from _stackless import _test_nostacklesscall as apply
 
             if "--hard" in sys.argv:
                 stackless.enable_softswitch(False)
@@ -301,7 +301,7 @@ class TestShutdown(StacklessTestCase):
         self.assertEqual(rc, 42)
 
     def test_deep_Py_Exit(self):
-        # test for issue #103 https://bitbucket.org/stackless-dev/stackless/issues/103/
+        # test for issue #103 https://github.com/stackless-dev/stackless/issues/103/
         try:
             import ctypes  # @UnusedImport
         except ImportError:
@@ -317,7 +317,7 @@ class TestShutdown(StacklessTestCase):
             import stackless
             import sys
             import ctypes
-            from stackless import _test_nostacklesscall as apply
+            from _stackless import _test_nostacklesscall as apply
 
             if "--hard" in sys.argv:
                 stackless.enable_softswitch(False)
@@ -345,7 +345,7 @@ class TestShutdown(StacklessTestCase):
 
     @unittest.skipUnless(withThreads, "requires thread support")
     def test_other_thread_Py_Exit(self):
-        # test for issue #103 https://bitbucket.org/stackless-dev/stackless/issues/103/
+        # test for issue #103 https://github.com/stackless-dev/stackless/issues/103/
         try:
             import ctypes  # @UnusedImport
         except ImportError:
@@ -390,7 +390,7 @@ class TestShutdown(StacklessTestCase):
 
     @unittest.skipUnless(withThreads, "requires thread support")
     def test_kill_modifies_slp_cstack_chain(self):
-        # test for issue #105 https://bitbucket.org/stackless-dev/stackless/issues/105/
+        # test for issue #105 https://github.com/stackless-dev/stackless/issues/105/
 
         args = []
         if not stackless.enable_softswitch(None):
@@ -404,7 +404,7 @@ class TestShutdown(StacklessTestCase):
             import stackless
             import time
             import sys
-            from stackless import _test_nostacklesscall as apply
+            from _stackless import _test_nostacklesscall as apply
 
             DEBUG = False
             event = threading.Event()
@@ -491,7 +491,7 @@ class TestInterpreterShutdown(unittest.TestCase):
     # intentionally not a subclass of StacklessTestCase.
 
     def _test_shutdown_with_thread(self, case, is_hard, allowed_errors=(), debug=False):
-        # test for issue #81 https://bitbucket.org/stackless-dev/stackless/issues/81/
+        # test for issue #81 https://github.com/stackless-dev/stackless/issues/81/
         if not withThreads:
             self.skipTest("requires thread support")
         script = __file__

@@ -64,6 +64,22 @@ extern "C" {
 #undef STACKLESS
 #endif
 
+#ifdef STACKLESS
+#ifndef SLP_WITH_FRAME_REF_DEBUG
+/* Control frame reference count debugging. That's a special mode
+ * to find reference leaks during stack transfers and tasklet switching.
+ * Usually you do not want to enable this mode.
+ *
+ * SLP_WITH_FRAME_REF_DEBUG must be either undefined, 1 or 2
+ *  undefined: disable frame reference count debugging (default)
+ *  1: normal frame reference count debugging
+ *  2: heavy (slow) frame reference count debugging
+ */
+/* #define SLP_WITH_FRAME_REF_DEBUG 1 */
+/* #define SLP_WITH_FRAME_REF_DEBUG 2 */
+#endif  /* SLP_WITH_FRAME_REF_DEBUG */
+#endif  /* STACKLESS */
+
 #ifdef __cplusplus
 }
 #endif

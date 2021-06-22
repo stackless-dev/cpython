@@ -1,10 +1,11 @@
 #include "Python.h"
 #include "structmember.h"
+#include "pythread.h"
+#include "pycore_object.h"
 
 #ifdef STACKLESS
-#include "internal/stackless_impl.h"
+#include "pycore_stackless.h"
 
-#include "pythread.h"
 
 /******************************************************
 
@@ -41,12 +42,13 @@ bomb_traverse(PyBombObject *bomb, visitproc visit, void *arg)
     return 0;
 }
 
-static void
+static int
 bomb_clear(PyBombObject *bomb)
 {
     Py_CLEAR(bomb->curexc_type);
     Py_CLEAR(bomb->curexc_value);
     Py_CLEAR(bomb->curexc_traceback);
+    return 0;
 }
 
 PyBombObject *
@@ -178,7 +180,7 @@ slp_curexc_to_bomb(void)
     /* assert, that the bomb-type was initialized */
     assert(PyType_HasFeature(&PyBomb_Type, Py_TPFLAGS_READY));
     if (PyErr_ExceptionMatches(PyExc_MemoryError)) {
-        bomb = PyThreadState_GET()->interp->st.mem_bomb;
+        bomb = _PyThreadState_GET()->interp->st.mem_bomb;
         assert(bomb != NULL);
         Py_INCREF(bomb);
     } else
@@ -215,9 +217,14 @@ slp_bomb_explode(PyObject *_bomb)
 }
 
 static PyObject *
-bomb_reduce(PyBombObject *bomb)
+bomb_reduce(PyBombObject *bomb, PyObject *value)
 {
     PyObject *tup;
+
+    if (value && !PyLong_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "__reduce_ex__ argument should be an integer");
+        return NULL;
+    }
 
     tup = slp_into_tuple_with_nulls(&bomb->curexc_type, 3);
     if (tup != NULL)
@@ -245,7 +252,7 @@ static PyMemberDef bomb_members[] = {
 
 static PyMethodDef bomb_methods[] = {
     {"__reduce__",              (PyCFunction)bomb_reduce,       METH_NOARGS},
-    {"__reduce_ex__",           (PyCFunction)bomb_reduce,       METH_VARARGS},
+    {"__reduce_ex__",           (PyCFunction)bomb_reduce,       METH_O},
     {"__setstate__",            (PyCFunction)bomb_setstate,     METH_O},
     {NULL,     NULL}             /* sentinel */
 };
@@ -360,7 +367,7 @@ typedef struct {
 static int
 transfer_with_tracing(PyCStackObject **cstprev, PyCStackObject *cst, PyTaskletObject *prev)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     int ret;
 
     saved_tstat_with_magic_t sm;
@@ -433,7 +440,7 @@ slp_get_saved_tstate(PyTaskletObject *task) {
 int
 slp_schedule_callback(PyTaskletObject *prev, PyTaskletObject *next)
 {
-    PyThreadState * ts = PyThreadState_GET();
+    PyThreadState * ts = _PyThreadState_GET();
     PyObject *schedule_hook = ts->interp->st.schedule_hook;
     PyObject *args;
 
@@ -521,16 +528,17 @@ kill_wrap_bad_guy(PyTaskletObject *prev, PyTaskletObject *bad_guy)
      * tasklet into the exception and remove it from the runnables.
      *
      */
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyObject *newval = PyTuple_New(2);
     if (bad_guy->next != NULL) {
         ts->st.current = bad_guy;
         slp_current_remove();
+        Py_DECREF(bad_guy);
     }
     /* restore last tasklet */
     if (prev->next == NULL)
         slp_current_insert(prev);
-    SLP_STORE_NEXT_FRAME(ts, prev->f.frame);
+    SLP_SET_CURRENT_FRAME(ts, prev->f.frame);
     Py_CLEAR(prev->f.frame);
     ts->st.current = prev;
     if (newval != NULL) {
@@ -549,10 +557,9 @@ kill_wrap_bad_guy(PyTaskletObject *prev, PyTaskletObject *bad_guy)
 /* non-recursive scheduling */
 
 PyObject *
-slp_restore_tracing(PyFrameObject *f, int exc, PyObject *retval)
+slp_restore_tracing(PyCFrameObject *cf, int exc, PyObject *retval)
 {
-    PyThreadState *ts = PyThreadState_GET();
-    PyCFrameObject *cf = (PyCFrameObject *) f;
+    PyThreadState *ts = _PyThreadState_GET();
 
     if (NULL == cf->any1 && NULL == cf->any2) {
         /* frame was created by unpickling */
@@ -598,20 +605,20 @@ slp_encode_ctrace_functions(Py_tracefunc c_tracefunc, Py_tracefunc c_profilefunc
 /* jumping from a soft tasklet to a hard switched */
 
 static PyObject *
-jump_soft_to_hard(PyFrameObject *f, int exc, PyObject *retval)
+jump_soft_to_hard(PyCFrameObject *cf, int exc, PyObject *retval)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
 
-    SLP_STORE_NEXT_FRAME(ts, f->f_back);
+    SLP_STORE_NEXT_FRAME(ts, cf->f_back);
 
     /* reinstate the del_post_switch */
     assert(ts->st.del_post_switch == NULL);
-    ts->st.del_post_switch = ((PyCFrameObject*)f)->ob1;
-    ((PyCFrameObject*)f)->ob1 = NULL;
+    ts->st.del_post_switch = cf->ob1;
+    cf->ob1 = NULL;
 
     /* ignore retval. everything is in the tasklet. */
     Py_DECREF(retval); /* consume ref according to protocol */
-    SLP_FRAME_EXECFUNC_DECREF(f);
+    SLP_FRAME_EXECFUNC_DECREF(cf);
     slp_transfer_return(ts->st.current->cstate);
     /* We either have an error or don't come back, so bail out.
      * There is no way to recover, because we don't know the previous
@@ -642,7 +649,7 @@ slp_ensure_linkage(PyTaskletObject *t)
 static int
 is_thread_runnable(PyThreadState *ts)
 {
-    if (ts == PyThreadState_GET())
+    if (ts == _PyThreadState_GET())
         return 0;
     return !ts->st.thread.is_blocked;
 }
@@ -650,7 +657,7 @@ is_thread_runnable(PyThreadState *ts)
 static int
 check_for_deadlock(void)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyInterpreterState *interp = ts->interp;
 
     /* see if anybody else will be able to run */
@@ -710,38 +717,73 @@ new_lock(void)
  * whereas Stackless stores the exception state in the tasklet object.
  * When switching from one tasklet to another tasklet, we have to switch
  * the exc_info-pointer in the thread state.
+ *
+ * With current compilers, an inline function performs no worse than a macro,
+ * but in the debugger single stepping it is much simpler.
  */
-
+#if 1
+Py_LOCAL_INLINE(void) SLP_EXCHANGE_EXCINFO(PyThreadState *tstate, PyTaskletObject *task)
+{
+    PyThreadState *ts_ = (tstate);
+    PyTaskletObject *t_ = (task);
+    _PyErr_StackItem *exc_info;
+    assert(ts_);
+    assert(t_);
+    exc_info = ts_->exc_info;
+    assert(exc_info);
+    assert(t_->exc_info);
 #if 0
-#define SLP_EXCHANGE_EXCINFO(tstate, task) \
+    PyObject *c = PyStackless_GetCurrent();
+    fprintf(stderr, "SLP_EXCHANGE_EXCINFO %3d current %14p,\tset task %p = %p,\ttstate %p = %p\n", __LINE__, c, t_, exc_info, ts_, t_->exc_info);
+    Py_XDECREF(c);
+#endif
+    ts_->exc_info = t_->exc_info;
+    t_->exc_info = exc_info;
+}
+#else
+#define SLP_EXCHANGE_EXCINFO(tstate_, task_) \
     do { \
-        PyThreadState *ts_ = (tstate); \
-        PyTaskletObject *t_ = (task); \
+        PyThreadState *ts_ = (tstate_); \
+        PyTaskletObject *t_ = (task_); \
         _PyErr_StackItem *exc_info; \
-        PyObject * c = PyStackless_GetCurrent(); \
         assert(ts_); \
         assert(t_); \
         exc_info = ts_->exc_info; \
         assert(exc_info); \
         assert(t_->exc_info); \
-        fprintf(stderr, "SLP_EXCHANGE_EXCINFO %3d current %14p,\tset task %p = %p,\ttstate %p = %p\n", __LINE__, c, t_, exc_info, ts_, t_->exc_info); \
-        Py_XDECREF(c); \
         ts_->exc_info = t_->exc_info; \
         t_->exc_info = exc_info; \
     } while(0)
+#endif
+
+/*
+ * The inline function (or macro) SLP_UPDATE_TSTATE_ON_SWITCH encapsulates some changes
+ * to the thread state when Stackless switches tasklets:
+ * - Exchange the exception information
+ * - Switch the PEP 567 context
+ */
+#if 1
+Py_LOCAL_INLINE(void) SLP_UPDATE_TSTATE_ON_SWITCH(PyThreadState *tstate, PyTaskletObject *prev, PyTaskletObject *next)
+{
+    SLP_EXCHANGE_EXCINFO(tstate, prev);
+    SLP_EXCHANGE_EXCINFO(tstate, next);
+    prev->context = tstate->context;
+    tstate->context = next->context;
+    tstate->context_ver++;
+    next->context = NULL;
+}
 #else
-#define SLP_EXCHANGE_EXCINFO(tstate, task) \
+#define SLP_UPDATE_TSTATE_ON_SWITCH(tstate__, prev_, next_) \
     do { \
-        PyThreadState *ts_ = (tstate); \
-        PyTaskletObject *t_ = (task); \
-        _PyErr_StackItem *exc_info; \
-        assert(ts_); \
-        assert(t_); \
-        exc_info = ts_->exc_info; \
-        assert(exc_info); \
-        assert(t_->exc_info); \
-        ts_->exc_info = t_->exc_info; \
-        t_->exc_info = exc_info; \
+        PyThreadState *ts__ = (tstate__); \
+        PyTaskletObject *prev__ = (prev_); \
+        PyTaskletObject *next__ = (next_); \
+        SLP_EXCHANGE_EXCINFO(ts__, prev__); \
+        SLP_EXCHANGE_EXCINFO(ts__, next__); \
+        prev__->context = ts__->context; \
+        ts__->context = next__->context; \
+        ts__->context_ver++; \
+        next__->context = NULL; \
     } while(0)
 #endif
 
@@ -784,7 +826,7 @@ void slp_thread_unblock(PyThreadState *nts)
 static int
 schedule_task_block(PyObject **result, PyTaskletObject *prev, int stackless, int *did_switch)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyObject *retval, *tmpval=NULL;
     PyTaskletObject *next = NULL;
     int fail, revive_main = 0;
@@ -969,7 +1011,7 @@ int
 slp_schedule_task(PyObject **result, PyTaskletObject *prev, PyTaskletObject *next, int stackless,
                   int *did_switch)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyChannelObject *u_chan = NULL;
     PyTaskletObject *u_next;
     int u_dir;
@@ -1018,12 +1060,14 @@ slp_schedule_task(PyObject **result, PyTaskletObject *prev, PyTaskletObject *nex
     fail = slp_schedule_task_prepared(ts, result, prev, next, stackless, did_switch);
     if (fail && inserted) {
         /* in case of an error, it is unknown, if the tasklet is still scheduled */
-        if (next->next)
+        if (next->next) {
             slp_current_uninsert(next);
-        if (u_chan)
-            slp_channel_insert(u_chan, next, u_dir, u_next);
-        else
             Py_DECREF(next);
+        }
+        if (u_chan) {
+            Py_INCREF(next);
+            slp_channel_insert(u_chan, next, u_dir, u_next);
+        }
     }
     return fail;
 }
@@ -1147,10 +1191,9 @@ slp_schedule_task_prepared(PyThreadState *ts, PyObject **result, PyTaskletObject
             retval = slp_bomb_explode(retval);
     }
     /* no failure possible from here on */
-    SLP_EXCHANGE_EXCINFO(ts, prev);
+    SLP_UPDATE_TSTATE_ON_SWITCH(ts, prev, next);
     ts->recursion_depth = next->recursion_depth;
     ts->st.current = next;
-    SLP_EXCHANGE_EXCINFO(ts, next);
     if (did_switch)
         *did_switch = 1;
     *result = STACKLESS_PACK(ts, retval);
@@ -1175,8 +1218,7 @@ hard_switching:
     else
         transfer = slp_transfer;
 
-    SLP_EXCHANGE_EXCINFO(ts, prev);
-    SLP_EXCHANGE_EXCINFO(ts, next);
+    SLP_UPDATE_TSTATE_ON_SWITCH(ts, prev, next);
 
     transfer_result = transfer(cstprev, next->cstate, prev);
     /* Note: If the transfer was successful from here on "prev" holds the
@@ -1202,7 +1244,7 @@ hard_switching:
          * (For now there is at most a single pending cframe.)
          */
         if (prev->cstate->nesting_level > 0 && f && PyCFrame_Check(f) &&
-            f->f_execute == slp_restore_tracing) {
+            ((PyCFrameObject *)f)->f_execute == slp_restore_tracing) {
             PyObject *retval;
             PyFrameObject *f2;
 
@@ -1224,8 +1266,7 @@ hard_switching:
     }
     else {
         /* Failed transfer. */
-        SLP_EXCHANGE_EXCINFO(ts, next);
-        SLP_EXCHANGE_EXCINFO(ts, prev);
+        SLP_UPDATE_TSTATE_ON_SWITCH(ts, next, prev);
         PyFrameObject *f = SLP_CLAIM_NEXT_FRAME(ts);
         Py_XSETREF(next->f.frame, f); /* revert the Py_CLEAR(next->f.frame) */
         kill_wrap_bad_guy(prev, next);
@@ -1236,7 +1277,7 @@ hard_switching:
 int
 slp_initialize_main_and_current(void)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyTaskletObject *task;
 
     /* refuse executing main in an unhandled error context */
@@ -1270,6 +1311,7 @@ slp_initialize_main_and_current(void)
     assert(task->exc_state.exc_traceback == NULL);
     assert(task->exc_state.previous_item == NULL);
     assert(task->exc_info == &task->exc_state);
+    assert(task->context == NULL);
     SLP_EXCHANGE_EXCINFO(ts, task);
 
     NOTIFY_SCHEDULE(ts, NULL, task, -1);
@@ -1294,7 +1336,7 @@ schedule_task_destruct(PyObject **retval, PyTaskletObject *prev, PyTaskletObject
      * until we have done the switch.  We use the st->ts.del_post_switch
      * field to help us with that, someone else with decref it.
      */
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     int fail = 0;
 
     /* we should have no nesting level */
@@ -1363,6 +1405,7 @@ schedule_task_destruct(PyObject **retval, PyTaskletObject *prev, PyTaskletObject
         /* main is exiting */
         assert(ts->st.main == NULL);
         assert(ts->exc_info == &prev->exc_state);
+        assert(prev->context == NULL);
         SLP_EXCHANGE_EXCINFO(ts, prev);
         TASKLET_CLAIMVAL(prev, retval);
         if (PyBomb_Check(*retval))
@@ -1384,7 +1427,7 @@ extern int PyStackless_CallErrorHandler(void);
 PyObject *
 slp_tasklet_end(PyObject *retval)
 {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyTaskletObject *task = ts->st.current;
     PyTaskletObject *next;
     _PyErr_StackItem *exc_info;
@@ -1599,13 +1642,17 @@ slp_claim_next_frame(PyThreadState *tstate)
 
 PyObject *
 slp_wrap_call_frame(PyFrameObject *frame, int exc, PyObject *retval) {
-    PyThreadState *ts = PyThreadState_GET();
+    PyThreadState *ts = _PyThreadState_GET();
     PyObject *res;
     assert(frame);
     assert(SLP_CURRENT_FRAME_IS_VALID(ts));
     Py_INCREF(frame);
-    assert(frame->f_execute != NULL);
-    res = frame->f_execute(frame, exc, retval);
+    if (PyCFrame_Check(frame)) {
+        assert(((PyCFrameObject *)frame)->f_execute != NULL);
+        res = ((PyCFrameObject *)frame)->f_execute((PyCFrameObject *)frame, exc, retval);
+    } else {
+        res = PyEval_EvalFrameEx_slp(frame, exc, retval);
+    }
     assert(Py_REFCNT(frame) >= 2);
     Py_DECREF(frame);
     SLP_ASSERT_FRAME_IN_TRANSFER(ts);

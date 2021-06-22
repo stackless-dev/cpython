@@ -20,7 +20,8 @@ class StacklessError(Exception):
 
 try:
     from stackless import *
-    from stackless import test_cframe, test_cframe_nr, test_outside
+    from _stackless import _test_cframe_nr as test_cframe_nr, _test_outside as test_outside
+    from _teststackless import test_cframe
     IS_SLP = True
 except ImportError:
     IS_SLP = False
@@ -106,7 +107,7 @@ def cleanup():
 
 def tester(func, niter, args, msg, ntasks=10, run=run):
     print("%8d %s" % (niter, msg, ), end=' ')
-    clock = time.clock
+    clock = time.perf_counter
     args = (niter // ntasks,) + args
     diff = 0
     try:
@@ -353,7 +354,7 @@ if IS_SLP:
     adrsize = len(struct.pack("P", 0))
 
     def stacksize(tasklet):
-        stack = bytes(tasklet.cstate)
+        stack = str(tasklet.cstate).encode('iso-8859-1')
         return len(stack) / adrsize
 
     tmp = enable_softswitch(0)
@@ -371,7 +372,7 @@ if IS_SLP:
     cleanup()
 
 results_2002_07_28 = """
-D:\slpdev\src\2.2\src\PCbuild>\python22\python taskspeed.py
+python22/python taskspeed.py
 hey this is sitepython
 10000000 frame switches   took 3.46863 seconds, rate = 2882985/s
 10000000 cfunction calls  took 2.07762 seconds, rate = 4813209/s
@@ -387,7 +388,7 @@ Stack size of cframe tasklet = 30
 
 # here we are, after the fact :-)
 results_2002_08_15 = """
-D:\slpdev\src\2.2\src\PCbuild>python taskspeed.py
+python22/python taskspeed.py
 10000000 frame switches   took 3.40898 seconds, rate = 2933428/s
 10000000 cfunction calls  took 2.29988 seconds, rate = 4348046/s
 10000000 cframe switches  took 1.50435 seconds, rate = 6647368/s

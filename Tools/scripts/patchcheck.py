@@ -54,21 +54,13 @@ def is_stackless():
             os.path.exists(os.path.join(SRCDIR, 'Stackless')))
 
 
-def mq_patches_applied():
-    """Check if there are any applied MQ patches."""
-    cmd = 'hg qapplied'
-    with subprocess.Popen(cmd.split(),
-                          stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE) as st:
-        bstdout, _ = st.communicate()
-        return st.returncode == 0 and bstdout
-
-
 def get_git_branch():
     """Get the symbolic name for the current git branch"""
     cmd = "git rev-parse --abbrev-ref HEAD".split()
     try:
-        return subprocess.check_output(cmd, stderr=subprocess.DEVNULL)
+        return subprocess.check_output(cmd,
+                                       stderr=subprocess.DEVNULL,
+                                       cwd=SRCDIR)
     except subprocess.CalledProcessError:
         return None
 
@@ -80,7 +72,9 @@ def get_git_upstream_remote():
     """
     cmd = "git remote get-url upstream".split()
     try:
-        subprocess.check_output(cmd, stderr=subprocess.DEVNULL)
+        subprocess.check_output(cmd,
+                                stderr=subprocess.DEVNULL,
+                                cwd=SRCDIR)
     except subprocess.CalledProcessError:
         return "origin"
     return "upstream"
@@ -94,7 +88,7 @@ def get_base_branch():
         return None
     version = sys.version_info
     if version.releaselevel == 'alpha':
-        base_branch = "master"
+        base_branch = "main"
     else:
         base_branch = "{0.major}.{0.minor}".format(version)
     if is_stackless():
@@ -110,16 +104,8 @@ def get_base_branch():
 @status("Getting the list of files that have been added/changed",
         info=lambda x: n_files_str(len(x)))
 def changed_files(base_branch=None):
-    """Get the list of changed or added files from Mercurial or git."""
-    if os.path.isdir(os.path.join(SRCDIR, '.hg')):
-        if base_branch is not None:
-            sys.exit('need a git checkout to check PR status')
-        cmd = 'hg status --added --modified --no-status'
-        if mq_patches_applied():
-            cmd += ' --rev qparent'
-        with subprocess.Popen(cmd.split(), stdout=subprocess.PIPE) as st:
-            filenames = [x.decode().rstrip() for x in st.stdout]
-    elif os.path.exists(os.path.join(SRCDIR, '.git')):
+    """Get the list of changed or added files from git."""
+    if os.path.exists(os.path.join(SRCDIR, '.git')):
         # We just use an existence check here as:
         #  directory = normal git checkout/clone
         #  file = git worktree directory
@@ -128,7 +114,9 @@ def changed_files(base_branch=None):
         else:
             cmd = 'git status --porcelain'
         filenames = []
-        with subprocess.Popen(cmd.split(), stdout=subprocess.PIPE) as st:
+        with subprocess.Popen(cmd.split(),
+                              stdout=subprocess.PIPE,
+                              cwd=SRCDIR) as st:
             for line in st.stdout:
                 line = line.decode().rstrip()
                 status_text, filename = line.split(maxsplit=1)
@@ -141,7 +129,7 @@ def changed_files(base_branch=None):
                     filename = filename.split(' -> ', 2)[1].strip()
                 filenames.append(filename)
     else:
-        sys.exit('need a Mercurial or git checkout to get modified files')
+        sys.exit('need a git checkout to get modified files')
 
     filenames2 = []
     for filename in filenames:

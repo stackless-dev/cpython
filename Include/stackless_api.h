@@ -38,7 +38,7 @@ extern "C" {
 
 #ifdef STACKLESS
 
-#include "slp_structs.h"
+#include "cpython/slp_structs.h"
 
 /*
  * create a new tasklet object.
