@@ -3894,13 +3894,13 @@ handle_unwinding(int lineno, PyFrameObject *f,
 }
 
 PyObject*
-PyEval_EvalFrameEx_slp(PyFrameObject *f, int throwflag, PyObject *retval_arg)
+PyEval_EvalFrameEx_slp(PyFrameObject *f, int throwflag, PyObject *retval)
 {
     PyThreadState *tstate = _PyThreadState_GET();
     int executing = f->f_executing;
     if (executing == SLP_FRAME_EXECUTING_INVALID) {
         --tstate->recursion_depth;
-        return slp_cannot_execute((PyCFrameObject *)f, "PyEval_EvalFrameEx_slp", retval_arg);
+        return slp_cannot_execute((PyCFrameObject *)f, "PyEval_EvalFrameEx_slp", retval);
     } else if (executing == SLP_FRAME_EXECUTING_NO ||
                executing == SLP_FRAME_EXECUTING_HOOK) {
         /* Processing of a frame starts here */
@@ -3912,9 +3912,9 @@ PyEval_EvalFrameEx_slp(PyFrameObject *f, int throwflag, PyObject *retval_arg)
          */
         if (executing == SLP_FRAME_EXECUTING_NO &&
                 tstate->interp->eval_frame != _PyEval_EvalFrameDefault) {
-            Py_XDECREF(retval_arg);
+            Py_XDECREF(retval);
             f->f_executing = SLP_FRAME_EXECUTING_HOOK;
-            PyObject *retval = PyEval_EvalFrameEx(f, throwflag);
+            retval = tstate->interp->eval_frame(f, throwflag);
             /* There are two possibilities:
              *  - Either the hook-functions delegates to _PyEval_EvalFrameDefault
              *      Then the frame transfer protocol is observed, SLP_STORE_NEXT_FRAME(tstate, f->f_back)
@@ -3947,10 +3947,14 @@ PyEval_EvalFrameEx_slp(PyFrameObject *f, int throwflag, PyObject *retval_arg)
             /* Setup the C-stack and recursively call PyEval_EvalFrameEx_slp with the same arguments.
              * SLP_CSTACK_SAVE_NOW(tstate, f) will be false then.
              */
-            return slp_eval_frame_newstack(f, throwflag, retval_arg);
+            return slp_eval_frame_newstack(f, throwflag, retval);
         }
     }
-    return slp_eval_frame_value(f, throwflag, retval_arg);
+
+    /* This is the only call of static slp_eval_frame_value.
+     * An optimizing compiler will eliminate this call
+     */
+    return slp_eval_frame_value(f, throwflag, retval);
 }
 
 
