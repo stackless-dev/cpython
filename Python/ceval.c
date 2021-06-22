@@ -989,8 +989,8 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
     if (executing == SLP_FRAME_EXECUTING_INVALID) {
         --tstate->recursion_depth;
         return slp_cannot_execute((PyCFrameObject *)f, "PyEval_EvalFrameEx_slp", retval_arg);
-    } else if (f->f_executing != SLP_FRAME_EXECUTING_NO &&
-            f->f_executing != SLP_FRAME_EXECUTING_HOOK) {
+    } else if (executing != SLP_FRAME_EXECUTING_NO &&
+            executing != SLP_FRAME_EXECUTING_HOOK) {
         goto slp_setup_completed;
     }
 
@@ -999,11 +999,37 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
      * evaluation. Stackless support this API and calls it, if it starts the
      * evaluation of a frame.
      */
-    if (f->f_executing == SLP_FRAME_EXECUTING_NO &&
+    if (executing == SLP_FRAME_EXECUTING_NO &&
             tstate->interp->eval_frame != _PyEval_EvalFrameDefault) {
         Py_XDECREF(retval_arg);
         f->f_executing = SLP_FRAME_EXECUTING_HOOK;
-        return PyEval_EvalFrameEx(f, throwflag);
+        retval = PyEval_EvalFrameEx(f, throwflag);
+        /* There are two possibilities:
+         *  - Either the hook-functions delegates to _PyEval_EvalFrameDefault
+         *      Then the frame transfer protocol is observed, SLP_STORE_NEXT_FRAME(tstate, f->f_back)
+         *      has been called.
+         *  - Or the the hook function does not call _PyEval_EvalFrameDefault
+         *      Then the frame transfer protocol is (probably) violated and the code just
+         *      assigned tstate->frame = f->f_back.
+         *
+         * To distinguish both cases, we look a f->f_executing. If the value is still
+         * SLP_FRAME_EXECUTING_HOOK, then _PyEval_EvalFrameDefault wasn't called for frame f.
+         */
+        if (f->f_executing != SLP_FRAME_EXECUTING_HOOK)
+            /* _PyEval_EvalFrameDefault was called */
+            return retval;
+        /* Try to repair the frame reference count.
+         * It is possible in case of a simple tstate->frame = f->f_back */
+        if (tstate->frame == f->f_back) {
+            SLP_STORE_NEXT_FRAME(tstate, f->f_back);
+            return retval;
+        }
+        /* Game over */
+        Py_FatalError("An extension module has set a custom frame evaluation function (see PEP 523).\n"
+                      "Stackless Python does not completely support the frame evaluation API defined by PEP 523.\n"
+                      "The programm now terminates to prevent undefined behavior.\n");
+    } else if (executing == SLP_FRAME_EXECUTING_HOOK) {
+        executing = f->f_executing = SLP_FRAME_EXECUTING_NO;
     }
 
     if (SLP_CSTACK_SAVE_NOW(tstate, f))

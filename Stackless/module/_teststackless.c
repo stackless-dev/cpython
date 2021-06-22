@@ -485,6 +485,87 @@ exit:
     return result;
 }
 
+static PyObject *pep523_frame_hook_throw = NULL;
+static PyObject *pep523_frame_hook_store_args = NULL;
+static PyObject *pep523_frame_hook_result = NULL;
+
+static PyObject *
+pep523_frame_hook_eval_frame(PyFrameObject *f, int throwflag) {
+    PyThreadState *tstate = PyThreadState_GET();
+    if (pep523_frame_hook_store_args) {
+        PyObject *ret = PyObject_CallFunction(pep523_frame_hook_store_args, "((Oi))", (PyObject *)f, throwflag);
+        if (!ret) {
+            tstate->frame = f->f_back;
+            return NULL;
+        }
+        Py_DECREF(ret);
+    }
+    if (pep523_frame_hook_throw) {
+        PyErr_SetObject((PyObject *)Py_TYPE(pep523_frame_hook_throw), pep523_frame_hook_throw);
+        Py_CLEAR(pep523_frame_hook_throw);
+        tstate->frame = f->f_back;
+        return NULL;
+    }
+    PyObject *retval = _PyEval_EvalFrameDefault(f, throwflag);
+
+    /* After _PyEval_EvalFrameDefault the current frame is invalid.
+     * We must not enter the interpreter and we can't use the frame transfer macros,
+     * because they are a Py_BUILD_CORE API only.
+     * In practice entering the interpreter would work. Only if you compile
+     * Stackless with SLP_WITH_FRAME_REF_DEBUG defined you get assertion failures.
+     */
+    if (retval != NULL ) {
+        Py_INCREF(retval);
+        Py_XSETREF(pep523_frame_hook_result, retval);
+    } else {
+        Py_INCREF(Py_NotImplemented);  /* anything else but None */
+        Py_XSETREF(pep523_frame_hook_result, Py_NotImplemented);
+    }
+    return retval;
+}
+
+PyDoc_STRVAR(test_install_PEP523_eval_frame_hook__doc__,
+    "test_install_PEP523_eval_frame_hook(*, store_args, store_result, reset=False) -- a test function.\n\
+This function tests the PEP-523 eval_frame-hook. Usually it is not used by Stackless Python.");
+
+static PyObject* test_install_PEP523_eval_frame_hook(PyObject *self, PyObject *args, PyObject *kwds) {
+    static char *kwlist[] = { "throw", "store_args", "reset", NULL };
+    PyThreadState *tstate = PyThreadState_GET();
+    PyObject *throw = NULL;
+    PyObject *store_args = NULL;
+    PyObject *reset = Py_False;
+    PyObject *retval;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|$O!OO!:test_install_PEP523_eval_frame_hook", kwlist,
+        PyExc_Exception, &throw, &store_args, &PyBool_Type, &reset))
+        return NULL;
+
+    if (PyObject_IsTrue(reset)) {
+        tstate->interp->eval_frame = _PyEval_EvalFrameDefault;
+        Py_CLEAR(pep523_frame_hook_throw);
+        Py_CLEAR(pep523_frame_hook_store_args);
+    } else {
+
+        if (throw) {
+            Py_INCREF(throw);
+            Py_XSETREF(pep523_frame_hook_throw, throw);
+        }
+        if (store_args) {
+            Py_INCREF(store_args);
+            Py_XSETREF(pep523_frame_hook_store_args, store_args);
+        }
+
+        tstate->interp->eval_frame = pep523_frame_hook_eval_frame;
+    }
+    retval = pep523_frame_hook_result;
+    pep523_frame_hook_result = NULL;
+    if (!retval) {
+        retval = Py_Ellipsis;  /* just something different from None and NotImplemented */
+        Py_INCREF(retval);
+    }
+    return retval;
+}
+
 
 /* ---------- */
 
@@ -500,6 +581,8 @@ static PyMethodDef _teststackless_methods[] = {
     test_cstate__doc__ },
     { "test_PyEval_EvalFrameEx", (PyCFunction)(void(*)(void))test_PyEval_EvalFrameEx, METH_VARARGS | METH_KEYWORDS,
     test_PyEval_EvalFrameEx__doc__ },
+    { "test_install_PEP523_eval_frame_hook", (PyCFunction)(void(*)(void))test_install_PEP523_eval_frame_hook, METH_VARARGS | METH_KEYWORDS,
+    test_install_PEP523_eval_frame_hook__doc__ },
     {NULL,              NULL}           /* sentinel */
 };
 
