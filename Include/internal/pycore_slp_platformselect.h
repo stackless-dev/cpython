@@ -9,7 +9,7 @@
  * assembler, use that if possible
  */
 #define STACKMAN_OPTIONAL
-#include "stackman/src/stackman.h"
+#include "stackman/stackman/stackman.h"
 #if defined(STACKMAN_PLATFORM) && !defined(STACKMAN_EXTERNAL_ASM)
 #include "internal/slp_switch_stackman.h"
 
