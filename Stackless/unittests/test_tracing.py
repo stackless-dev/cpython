@@ -126,6 +126,18 @@ class TestTracingProperties(StacklessTestCase):
         self.assertIsNone(tasklet.profile_function)
         self.assertGreater(self.tracecount, 0)
 
+    def testSetTraceOnDeadTasklet(self):
+        t = stackless.tasklet()
+        self.assertIsNone(t.trace_function)
+        t.trace_function = self.nullTraceFunc
+        self.assertIs(t.trace_function.__func__, self.nullTraceFunc.__func__)
+
+    def testSetProfileOnDeadTasklet(self):
+        t = stackless.tasklet()
+        self.assertIsNone(t.trace_function)
+        t.profile_function = self.nullTraceFunc
+        self.assertIs(t.profile_function.__func__, self.nullTraceFunc.__func__)
+
     def testSetTraceOnTasklet1(self):
         # Change trace state of a non-current tasklet
         # create tasklet, set trace, clear trace, run
