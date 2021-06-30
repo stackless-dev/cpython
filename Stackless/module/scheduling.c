@@ -5,7 +5,7 @@
 
 #ifdef STACKLESS
 #include "pycore_stackless.h"
-
+// #include "pycore_slp_platformselect.h"  /* for SLP_DO_NOT_OPTIMIZE_AWAY */
 
 /******************************************************
 

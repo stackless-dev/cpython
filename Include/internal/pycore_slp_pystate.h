@@ -16,7 +16,11 @@
 
 /* This include file is included from pycore_pystate.h only */
 
-#include "pycore_slp_platformselect.h"  /* for SLP_CSTACK_SLOTS */
+
+/* adjust slots to typical size of a few recursions on your system */
+#ifndef SLP_CSTACK_SLOTS
+#define SLP_CSTACK_SLOTS        1024
+#endif
 
 /*
  * Stackless runtime state

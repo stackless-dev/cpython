@@ -8,7 +8,7 @@
 #include "pycore_slp_prickelpit.h"
 
 /* platform specific constants */
-#include "pycore_slp_platformselect.h"
+// #include "pycore_slp_platformselect.h"
 
 /******************************************************
 

@@ -35,62 +35,6 @@
 
 /* default definitions if not defined in above files */
 
-/*
- * Call SLP_DO_NOT_OPTIMIZE_AWAY(pointer) to ensure that pointer will be
- * computed even post-optimization.  Use it for pointers that are computed but
- * otherwise are useless. The compiler tends to do a good job at eliminating
- * unused variables, and this macro fools it into thinking var is in fact
- * needed.
- */
-
-#ifndef SLP_DO_NOT_OPTIMIZE_AWAY
-
-/* Code is based on Facebook folly
- * https://github.com/facebook/folly/blob/master/folly/Benchmark.h,
- * which has an Apache 2 license.
- */
-#ifdef _MSC_VER
-
-#pragma optimize("", off)
-
-static inline void doNotOptimizeDependencySink(const void* p) {}
-
-#pragma optimize("", on)
-
-#define SLP_DO_NOT_OPTIMIZE_AWAY(pointer) doNotOptimizeDependencySink(pointer)
-#define SLP_DO_NOT_OPTIMIZE_AWAY_DEFINITIONS /* empty */
-
-#elif (defined(__GNUC__) || defined(__clang__))
-/*
- * The "r" constraint forces the compiler to make datum available
- * in a register to the asm block, which means that it must have
- * computed/loaded it.
- */
-#define SLP_DO_NOT_OPTIMIZE_AWAY(pointer) \
-    do {__asm__ volatile("" ::"r"(pointer));} while(0)
-#define SLP_DO_NOT_OPTIMIZE_AWAY_DEFINITIONS /* empty */
-#else
-/*
- * Unknown compiler
- */
-#define SLP_DO_NOT_OPTIMIZE_AWAY(pointer) \
-    do { slp_do_not_opimize_away_sink = ((void*)(pointer)); } while(0)
-extern uint8_t* volatile slp_do_not_opimize_away_sink;
-#define SLP_DO_NOT_OPTIMIZE_AWAY_DEFINITIONS uint8_t* volatile slp_do_not_opimize_away_sink;
-#endif
-#endif
-
-/* adjust slots to typical size of a few recursions on your system */
-
-#ifndef SLP_CSTACK_SLOTS
-#define SLP_CSTACK_SLOTS        1024
-#endif
-
-/* how many cstacks to cache at all */
-
-#ifndef SLP_CSTACK_MAXCACHE
-#define SLP_CSTACK_MAXCACHE     100
-#endif
 
 /* a good estimate how much the cstack level differs between
    initialisation and main C-Python(r) code. Not critical, but saves time.
@@ -126,7 +70,7 @@ extern uint8_t* volatile slp_do_not_opimize_away_sink;
 #define SLP_CSTACK_SUBTRACT(a, b) (b) - (a)
 #endif
 
-#define SLP_CSTACK_SAVE_NOW(tstate, stackvar) \
+#define SLP_CSTACK_SAVE_NOW_to_be_deleted(tstate, stackvar) \
         ((tstate)->st.cstack_root != NULL ? \
          SLP_CSTACK_SUBTRACT((tstate)->st.cstack_root, \
          (intptr_t*)&(stackvar)) > SLP_CSTACK_WATERMARK : 1)

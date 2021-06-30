@@ -117,6 +117,32 @@ climb_stack_and_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
     return slp_transfer(cstprev, cst, prev);
 }
 
+PyObject *
+slp_climb_stack_and_eval_frame(PyFrameObject *f)
+{
+    /*
+     * a similar case to climb_stack_and_transfer,
+     * but here we need to incorporate a gap in the
+     * stack into main and keep this gap on the stack.
+     * This way, initial_stub is always valid to be
+     * used to return to the main c stack.
+     */
+    PyThreadState *ts = _PyThreadState_GET();
+    intptr_t probe;
+    ptrdiff_t needed = &probe - ts->st.cstack_base;
+    /* in rare cases, the need might have vanished due to the recursion */
+    if (needed > 0) {
+        register void * stack_ptr_tmp = alloca(needed * sizeof(intptr_t));
+        if (stack_ptr_tmp == NULL)
+            return NULL;
+        /* hinder the compiler to optimise away
+        stack_ptr_tmp and the alloca call.
+        This happens with gcc 4.7.x and -O2 */
+        SLP_DO_NOT_OPTIMIZE_AWAY(stack_ptr_tmp);
+    }
+    return slp_eval_frame(f);
+}
+
 /* This function returns -1 on error, 1 if a switch occurred and 0
  * if only a stack save was performed
  */
@@ -187,6 +213,23 @@ slp_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
     } else
         result = -1;
     return result;
+}
+
+int
+slp_cstack_save_now(const PyThreadState *tstate, const void * pstackvar)
+{
+    assert(tstate);
+    assert(pstackvar);
+    if (tstate->st.cstack_root == NULL)
+        return 1;
+    return SLP_CSTACK_SUBTRACT(tstate->st.cstack_root, (const intptr_t*)pstackvar) > SLP_CSTACK_WATERMARK;
+}
+
+void
+slp_cstack_set_root(PyThreadState *tstate, const void * pstackvar) {
+    assert(tstate);
+    assert(pstackvar);
+    tstate->st.cstack_root = SLP_STACK_REFPLUS + (intptr_t *)pstackvar;
 }
 
 #ifdef Py_DEBUG

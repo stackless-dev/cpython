@@ -22,7 +22,7 @@
 #include "setobject.h"
 #include "structmember.h"
 #include "pycore_stackless.h"
-#include "pycore_slp_platformselect.h" /* for stack saving */
+// #include "pycore_slp_platformselect.h" /* for stack saving */
 
 #include <ctype.h>
 
