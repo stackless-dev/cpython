@@ -380,8 +380,6 @@ PyAPI_FUNC(PyObject *) PyEval_EvalFrameEx_slp(struct _frame *, int, PyObject *);
 /* eval_frame with stack overflow, triggered there with a macro */
 PyObject * slp_eval_frame_newstack(struct _frame *f, int throwflag, PyObject *retval);
 
-/* other eval_frame functions from module/scheduling.c */
-PyObject * slp_restore_tracing(PyCFrameObject *cf, int exc, PyObject *retval);
 /* other eval_frame functions from Objects/typeobject.c */
 PyObject * slp_tp_init_callback(PyCFrameObject *cf, int exc, PyObject *retval);
 /* functions related to pickling */
@@ -754,7 +752,6 @@ int slp_prepare_slots(PyTypeObject*);
 Py_tracefunc slp_get_sys_profile_func(void);
 Py_tracefunc slp_get_sys_trace_func(void);
 int slp_encode_ctrace_functions(Py_tracefunc c_tracefunc, Py_tracefunc c_profilefunc);
-PyTaskletTStateStruc * slp_get_saved_tstate(PyTaskletObject *task);
 
 /*
  * Channel related prototypes

@@ -27,8 +27,8 @@ class TestExcStatePickling(StacklessPickleTestCase):
         self.assertEqual(len(state), 3)
         state = state[2]
         self.assertIsInstance(state, tuple)
-        self.assertEqual(len(state), 8)
-        self.assertTupleEqual(state[-4:], (None, None, None, None))
+        self.assertEqual(len(state), 12)
+        self.assertTupleEqual(state[4:8], (None, None, None, None))
 
     def test_tasklet_pickle_with_exc(self):
         self.skipUnlessSoftswitching()

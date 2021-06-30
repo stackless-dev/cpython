@@ -828,7 +828,6 @@ static int init_functype(PyObject * mod)
 #define frametuplefmt "O)(OibOiOOiiOO"
 
 SLP_DEF_INVALID_EXEC(slp_channel_seq_callback)
-SLP_DEF_INVALID_EXEC(slp_restore_tracing)
 SLP_DEF_INVALID_EXEC(slp_tp_init_callback)
 
 static PyTypeObject wrap_PyFrame_Type;
@@ -1164,8 +1163,6 @@ static int init_frametype(PyObject * mod)
 {
     return slp_register_execute(&PyCFrame_Type, "channel_seq_callback",
                              slp_channel_seq_callback, SLP_REF_INVALID_EXEC(slp_channel_seq_callback))
-        || slp_register_execute(&PyCFrame_Type, "slp_restore_tracing",
-                             slp_restore_tracing, SLP_REF_INVALID_EXEC(slp_restore_tracing))
         || slp_register_execute(&PyCFrame_Type, "slp_tp_init_callback",
                              slp_tp_init_callback, SLP_REF_INVALID_EXEC(slp_tp_init_callback))
         || init_type(&wrap_PyFrame_Type, initchain, mod);

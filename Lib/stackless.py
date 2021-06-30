@@ -92,7 +92,7 @@ def _tasklet_get_unpicklable_state(tasklet):
 
         flags = pickle_flags(PICKLEFLAGS_PICKLE_CONTEXT, PICKLEFLAGS_PICKLE_CONTEXT)
         try:
-            return {'context': tasklet.__reduce__()[2][8]}
+            return {'context': tasklet.__reduce__()[2][12]}
         finally:
             pickle_flags(flags, PICKLEFLAGS_PICKLE_CONTEXT)
 
