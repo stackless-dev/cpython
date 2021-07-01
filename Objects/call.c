@@ -354,7 +354,6 @@ function_code_fastcall(PyCodeObject *co, PyObject *const *args, Py_ssize_t nargs
     }
 
 #ifdef STACKLESS
-    f->f_execute = PyEval_EvalFrameEx_slp;
     if (stackless) {
         Py_INCREF(Py_None);
         result = Py_None;

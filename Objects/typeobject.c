@@ -6781,10 +6781,10 @@ slot_tp_descr_set(PyObject *self, PyObject *target, PyObject *value)
 
 #ifdef STACKLESS
 PyObject *
-slp_tp_init_callback(PyFrameObject *f, int exc, PyObject *retval)
+slp_tp_init_callback(PyCFrameObject *cf, int exc, PyObject *retval)
 {
     PyThreadState *ts = _PyThreadState_GET();
-    PyCFrameObject *cf = (PyCFrameObject *) f;
+    PyFrameObject *f = (PyFrameObject *) cf;
 
     f = cf->f_back;
     if (retval != NULL) {

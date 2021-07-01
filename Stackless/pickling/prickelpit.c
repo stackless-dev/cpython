@@ -366,7 +366,7 @@ run_script(char *src, char *retname)
  */
 
 PyObject *
-slp_cannot_execute(PyFrameObject *f, const char *exec_name, PyObject *retval)
+slp_cannot_execute(PyCFrameObject *f, const char *exec_name, PyObject *retval)
 {
     /*
      * Special rule for frame execution functions: we now own a reference to retval!
@@ -387,12 +387,6 @@ slp_cannot_execute(PyFrameObject *f, const char *exec_name, PyObject *retval)
     }
 
     SLP_STORE_NEXT_FRAME(tstate, f->f_back);
-
-    if(PyFrame_Check(f)) {
-        /* Only real frames contribute to the recursion count.
-         * C-frames don't contribute, see tasklet_setstate(...) */
-        --tstate->recursion_depth;
-    }
 
     return NULL;
 }
@@ -497,13 +491,13 @@ slp_find_execfuncs(PyTypeObject *type, PyObject *exec_name,
 }
 
 PyObject *
-slp_find_execname(PyFrameObject *f, int *valid)
+slp_find_execname(PyCFrameObject *cf, int *valid)
 {
     PyObject *exec_name = NULL;
     proxyobject *dp = (proxyobject *)
-                      PyDict_GetItemString(Py_TYPE(f)->tp_dict, "_exec_map");
+                      PyDict_GetItemString(Py_TYPE(cf)->tp_dict, "_exec_map");
     PyObject *dic = dp ? dp->dict : NULL;
-    PyObject *exec_addr = PyLong_FromVoidPtr(f->f_execute);
+    PyObject *exec_addr = PyLong_FromVoidPtr(cf->f_execute);
 
     assert(valid != NULL);
 
@@ -513,19 +507,19 @@ slp_find_execname(PyFrameObject *f, int *valid)
         char msg[500];
         PyErr_Clear();
         sprintf(msg, "frame exec function at %p is not registered!",
-            (void *)f->f_execute);
+            (void *)cf->f_execute);
         PyErr_SetString(PyExc_ValueError, msg);
         *valid = 0;
     }
     else {
         PyFrame_ExecFunc *good, *bad;
-        if (slp_find_execfuncs(Py_TYPE(f), exec_name, &good, &bad)) {
+        if (slp_find_execfuncs(Py_TYPE(cf), exec_name, &good, &bad)) {
             exec_name = NULL;
             goto err_exit;
         }
-        if (f->f_execute == bad)
+        if (cf->f_execute == bad)
             *valid = 0;
-        else if (f->f_execute != good) {
+        else if (cf->f_execute != good) {
             PyErr_SetString(PyExc_SystemError,
                 "inconsistent c?frame function registration");
             goto err_exit;
@@ -874,15 +868,8 @@ static int init_functype(PyObject * mod)
 
  ******************************************************/
 
-#define frametuplefmt "O)(OiSOiOOiiOO"
+#define frametuplefmt "O)(OibOiOOiiOO"
 
-SLP_DEF_INVALID_EXEC(eval_frame)
-SLP_DEF_INVALID_EXEC(eval_frame_value)
-SLP_DEF_INVALID_EXEC(eval_frame_noval)
-SLP_DEF_INVALID_EXEC(eval_frame_iter)
-SLP_DEF_INVALID_EXEC(eval_frame_setup_with)
-SLP_DEF_INVALID_EXEC(eval_frame_with_cleanup)
-SLP_DEF_INVALID_EXEC(eval_frame_yield_from)
 SLP_DEF_INVALID_EXEC(slp_channel_seq_callback)
 SLP_DEF_INVALID_EXEC(slp_restore_tracing)
 SLP_DEF_INVALID_EXEC(slp_tp_init_callback)
@@ -895,7 +882,7 @@ frameobject_reduce(PyFrameObject *f, PyObject *unused)
     int i;
     PyObject **f_stacktop;
     PyObject *blockstack_as_tuple = NULL, *localsplus_as_tuple = NULL,
-    *res = NULL, *exec_name = NULL;
+    *res = NULL;
     int valid = 1;
     int have_locals = f->f_locals != NULL;
     PyObject * dummy_locals = NULL;
@@ -905,9 +892,6 @@ frameobject_reduce(PyFrameObject *f, PyObject *unused)
     if (!have_locals)
         if ((dummy_locals = PyDict_New()) == NULL)
             return NULL;
-
-    if ((exec_name = slp_find_execname(f, &valid)) == NULL)
-        return NULL;
 
     blockstack_as_tuple = PyTuple_New (f->f_iblock);
     if (blockstack_as_tuple == NULL) goto err_exit;
@@ -957,7 +941,7 @@ frameobject_reduce(PyFrameObject *f, PyObject *unused)
                          f->f_code,
                          f->f_code,
                          valid,
-                         exec_name,
+                         f->f_executing,
                          f->f_globals,
                          have_locals,
                          have_locals ? f->f_locals : dummy_locals,
@@ -969,7 +953,6 @@ frameobject_reduce(PyFrameObject *f, PyObject *unused)
                  );
 
 err_exit:
-    Py_XDECREF(exec_name);
     Py_XDECREF(blockstack_as_tuple);
     Py_XDECREF(localsplus_as_tuple);
     Py_XDECREF(dummy_locals);
@@ -978,7 +961,7 @@ err_exit:
 }
 
 #define frametuplenewfmt "O!:frame.__new__"
-#define frametuplesetstatefmt "O!iUO!iO!OiiO!O:frame.__setstate__"
+#define frametuplesetstatefmt "O!ibO!iO!OiiO!O:frame.__setstate__"
 
 static PyObject *
 frame_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -1001,7 +984,6 @@ frame_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (globals == NULL)
         return NULL;
     f = PyFrame_New(ts, (PyCodeObject *) f_code, globals, globals);
-    assert(f->f_execute == NULL); /* frame is not executable */
     if (f != NULL)
         Py_TYPE(f) = &wrap_PyFrame_Type;
     Py_DECREF(globals);
@@ -1016,9 +998,8 @@ frame_setstate(PyFrameObject *f, PyObject *args)
     Py_ssize_t i;
     PyObject *f_globals, *f_locals, *blockstack_as_tuple;
     PyObject *localsplus_as_tuple, *trace, *f_code;
-    PyObject *exec_name = NULL;
-    PyFrame_ExecFunc *good_func, *bad_func;
     int valid, have_locals;
+    char f_executing;
     Py_ssize_t tmp;
 
     if (is_wrong_type(Py_TYPE(f))) return NULL;
@@ -1026,18 +1007,17 @@ frame_setstate(PyFrameObject *f, PyObject *args)
     Py_CLEAR(f->f_locals);
 
     if (!PyArg_ParseTuple (args, frametuplesetstatefmt,
-                           &PyCode_Type, &f_code,
-                           &valid,
-                           &exec_name,
-                           &PyDict_Type, &f_globals,
-                           &have_locals,
-                           &PyDict_Type, &f_locals,
-                           &trace,
-                   &f_lasti,
-                   &f_lineno,
-                   &PyTuple_Type, &blockstack_as_tuple,
-                   &localsplus_as_tuple
-                   ))
+            &PyCode_Type, &f_code,
+            &valid,
+            &f_executing,
+            &PyDict_Type, &f_globals,
+            &have_locals,
+            &PyDict_Type, &f_locals,
+            &trace,
+            &f_lasti,
+            &f_lineno,
+            &PyTuple_Type, &blockstack_as_tuple,
+            &localsplus_as_tuple))
         return NULL;
 
     if (f->f_code != (PyCodeObject *) f_code) {
@@ -1045,9 +1025,6 @@ frame_setstate(PyFrameObject *f, PyObject *args)
                         "invalid code object for frame_setstate");
         return NULL;
     }
-    if (slp_find_execfuncs(Py_TYPE(f)->tp_base, exec_name, &good_func,
-                           &bad_func))
-        return NULL;
 
     if (have_locals) {
         Py_INCREF(f_locals);
@@ -1140,14 +1117,12 @@ frame_setstate(PyFrameObject *f, PyObject *args)
     }
 
     /* See if this frame is valid to be run. */
-    f->f_execute = valid ? good_func : bad_func;
+    f->f_executing = valid ? f_executing : SLP_FRAME_EXECUTING_INVALID;
 
     Py_TYPE(f) = &PyFrame_Type;
     Py_INCREF(f);
     return (PyObject *) f;
 err_exit:
-    /* Make sure that the frame is not executable. */
-    f->f_execute = NULL;
     /* Clear members that could leak. */
     PyFrame_Type.tp_clear((PyObject*)f);
 
@@ -1230,21 +1205,7 @@ MAKE_WRAPPERTYPE(PyFrame_Type, frame, "frame", frameobject_reduce, frame_new, fr
 
 static int init_frametype(PyObject * mod)
 {
-    return slp_register_execute(&PyFrame_Type, "eval_frame",
-                             PyEval_EvalFrameEx_slp, SLP_REF_INVALID_EXEC(eval_frame))
-        || slp_register_execute(&PyFrame_Type, "eval_frame_value",
-                             slp_eval_frame_value, SLP_REF_INVALID_EXEC(eval_frame_value))
-        || slp_register_execute(&PyFrame_Type, "eval_frame_noval",
-                             slp_eval_frame_noval, SLP_REF_INVALID_EXEC(eval_frame_noval))
-        || slp_register_execute(&PyFrame_Type, "eval_frame_iter",
-                             slp_eval_frame_iter, SLP_REF_INVALID_EXEC(eval_frame_iter))
-        || slp_register_execute(&PyFrame_Type, "eval_frame_setup_with",
-                             slp_eval_frame_setup_with, SLP_REF_INVALID_EXEC(eval_frame_setup_with))
-        || slp_register_execute(&PyFrame_Type, "eval_frame_with_cleanup",
-                             slp_eval_frame_with_cleanup, SLP_REF_INVALID_EXEC(eval_frame_with_cleanup))
-        || slp_register_execute(&PyFrame_Type, "eval_frame_yield_from",
-                             slp_eval_frame_yield_from, SLP_REF_INVALID_EXEC(eval_frame_yield_from))
-        || slp_register_execute(&PyCFrame_Type, "channel_seq_callback",
+    return slp_register_execute(&PyCFrame_Type, "channel_seq_callback",
                              slp_channel_seq_callback, SLP_REF_INVALID_EXEC(slp_channel_seq_callback))
         || slp_register_execute(&PyCFrame_Type, "slp_restore_tracing",
                              slp_restore_tracing, SLP_REF_INVALID_EXEC(slp_restore_tracing))
@@ -1881,8 +1842,9 @@ static int init_generatortype(PyObject * mod)
     if (gen == NULL || gen->gi_frame->f_back == NULL)
         return -1;
     cbframe = gen->gi_frame->f_back;
+    assert(PyCFrame_Check(cbframe));
     res = slp_register_execute(Py_TYPE(cbframe), "gen_iternext_callback",
-              gen->gi_frame->f_back->f_execute,
+              ((PyCFrameObject *)cbframe)->f_execute,
               SLP_REF_INVALID_EXEC(gen_iternext_callback))
           || init_type(&wrap_PyGen_Type, initchain, mod);
 

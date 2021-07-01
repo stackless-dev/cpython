@@ -17,6 +17,7 @@ extern "C" {
 
 #ifdef SLP_BUILD_CORE
 
+#include "frameobject.h"
 #ifdef Py_BUILD_CORE
 #include "pycore_pystate.h"  /* for _PyRuntime */
 #endif
@@ -39,7 +40,7 @@ extern "C" {
  * were created with an older Cython compiled with regular C-Python.
  * See Stackless issue #168
  */
-#define SLP_END_OF_OLD_CYTHON_HACK_VERSION (0x030800b1)
+#define SLP_END_OF_OLD_CYTHON_HACK_VERSION (0x030800a1)
 #endif
 
 /*
@@ -325,8 +326,9 @@ PyObject * slp_wrap_call_frame(PyFrameObject *frame, int exc, PyObject *retval);
     } while (0)
 
 #define CALL_FRAME_FUNCTION(frame_, exc, retval) \
-     (assert((frame_) && (frame_)->f_execute), \
-     ((frame_)->f_execute((frame_), (exc), (retval))))
+     (assert((frame_) && (!PyCFrame_Check(frame_) || ((PyCFrameObject *)(frame_))->f_execute)), \
+     (PyCFrame_Check(frame_) ? (((PyCFrameObject *)(frame_))->f_execute(((PyCFrameObject *)(frame_)), (exc), (retval))) : \
+     PyEval_EvalFrameEx_slp((frame_), (exc), (retval))))
 
 #endif
 
@@ -378,18 +380,10 @@ PyAPI_FUNC(PyObject *) PyEval_EvalFrameEx_slp(struct _frame *, int, PyObject *);
 /* eval_frame with stack overflow, triggered there with a macro */
 PyObject * slp_eval_frame_newstack(struct _frame *f, int throwflag, PyObject *retval);
 
-/* the new eval_frame loop with or without value or resuming an iterator
-   or setting up or cleaning up a with block */
-PyObject * slp_eval_frame_value(struct _frame *f,  int throwflag, PyObject *retval);
-PyObject * slp_eval_frame_noval(struct _frame *f,  int throwflag, PyObject *retval);
-PyObject * slp_eval_frame_iter(struct _frame *f,  int throwflag, PyObject *retval);
-PyObject * slp_eval_frame_setup_with(struct _frame *f,  int throwflag, PyObject *retval);
-PyObject * slp_eval_frame_with_cleanup(struct _frame *f,  int throwflag, PyObject *retval);
-PyObject * slp_eval_frame_yield_from(struct _frame *f,  int throwflag, PyObject *retval);
 /* other eval_frame functions from module/scheduling.c */
-PyObject * slp_restore_tracing(PyFrameObject *f, int exc, PyObject *retval);
+PyObject * slp_restore_tracing(PyCFrameObject *cf, int exc, PyObject *retval);
 /* other eval_frame functions from Objects/typeobject.c */
-PyObject * slp_tp_init_callback(PyFrameObject *f, int exc, PyObject *retval);
+PyObject * slp_tp_init_callback(PyCFrameObject *cf, int exc, PyObject *retval);
 /* functions related to pickling */
 PyObject * slp_reduce_frame(PyFrameObject * frame);
 
@@ -765,13 +759,13 @@ PyTaskletTStateStruc * slp_get_saved_tstate(PyTaskletObject *task);
 /*
  * Channel related prototypes
  */
-PyObject * slp_channel_seq_callback(struct _frame *f,  int throwflag, PyObject *retval);
+PyObject * slp_channel_seq_callback(PyCFrameObject *f,  int throwflag, PyObject *retval);
 PyObject * slp_get_channel_callback(void);
 
 /*
  * contextvars related prototypes
  */
-PyObject* slp_context_run_callback(PyFrameObject *f, int exc, PyObject *result);
+PyObject* slp_context_run_callback(PyCFrameObject *f, int exc, PyObject *result);
 
 /* macro for use when interrupting tasklets from watchdog */
 #define TASKLET_NESTING_OK(task) \
@@ -788,6 +782,48 @@ void slp_head_unlock(void);
 
 long slp_parse_thread_id(PyObject *thread_id, unsigned long *id);
 
+/*
+ * Symbolic names for values stored in PyFrameObject.f_executing
+ *
+ * Regular C-Python only uses two values
+ * 0: the frame is not executing
+ * 1: the frame is executing
+ *
+ * Stackless Python extends the range of values to indicate, what to do
+ * upon the next invocation of PyEval_EvalFrameEx_slp.
+ */
+
+/* Frame is invalid and PyEval_EvalFrameEx_slp must raise an exception.
+ * Only set, if the frame was unpickled and had C-state on the stack.
+ */
+#define SLP_FRAME_EXECUTING_INVALID (-1)
+
+/* Frame is new or completely executed. */
+#define SLP_FRAME_EXECUTING_NO 0
+
+/* Frame is executing, value in retval is valid and must be pushed onto the stack. */
+#define SLP_FRAME_EXECUTING_VALUE 1
+
+/* Frame is executing, ignore value in retval.
+ * This is used at the start of a frame or after an interrupt. */
+#define SLP_FRAME_EXECUTING_NOVAL 2
+
+/* Frame is executing, continue opcode ITER */
+#define SLP_FRAME_EXECUTING_ITER 3
+
+/* Frame is executing, continue opcode SETUP_WITH */
+#define SLP_FRAME_EXECUTING_SETUP_WITH 4
+
+/* Frame is executing, continue opcode WITH_CLEANUP */
+#define SLP_FRAME_EXECUTING_WITH_CLEANUP 5
+
+/* Frame is executing, continue opcode YIELD_FROM */
+#define SLP_FRAME_EXECUTING_YIELD_FROM 6
+
+/* Test, if the frame is executing */
+#define SLP_FRAME_IS_EXECUTING(frame_) \
+    ((frame_)->f_executing >= SLP_FRAME_EXECUTING_VALUE && \
+     (frame_)->f_executing <= SLP_FRAME_EXECUTING_YIELD_FROM)
 
 
 #endif /* #ifdef SLP_BUILD_CORE */

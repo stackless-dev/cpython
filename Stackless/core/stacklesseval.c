@@ -348,11 +348,11 @@ slp_eval_frame(PyFrameObject *f)
         if (ts->st.cstack_base == NULL)
             ts->st.cstack_base = stackref - SLP_CSTACK_GOODGAP;
         if (stackref > ts->st.cstack_base) {
-                        PyCStackObject *initial_stub;
+            PyCStackObject *initial_stub;
             retval = climb_stack_and_eval_frame(f);
-                        initial_stub = ts->st.initial_stub;
-                        /* cst might be NULL in OOM conditions */
-                        if (ts->interp != _PyRuntime.interpreters.main && initial_stub != NULL) {
+            initial_stub = ts->st.initial_stub;
+            /* cst might be NULL in OOM conditions */
+            if (ts->interp != _PyRuntime.interpreters.main && initial_stub != NULL) {
                 PyCStackObject *cst;
                 register int found = 0;
                 assert(initial_stub->startaddr == ts->st.cstack_base);
@@ -843,12 +843,12 @@ void PyStackless_kill_tasks_with_stacks(int allthreads)
 /* cstack spilling for recursive calls */
 
 static PyObject *
-eval_frame_callback(PyFrameObject *f, int exc, PyObject *retval)
+eval_frame_callback(PyCFrameObject *cf, int exc, PyObject *retval)
 {
     PyThreadState *ts = _PyThreadState_GET();
     PyTaskletObject *cur = ts->st.current;
     PyCStackObject *cst;
-    PyCFrameObject *cf = (PyCFrameObject *) f;
+    PyFrameObject *f = (PyFrameObject *) cf;
     intptr_t *saved_base;
     Py_ssize_t tmp;
     int in_transfer;

@@ -719,6 +719,11 @@ Makefile Modules/config.c: Makefile.pre \
 Programs/_testembed: Programs/_testembed.o $(LIBRARY) $(LDLIBRARY) $(PY3LIBRARY)
 	$(LINKCC) $(PY_CORE_LDFLAGS) $(LINKFORSHARED) -o $@ Programs/_testembed.o $(BLDLIBRARY) $(LIBS) $(MODLIBS) $(SYSLIBS)
 
+
+$(srcdir)/Include/cpython/slp_exttype.h: $(srcdir)/Objects/typeobject.c
+	$(PYTHON_FOR_REGEN) $(srcdir)/Stackless/Tools/extract_slp_info.py
+	$(UPDATE_FILE) $(srcdir)/Include/cpython/slp_exttype.h $(srcdir)/Include/cpython/slp_exttype.h.new
+
 ############################################################################
 # Importlib
 

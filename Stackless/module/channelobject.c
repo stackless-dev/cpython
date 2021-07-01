@@ -958,10 +958,9 @@ _channel_send_sequence(PyChannelObject *self, PyObject *v)
  */
 
 PyObject *
-slp_channel_seq_callback(PyFrameObject *_f, int exc, PyObject *retval)
+slp_channel_seq_callback(PyCFrameObject *f, int exc, PyObject *retval)
 {
     PyThreadState *ts = _PyThreadState_GET();
-    PyCFrameObject *f = (PyCFrameObject *) _f;
     PyChannelObject *ch;
     PyObject *item;
     int stage = f->n;

@@ -751,9 +751,6 @@ _PyFrame_New_NoTrack(PyThreadState *tstate, PyCodeObject *code,
     f->f_trace_opcodes = 0;
     f->f_trace_lines = 1;
 
-#ifdef STACKLESS
-    f->f_execute = NULL;
-#endif
     return f;
 }
 

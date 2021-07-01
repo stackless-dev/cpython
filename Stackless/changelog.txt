@@ -14,6 +14,12 @@ What's New in Stackless 3.X.X?
   code objects pickled with an incompatible version of Python now raises a
   ValueError exception.
 
+- https://github.com/stackless-dev/stackless/issues/270
+  Stackless now uses an unmodified PyFrameObject structure. Stackless now
+  stores more state information in the field f->f_executing than C-Python.
+  If an extension module modifies f->f_executing, undefined behavior can occur.
+  Reading the field as boolean still works.
+
 - https://github.com/stackless-dev/stackless/issues/269
   A failure to unpickle a frame could cause a NULL pointer access when
   deallocating the frame. This has been fixed.

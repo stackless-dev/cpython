@@ -23,8 +23,8 @@ class HandledTasklet(tasklet):
         def handler(*args, **kwds):
             try:
                 func(*args, **kwds)
-            except Exception, e:
-                print "captured", e
+            except Exception as e:
+                print("captured", e)
                 raise
 
         return tasklet.__new__(self, handler)

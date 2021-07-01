@@ -557,10 +557,9 @@ kill_wrap_bad_guy(PyTaskletObject *prev, PyTaskletObject *bad_guy)
 /* non-recursive scheduling */
 
 PyObject *
-slp_restore_tracing(PyFrameObject *f, int exc, PyObject *retval)
+slp_restore_tracing(PyCFrameObject *cf, int exc, PyObject *retval)
 {
     PyThreadState *ts = _PyThreadState_GET();
-    PyCFrameObject *cf = (PyCFrameObject *) f;
 
     if (NULL == cf->any1 && NULL == cf->any2) {
         /* frame was created by unpickling */
@@ -606,20 +605,20 @@ slp_encode_ctrace_functions(Py_tracefunc c_tracefunc, Py_tracefunc c_profilefunc
 /* jumping from a soft tasklet to a hard switched */
 
 static PyObject *
-jump_soft_to_hard(PyFrameObject *f, int exc, PyObject *retval)
+jump_soft_to_hard(PyCFrameObject *cf, int exc, PyObject *retval)
 {
     PyThreadState *ts = _PyThreadState_GET();
 
-    SLP_STORE_NEXT_FRAME(ts, f->f_back);
+    SLP_STORE_NEXT_FRAME(ts, cf->f_back);
 
     /* reinstate the del_post_switch */
     assert(ts->st.del_post_switch == NULL);
-    ts->st.del_post_switch = ((PyCFrameObject*)f)->ob1;
-    ((PyCFrameObject*)f)->ob1 = NULL;
+    ts->st.del_post_switch = cf->ob1;
+    cf->ob1 = NULL;
 
     /* ignore retval. everything is in the tasklet. */
     Py_DECREF(retval); /* consume ref according to protocol */
-    SLP_FRAME_EXECFUNC_DECREF(f);
+    SLP_FRAME_EXECFUNC_DECREF(cf);
     slp_transfer_return(ts->st.current->cstate);
     /* We either have an error or don't come back, so bail out.
      * There is no way to recover, because we don't know the previous
@@ -1245,7 +1244,7 @@ hard_switching:
          * (For now there is at most a single pending cframe.)
          */
         if (prev->cstate->nesting_level > 0 && f && PyCFrame_Check(f) &&
-            f->f_execute == slp_restore_tracing) {
+            ((PyCFrameObject *)f)->f_execute == slp_restore_tracing) {
             PyObject *retval;
             PyFrameObject *f2;
 
@@ -1648,8 +1647,12 @@ slp_wrap_call_frame(PyFrameObject *frame, int exc, PyObject *retval) {
     assert(frame);
     assert(SLP_CURRENT_FRAME_IS_VALID(ts));
     Py_INCREF(frame);
-    assert(frame->f_execute != NULL);
-    res = frame->f_execute(frame, exc, retval);
+    if (PyCFrame_Check(frame)) {
+        assert(((PyCFrameObject *)frame)->f_execute != NULL);
+        res = ((PyCFrameObject *)frame)->f_execute((PyCFrameObject *)frame, exc, retval);
+    } else {
+        res = PyEval_EvalFrameEx_slp(frame, exc, retval);
+    }
     assert(Py_REFCNT(frame) >= 2);
     Py_DECREF(frame);
     SLP_ASSERT_FRAME_IN_TRANSFER(ts);

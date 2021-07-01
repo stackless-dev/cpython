@@ -596,14 +596,28 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 #define LLTRACE_HANDLE_UNWINDING(obj__, msg__) (void)1
 #endif
 
+#if 1
+static inline int
+handle_unwinding(int lineno, PyFrameObject *f,
+        PyObject **stack_pointer, int oparg, PyThreadState *tstate,
+        const _Py_CODEUNIT *first_instr, const _Py_CODEUNIT *next_instr,
+        char frame_func, int has_opcode, PyObject **pretval);
+#define HANDLE_UNWINDING(frame_func, has_opcode, retval__) \
+    if (handle_unwinding(__LINE__, f, stack_pointer, oparg, tstate, \
+            first_instr, next_instr, (frame_func), (has_opcode), &(retval__)))\
+            return (retval__)
+#else
+/* keep the old macro in case of performance problems */
 #define HANDLE_UNWINDING(frame_func, has_opcode, retval__) \
 do { \
     if (has_opcode) \
         next_instr -= 1 + EXTENDED_ARG_OFFSET(oparg); \
-    SLP_DISABLE_GCC_W_ADDRESS /* suppress warning, if frame_func is a function */ \
-    if (frame_func != NULL) { \
-    SLP_RESTORE_WARNINGS \
-        f->f_execute = (frame_func); \
+    assert(SLP_FRAME_EXECUTING_VALUE == f->f_executing); \
+    if (frame_func != SLP_FRAME_EXECUTING_VALUE) { \
+        f->f_executing = (frame_func); \
+        /* check argument: must be an executing frame with retval */ \
+        assert(frame_func != SLP_FRAME_EXECUTING_NOVAL); \
+        assert(SLP_FRAME_IS_EXECUTING(f)); \
     } \
     /* keep the reference to the frame to be called. */ \
     f->f_stacktop = stack_pointer; \
@@ -623,11 +637,7 @@ do { \
         (retval__) = CALL_FRAME_FUNCTION(f2, 0, (retval__)); \
         Py_DECREF(f2); \
         if (SLP_PEEK_NEXT_FRAME(tstate) != f) { \
-            assert(f->f_execute == slp_eval_frame_value || f->f_execute == slp_eval_frame_noval || \
-                f->f_execute == slp_eval_frame_setup_with || f->f_execute == slp_eval_frame_with_cleanup || \
-                f->f_execute == slp_eval_frame_yield_from); \
-            if (f->f_execute == slp_eval_frame_noval) \
-                f->f_execute = slp_eval_frame_value; \
+            assert(f->f_executing == (frame_func)); \
             LLTRACE_HANDLE_UNWINDING(STACKLESS_RETVAL((tstate), (retval__)), "handle_unwinding return from next frame:");\
             return (retval__); \
         } \
@@ -638,19 +648,13 @@ do { \
     if (STACKLESS_UNWINDING(retval__)) \
         STACKLESS_UNPACK(tstate, (retval__)); \
     f->f_stacktop = NULL; \
-    SLP_DISABLE_GCC_W_ADDRESS /* suppress warning, if frame_func is a function */ \
-    if (frame_func != NULL) { \
-    SLP_RESTORE_WARNINGS \
-        assert(f->f_execute == (frame_func)); \
-    } \
-    else { \
-        assert(f->f_execute == slp_eval_frame_value || f->f_execute == slp_eval_frame_noval); \
-    } \
-    f->f_execute = slp_eval_frame_value; \
+    assert(f->f_executing == (frame_func)); \
+    f->f_executing = SLP_FRAME_EXECUTING_VALUE; \
     if (has_opcode) \
         next_instr += 1 + EXTENDED_ARG_OFFSET(oparg); \
     LLTRACE_HANDLE_UNWINDING((retval__), "handle_unwinding end:");\
 } while(0)
+#endif
 
 /* To be called in the slp_continue_<xxxx> block, if
  * HANDLE_UNWINDING is used with has_opcode==1
@@ -667,10 +671,11 @@ do { \
 
 #endif
 
-PyObject* _Py_HOT_FUNCTION
 #ifdef STACKLESS
-slp_eval_frame_value(PyFrameObject *f, int throwflag, PyObject *retval)
+static PyObject* _Py_HOT_FUNCTION
+slp_eval_frame_value(PyFrameObject *f, int throwflag, PyObject *retval_arg)
 #else
+PyObject* _Py_HOT_FUNCTION
 _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
 #endif
 {
@@ -682,9 +687,7 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
     int opcode;        /* Current opcode */
     int oparg;         /* Current opcode argument, if any */
     PyObject **fastlocals, **freevars;
-#ifndef STACKLESS
     PyObject *retval = NULL;            /* Return value */
-#endif
     PyThreadState *tstate = _PyThreadState_GET();
     PyCodeObject *co;
 
@@ -964,7 +967,7 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
         Py_XDECREF(traceback); \
     } while(0)
 
-/* Stackless specific defines start here.. */
+/* Stackless specific macros and code start here. */
 #ifdef STACKLESS
 #define SLP_CHECK_INTERRUPT() \
     if (tstate->st.interrupt && !tstate->curexc_type) { \
@@ -983,6 +986,19 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
     } \
     tstate->st.tick_counter++;
 
+    int executing = f->f_executing;
+    assert(executing != SLP_FRAME_EXECUTING_INVALID);
+    if (executing != SLP_FRAME_EXECUTING_NO) {
+        goto slp_setup_completed;
+    }
+
+    /* push frame */
+    if (Py_EnterRecursiveCall("")) {
+        Py_XDECREF(retval_arg);
+        SLP_STORE_NEXT_FRAME(tstate, f->f_back);
+        return NULL;
+    }
+
 #else
 #define SLP_CHECK_INTERRUPT() ;
 
@@ -991,11 +1007,8 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
     /* push frame */
     if (Py_EnterRecursiveCall(""))
         return NULL;
+#endif
 
-    /* STACKLESS:
-     * the code starting from here on until the end-marker
-     * is duplicated below. Keep the two copies in sync!
-     */
     tstate->frame = f;
 
     if (tstate->use_tracing) {
@@ -1031,10 +1044,10 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
             }
         }
     }
-    /* STACKLESS: end of duplicated code
-     */
-
-#endif /* #ifdef STACKLESS */
+#ifdef STACKLESS
+    executing = SLP_FRAME_EXECUTING_NOVAL;
+slp_setup_completed:
+#endif
 
     if (PyDTrace_FUNCTION_ENTRY_ENABLED())
         dtrace_function_entry(f);
@@ -1080,40 +1093,34 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
     lltrace = _PyDict_GetItemId(f->f_globals, &PyId___ltrace__) != NULL;
 #endif
 
-    if (throwflag) { /* support for generator.throw() */
-        assert(retval == NULL);  /* to prevent reference leaks */
+    if (throwflag) /* support for generator.throw() */
         goto error;
-    }
-
 
 #ifdef STACKLESS
-    if (f->f_execute == slp_eval_frame_value) {
-        /* this is a return */
-        PUSH(retval); /* we are back from a function call */
-    }
-    else if (f->f_execute == slp_eval_frame_noval) {
-        f->f_execute = slp_eval_frame_value;
+    assert(f->f_executing == SLP_FRAME_EXECUTING_VALUE);
+    assert(retval == NULL);
+    retval = retval_arg;
+    retval_arg = NULL;
+    switch(executing){
+    case SLP_FRAME_EXECUTING_NOVAL:
         /* don't push it, frame ignores value */
         Py_XDECREF(retval);
-    }
-    else if (f->f_execute == slp_eval_frame_iter) {
-        f->f_execute = slp_eval_frame_value;
+        break;
+    case SLP_FRAME_EXECUTING_VALUE:
+        /* this is a return */
+        PUSH(retval); /* we are back from a function call */
+        break;
+    case SLP_FRAME_EXECUTING_ITER:
         goto slp_continue_slp_eval_frame_iter;
-    }
-    else if (f->f_execute == slp_eval_frame_setup_with) {
-        f->f_execute = slp_eval_frame_value;
+    case SLP_FRAME_EXECUTING_SETUP_WITH:
         goto slp_continue_slp_eval_frame_setup_with;
-    }
-    else if (f->f_execute == slp_eval_frame_with_cleanup) {
-        f->f_execute = slp_eval_frame_value;
+    case SLP_FRAME_EXECUTING_WITH_CLEANUP:
         goto slp_continue_slp_eval_frame_with_cleanup;
-    }
-    else if (f->f_execute == slp_eval_frame_yield_from) {
-        f->f_execute = slp_eval_frame_value;
+    case SLP_FRAME_EXECUTING_YIELD_FROM:
         goto slp_continue_slp_eval_frame_yield_from;
+    default:
+        Py_FatalError("invalid frame->f_executing value");
     }
-    else
-        Py_FatalError("invalid frame function");
 
     /* always check for an error flag */
     if (retval == NULL)
@@ -2026,12 +2033,14 @@ main_loop:
                 STACKLESS_ASSERT();
             } else {
                 _Py_IDENTIFIER(send);
-                if (v == Py_None) {
+                if (v == Py_None)
+                {
                     STACKLESS_PROPOSE_METHOD(tstate, receiver, tp_iternext);
                     retval = Py_TYPE(receiver)->tp_iternext(receiver);
                     STACKLESS_ASSERT();
                 }
-                else {
+                else
+                {
                     STACKLESS_PROPOSE_ALL(tstate);
                     retval = _PyObject_CallMethodIdObjArgs(receiver, &PyId_send, v, NULL);
                     STACKLESS_ASSERT();
@@ -2040,10 +2049,10 @@ main_loop:
             Py_DECREF(v);
 #ifdef STACKLESS
             if (STACKLESS_UNWINDING(retval)) {
-                HANDLE_UNWINDING(slp_eval_frame_yield_from, 0, retval);
+                HANDLE_UNWINDING(SLP_FRAME_EXECUTING_YIELD_FROM, 0, retval);
             }
             if (0) {
-                slp_continue_slp_eval_frame_yield_from:
+slp_continue_slp_eval_frame_yield_from:
                 /* Initialize variables */
                 receiver = TOP();
             }
@@ -3129,10 +3138,10 @@ main_loop:
                 STACKLESS_ASSERT();
             }
             if (STACKLESS_UNWINDING(next)) {
-                HANDLE_UNWINDING(slp_eval_frame_iter, 1, next);
+                HANDLE_UNWINDING(SLP_FRAME_EXECUTING_ITER, 1, next);
             }
             if (0) {
-                slp_continue_slp_eval_frame_iter:
+slp_continue_slp_eval_frame_iter:
                 SLP_SET_OPCODE_AND_OPARG();
                 assert(opcode == FOR_ITER);
 
@@ -3231,10 +3240,10 @@ main_loop:
             Py_DECREF(enter);
 #ifdef STACKLESS
             if (STACKLESS_UNWINDING(res)) {
-                HANDLE_UNWINDING(slp_eval_frame_setup_with, 1, res);
+                HANDLE_UNWINDING(SLP_FRAME_EXECUTING_SETUP_WITH, 1, res);
             }
             if(0) {
-                slp_continue_slp_eval_frame_setup_with:
+slp_continue_slp_eval_frame_setup_with:
                 SLP_SET_OPCODE_AND_OPARG();
                 assert(opcode == SETUP_WITH);
                 /* Initialize variables */
@@ -3320,10 +3329,10 @@ main_loop:
             Py_DECREF(exit_func);
 #ifdef STACKLESS
             if (STACKLESS_UNWINDING(res)) {
-                HANDLE_UNWINDING(slp_eval_frame_with_cleanup, 0, res);
+                HANDLE_UNWINDING(SLP_FRAME_EXECUTING_WITH_CLEANUP, 0, res);
             }
             if (0) {
-                slp_continue_slp_eval_frame_with_cleanup:
+slp_continue_slp_eval_frame_with_cleanup:
                 /* Initialize variables */
                 exc = TOP();
                 if (exc == NULL)
@@ -3460,7 +3469,7 @@ main_loop:
             }
 #ifdef STACKLESS
             if (STACKLESS_UNWINDING(res)) {
-                HANDLE_UNWINDING(NULL, 0, res);
+                HANDLE_UNWINDING(SLP_FRAME_EXECUTING_VALUE, 0, res);
             }
 #endif
 
@@ -3478,7 +3487,7 @@ main_loop:
             stack_pointer = sp;
 #ifdef STACKLESS
             if (STACKLESS_UNWINDING(res)) {
-                HANDLE_UNWINDING(NULL, 0, res);
+                HANDLE_UNWINDING(SLP_FRAME_EXECUTING_VALUE, 0, res);
             }
 #endif
             PUSH(res);
@@ -3499,7 +3508,7 @@ main_loop:
             Py_DECREF(names);
 #ifdef STACKLESS
             if (STACKLESS_UNWINDING(res)) {
-                HANDLE_UNWINDING(NULL, 0, res);
+                HANDLE_UNWINDING(SLP_FRAME_EXECUTING_VALUE, 0, res);
             }
 #endif
             PUSH(res);
@@ -3549,10 +3558,11 @@ main_loop:
             Py_DECREF(func);
             Py_DECREF(callargs);
             Py_XDECREF(kwargs);
+
 #ifdef STACKLESS
             if (STACKLESS_UNWINDING(result)) {
                 (void) POP();  /* top of stack causes a GC related assertion error */
-                HANDLE_UNWINDING(NULL, 0, result);
+                HANDLE_UNWINDING(SLP_FRAME_EXECUTING_VALUE, 0, result);
                 PUSH(result);
             } else
 #endif
@@ -3798,31 +3808,26 @@ return_or_yield:
     }
 
     /* pop frame */
-/* exit_eval_frame: */
-#ifndef STACKLESS
 exit_eval_frame:
     if (PyDTrace_FUNCTION_RETURN_ENABLED())
         dtrace_function_return(f);
     Py_LeaveRecursiveCall();
     f->f_executing = 0;
-    tstate->frame = f->f_back;
-
-    return _Py_CheckFunctionResult(NULL, retval, "PyEval_EvalFrameEx");
-
-#else
-    if (PyDTrace_FUNCTION_RETURN_ENABLED())
-        dtrace_function_return(f);
-    Py_LeaveRecursiveCall();
-    f->f_executing = 0;
+#ifdef STACKLESS
     SLP_STORE_NEXT_FRAME(tstate, f->f_back);
+    Py_CLEAR(retval_arg);
+#else
+    tstate->frame = f->f_back;
+#endif
 
     return _Py_CheckFunctionResult(NULL, retval, "PyEval_EvalFrameEx");
 
-
+#ifdef STACKLESS
 stackless_interrupt_call:
     /* interrupted during unwinding */
-
-    f->f_execute = slp_eval_frame_noval;
+    assert(retval_arg == NULL);
+    assert(f->f_executing == SLP_FRAME_EXECUTING_VALUE);
+    f->f_executing = SLP_FRAME_EXECUTING_NOVAL;
     f->f_stacktop = stack_pointer;
 
     /* Set f->f_lasti to the instruction before the current one or to the
@@ -3837,86 +3842,94 @@ stackless_interrupt_call:
 
 
 #ifdef STACKLESS
-PyObject * _Py_HOT_FUNCTION
-slp_eval_frame_noval(PyFrameObject *f, int throwflag, PyObject *retval)
+static inline int
+handle_unwinding(int lineno, PyFrameObject *f,
+        PyObject **stack_pointer, int oparg, PyThreadState *tstate,
+        const _Py_CODEUNIT *first_instr, const _Py_CODEUNIT *next_instr,
+        char frame_func, int has_opcode, PyObject **pretval)
 {
-    PyObject *r;
-    /*
-     * this function is identical to PyEval_EvalFrame_value.
-     * it serves as a marker whether we expect a value or
-     * not, and it makes debugging a little easier.
-     */
-    SLP_DO_NOT_OPTIMIZE_AWAY((char *)1);
-
-    r = slp_eval_frame_value(f, throwflag, retval);
-    return r;
+    assert(*pretval); /* check argument */
+    if (has_opcode)
+        next_instr -= 1 + EXTENDED_ARG_OFFSET(oparg);
+    assert(SLP_FRAME_EXECUTING_VALUE == f->f_executing);
+    if (frame_func != SLP_FRAME_EXECUTING_VALUE) {
+        f->f_executing = frame_func;
+        /* check argument: must be an executing frame with retval */
+        assert(frame_func != SLP_FRAME_EXECUTING_NOVAL);
+        assert(SLP_FRAME_IS_EXECUTING(f));
+    }
+    /* keep the reference to the frame to be called. */
+    f->f_stacktop = stack_pointer;
+    /* Set f->f_lasti to the instruction before the current one or to the */
+    /* first instruction (-1). See "f->f_lasti refers to ..." above.      */
+    f->f_lasti = INSTR_OFFSET() != 0 ?
+            assert(INSTR_OFFSET() >= sizeof(_Py_CODEUNIT)),
+            (int)(INSTR_OFFSET() - sizeof(_Py_CODEUNIT)) : -1;
+    if (SLP_PEEK_NEXT_FRAME(tstate)->f_back != f) {
+        LLTRACE_HANDLE_UNWINDING(STACKLESS_RETVAL(tstate, *pretval), "handle_unwinding return:");
+        return 1;
+    }
+    STACKLESS_UNPACK(tstate, *pretval);
+    {
+        LLTRACE_HANDLE_UNWINDING(*pretval, "handle_unwinding call next frame:");
+        PyFrameObject *f2 = SLP_CLAIM_NEXT_FRAME(tstate);
+        *pretval = CALL_FRAME_FUNCTION(f2, 0, *pretval);
+        Py_DECREF(f2);
+        if (SLP_PEEK_NEXT_FRAME(tstate) != f) {
+            assert(f->f_executing == (frame_func));
+            LLTRACE_HANDLE_UNWINDING(STACKLESS_RETVAL(tstate, *pretval), "handle_unwinding return from next frame:");
+            return 1;
+        }
+        f2 = SLP_CLAIM_NEXT_FRAME(tstate);
+        assert(f == f2);
+        Py_DECREF(f2);
+    }
+    if (STACKLESS_UNWINDING(*pretval))
+        STACKLESS_UNPACK(tstate, *pretval);
+    f->f_stacktop = NULL;
+    assert(f->f_executing == frame_func);
+    f->f_executing = SLP_FRAME_EXECUTING_VALUE;
+    LLTRACE_HANDLE_UNWINDING(*pretval, "handle_unwinding end:");
+    return 0;
 }
 
-PyObject *
-slp_eval_frame_iter(PyFrameObject *f, int throwflag, PyObject *retval)
+PyObject*
+PyEval_EvalFrameEx_slp(PyFrameObject *f, int throwflag, PyObject *retval_arg)
 {
-    PyObject *r;
-    /*
-     * this function is identical to PyEval_EvalFrame_value.
-     * it serves as a marker whether we are inside of a
-     * for_iter operation. In this case we need to handle
-     * null without error as valid result.
-     */
-    SLP_DO_NOT_OPTIMIZE_AWAY((char *)2);
-    r = slp_eval_frame_value(f, throwflag, retval);
-    return r;
+    PyThreadState *tstate = _PyThreadState_GET();
+    int executing = f->f_executing;
+    if (executing == SLP_FRAME_EXECUTING_INVALID) {
+        --tstate->recursion_depth;
+        return slp_cannot_execute((PyCFrameObject *)f, "PyEval_EvalFrameEx_slp", retval_arg);
+    } else if (executing == SLP_FRAME_EXECUTING_NO) {
+        /* Processing of a frame starts here */
+
+        /* Check, if an extension module has changed tstate->interp->eval_frame.
+         * PEP 523 defines this function pointer as an API to customise the frame
+         * evaluation. Stackless can not support this API. In order to prevent
+         * undefined behavior, we terminate the interpreter.
+         */
+        if (tstate->interp->eval_frame != _PyEval_EvalFrameDefault)
+            Py_FatalError("An extension module has set a custom frame evaluation function (see PEP 523).\n"
+                          "Stackless Python does not support the frame evaluation API defined by PEP 523.\n"
+                          "The programm now terminates to prevent undefined behavior.\n");
+
+        if (SLP_CSTACK_SAVE_NOW(tstate, f)) {
+            /* Setup the C-stack and recursively call PyEval_EvalFrameEx_slp with the same arguments.
+             * SLP_CSTACK_SAVE_NOW(tstate, f) will be false then.
+             */
+            return slp_eval_frame_newstack(f, throwflag, retval_arg);
+        }
+    }
+    return slp_eval_frame_value(f, throwflag, retval_arg);
 }
 
-PyObject *
-slp_eval_frame_setup_with(PyFrameObject *f, int throwflag, PyObject *retval)
-{
-    PyObject *r;
-    /*
-     * this function is identical to PyEval_EvalFrame_value.
-     * it serves as a marker whether we are inside of a
-     * SETUP_WITH operation.
-     * NOTE / XXX: see above.
-     */
-    SLP_DO_NOT_OPTIMIZE_AWAY((char *)3);
-    r = slp_eval_frame_value(f, throwflag, retval);
-    return r;
-}
-
-PyObject *
-slp_eval_frame_with_cleanup(PyFrameObject *f, int throwflag, PyObject *retval)
-{
-    PyObject *r;
-    /*
-     * this function is identical to PyEval_EvalFrame_value.
-     * it serves as a marker whether we are inside of a
-     * WITH_CLEANUP operation.
-     * NOTE / XXX: see above.
-     */
-    SLP_DO_NOT_OPTIMIZE_AWAY((char *)4);
-    r = slp_eval_frame_value(f, throwflag, retval);
-    return r;
-}
-
-PyObject *
-slp_eval_frame_yield_from(PyFrameObject *f, int throwflag, PyObject *retval)
-{
-    PyObject *r;
-    /*
-     * this function is identical to PyEval_EvalFrame_value.
-     * it serves as a marker whether we are inside of a
-     * WITH_CLEANUP operation.
-     * NOTE / XXX: see above.
-     */
-    SLP_DO_NOT_OPTIMIZE_AWAY((char *)5);
-    r = slp_eval_frame_value(f, throwflag, retval);
-    return r;
-}
 
 static PyObject *
-run_frame_dispatch(PyFrameObject *f, int exc, PyObject *retval)
+run_frame_dispatch(PyCFrameObject *cf, int exc, PyObject *retval)
 {
     PyThreadState *ts = _PyThreadState_GET();
-    PyCFrameObject *cf = (PyCFrameObject*) f;
+    PyFrameObject *f = (PyFrameObject*) cf;
     PyFrameObject *f_back;
     int done = cf->i;
 
@@ -3965,75 +3978,24 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
     PyObject * retval = NULL;
     PyFrameObject * f_back;
 
-    if (f == NULL)
+    if (f == NULL) {
+        PyErr_BadInternalCall();
         return NULL;
-
-    /* The layout of PyFrameObject differs between Stackless and C-Python.
-     * Stackless f->f_execute is C-Python f->f_code. Stackless f->f_code is at
-     * the end, just before f_localsplus.
-     */
-    if (PyFrame_Check(f) && f->f_execute == NULL) {
-        /* A new frame returned from PyFrame_New() has f->f_execute == NULL.
-         * Set the usual execution function.
-         */
-        f->f_execute = PyEval_EvalFrameEx_slp;
-
-#if PY_VERSION_HEX < SLP_END_OF_OLD_CYTHON_HACK_VERSION
-        /* Older versions of Cython used to create frames using C-Python layout
-         * of PyFrameObject. As a consequence f_code is overwritten by the first
-         * item of f_localsplus[]. To be able to fix it, we have a copy of
-         * f_code and a signature at the end of the block-stack.
-         * The Py_BUILD_ASSERT_EXPR checks,that our assumptions about the layout
-         * of PyFrameObject are true.
-         * See Stackless issue #168
-         */
-        (void) Py_BUILD_ASSERT_EXPR(offsetof(PyFrameObject, f_code) ==
-               offsetof(PyFrameObject, f_localsplus) - Py_MEMBER_SIZE(PyFrameObject, f_localsplus[0]));
-
-        /* Check for an old Cython frame */
-        if (f->f_iblock == 0 && f->f_lasti == -1 && /* blockstack is empty */
-            f->f_blockstack[0].b_type == -31683 && /* magic is present */
-            /* and f_code has been overwritten */
-            f->f_code != (&(f->f_code))[-1] &&
-            /* and (&(f->f_code))[-1] looks like a valid code object */
-            (&(f->f_code))[-1] && PyCode_Check((&(f->f_code))[-1]) &&
-            /* and there are arguments */
-            (&(f->f_code))[-1]->co_argcount > 0 &&
-            /* the last argument is NULL */
-            f->f_localsplus[(&(f->f_code))[-1]->co_argcount - 1] == NULL)
-        {
-            PyCodeObject * code = (&(f->f_code))[-1];
-            memmove(f->f_localsplus, f->f_localsplus-1, code->co_argcount * sizeof(f->f_localsplus[0]));
-            f->f_code = code;
-        } else
-#endif
-        if (!(f->f_code != NULL && PyCode_Check(f->f_code))) {
+    }
+    if (PyFrame_Check(f)) {
+        if (!(f->f_executing == SLP_FRAME_EXECUTING_NO ||
+                SLP_FRAME_IS_EXECUTING(f))) {
+            PyErr_BadInternalCall();
+            return NULL;
+        }
+    } else if (PyCFrame_Check(f)) {
+        if (((PyCFrameObject *)f)->f_execute == NULL) {
             PyErr_BadInternalCall();
             return NULL;
         }
     } else {
-        /* In order to detect a broken C-Python frame, we must compare f->f_execute
-         * with every valid frame function. Hard to implement completely.
-         * Therefore I'll check only for relevant functions.
-         * Amend the list as needed.
-         *
-         * If needed, we could try to fix an C-Python frame on the fly.
-         *
-         * (It is not possible to detect an C-Python frame by its size, because
-         * we need the code object to compute the expected size and the location
-         * of code objects varies between Stackless and C-Python frames).
-         */
-        if (!PyCFrame_Check(f) &&
-                f->f_execute != PyEval_EvalFrameEx_slp &&
-                f->f_execute != slp_eval_frame_value &&
-                f->f_execute != slp_eval_frame_noval &&
-                f->f_execute != slp_eval_frame_iter &&
-                f->f_execute != slp_eval_frame_setup_with &&
-                f->f_execute != slp_eval_frame_with_cleanup &&
-                f->f_execute != slp_eval_frame_yield_from)  {
-            PyErr_BadInternalCall();
-            return NULL;
-        }
+        PyErr_BadInternalCall();
+        return NULL;
     }
 
     if (!throwflag) {
@@ -4074,90 +4036,6 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
     assert(!STACKLESS_UNWINDING(retval));
     assert(SLP_CURRENT_FRAME_IS_VALID(tstate));
     return retval;
-}
-
-PyObject * _Py_HOT_FUNCTION
-PyEval_EvalFrameEx_slp(PyFrameObject *f, int throwflag, PyObject *retval)
-{
-    PyThreadState *tstate = _PyThreadState_GET();
-
-    /* Check, if an extension module has changed tstate->interp->eval_frame.
-     * PEP 523 defines this function pointer as an API to customise the frame
-     * evaluation. Stackless can not support this API. In order to prevent
-     * undefined behavior, we terminate the interpreter.
-     */
-    if (tstate->interp->eval_frame != _PyEval_EvalFrameDefault)
-        Py_FatalError("An extension module has set a custom frame evaluation function (see PEP 523).\n"
-                      "Stackless Python does not support the frame evaluation API defined by PEP 523.\n"
-                      "The programm now terminates to prevent undefined behavior.\n");
-
-    /* Start of code, similar to non stackless
-     * PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
-     */
-
-    if (SLP_CSTACK_SAVE_NOW(tstate, f))
-        return slp_eval_frame_newstack(f, throwflag, retval);
-
-    /* push frame */
-    if (Py_EnterRecursiveCall("")) {
-        Py_XDECREF(retval);
-        SLP_STORE_NEXT_FRAME(tstate, f->f_back);
-        return NULL;
-    }
-
-    /* STACKLESS:
-     * the code starting from here on until the end-marker
-     * is a copy of code above. Keep the two copies in sync!
-     */
-    tstate->frame = f;
-
-    if (tstate->use_tracing) {
-        if (tstate->c_tracefunc != NULL) {
-            /* tstate->c_tracefunc, if defined, is a
-               function that will be called on *every* entry
-               to a code block.  Its return value, if not
-               None, is a function that will be called at
-               the start of each executed line of code.
-               (Actually, the function must return itself
-               in order to continue tracing.)  The trace
-               functions are called with three arguments:
-               a pointer to the current frame, a string
-               indicating why the function is called, and
-               an argument which depends on the situation.
-               The global trace function is also called
-               whenever an exception is detected. */
-            if (call_trace_protected(tstate->c_tracefunc,
-                                     tstate->c_traceobj,
-                                     tstate, f, PyTrace_CALL, Py_None)) {
-                /* Trace function raised an error */
-                goto exit_eval_frame;
-            }
-        }
-        if (tstate->c_profilefunc != NULL) {
-            /* Similar for c_profilefunc, except it needn't
-               return itself and isn't called for "line" events */
-            if (call_trace_protected(tstate->c_profilefunc,
-                                     tstate->c_profileobj,
-                                     tstate, f, PyTrace_CALL, Py_None)) {
-                /* Profile function raised an error */
-                goto exit_eval_frame;
-            }
-        }
-    }
-    /* STACKLESS: end of duplicated code
-     */
-
-
-    f->f_execute = slp_eval_frame_noval;
-    return slp_eval_frame_value(f, throwflag, retval);
-exit_eval_frame:
-    Py_XDECREF(retval);
-    if (PyDTrace_FUNCTION_RETURN_ENABLED())
-        dtrace_function_return(f);
-    Py_LeaveRecursiveCall();
-    f->f_executing = 0;
-    SLP_STORE_NEXT_FRAME(tstate, f->f_back);
-    return NULL;
 }
 #endif /* #ifdef STACKLESS */
 
@@ -4355,10 +4233,6 @@ _PyEval_EvalCodeWithName(PyObject *_co, PyObject *globals, PyObject *locals,
     if (f == NULL) {
         return NULL;
     }
-
-#ifdef STACKLESS
-    f->f_execute = PyEval_EvalFrameEx_slp;
-#endif
     fastlocals = f->f_localsplus;
     freevars = f->f_localsplus + co->co_nlocals;
 
@@ -5146,7 +5020,7 @@ PyObject *
 PyEval_GetGlobals(void)
 {
     PyFrameObject *current_frame = PyEval_GetFrame();
-#if 1 && defined STACKLESS
+#ifdef STACKLESS
     if (current_frame == NULL) {
         PyThreadState *ts = _PyThreadState_GET();
 

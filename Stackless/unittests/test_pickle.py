@@ -571,7 +571,7 @@ class TestFramePickling(StacklessTestCase):
 
         # r is a tuple (frame_type, (f_code), (state))
         # state is a tuple of the form
-        # ('f_code', 'valid', 'exec_name', 'f_globals', 'have_locals',
+        # ('f_code', 'valid', 'f_executing', 'f_globals', 'have_locals',
         #  'f_locals', 'f_trace', 'f_lasti', 'f_lineno',
         #  'blockstack_as_tuple', 'localsplus_as_tuple')
         return r
