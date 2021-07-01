@@ -438,7 +438,7 @@
     <ClCompile Include="..\Python\thread.c" />
     <ClCompile Include="..\Python\traceback.c" />
     <ClCompile Include="..\Stackless\core\cframeobject.c" />
-    <ClCompile Include="..\Stackless\core\slp_transfer.c" />
+    <ClCompile Include="..\Stackless\platf\slp_transfer.c" />
     <ClCompile Include="..\Stackless\core\stacklesseval.c" />
     <ClCompile Include="..\Stackless\core\stackless_util.c" />
     <ClCompile Include="..\Stackless\module\channelobject.c" />

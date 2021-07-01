@@ -339,7 +339,7 @@ PYTHON_OBJS=	\
 		Python/bltinmodule.o \
 		Python/ceval.o \
 		Stackless/core/cframeobject.o \
-		Stackless/core/slp_transfer.o \
+		Stackless/platf/slp_transfer.o \
 		Stackless/core/stacklesseval.o \
 		Stackless/core/stackless_util.o \
 		Stackless/module/channelobject.o \
@@ -989,8 +989,8 @@ regen-typeslots:
 		$(srcdir)/Objects/typeslots.inc.new
 	$(UPDATE_FILE) $(srcdir)/Objects/typeslots.inc $(srcdir)/Objects/typeslots.inc.new
 
-Stackless/core/slp_transfer.o: $(srcdir)/Stackless/core/slp_transfer.c
-		$(CC) -c $(PY_CORE_CFLAGS) $(SLPFLAGS) -o $@ $(srcdir)/Stackless/core/slp_transfer.c
+Stackless/platf/slp_transfer.o: $(srcdir)/Stackless/platf/slp_transfer.c
+		$(CC) -c $(PY_CORE_CFLAGS) $(SLPFLAGS) -o $@ $(srcdir)/Stackless/platf/slp_transfer.c
 
 ############################################################################
 # Header files

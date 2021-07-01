@@ -1160,8 +1160,8 @@
     <ClCompile Include="..\Stackless\core\cframeobject.c">
       <Filter>Stackless\core</Filter>
     </ClCompile>
-    <ClCompile Include="..\Stackless\core\slp_transfer.c">
-      <Filter>Stackless\core</Filter>
+    <ClCompile Include="..\Stackless\platf\slp_transfer.c">
+      <Filter>Stackless\platf</Filter>
     </ClCompile>
     <ClCompile Include="..\Stackless\core\stackless_util.c">
       <Filter>Stackless\core</Filter>
