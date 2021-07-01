@@ -1093,7 +1093,6 @@ PYTHON_HEADERS= \
 		$(srcdir)/Include/internal/pycore_stackless.h \
 		$(srcdir)/Include/internal/pycore_slp_pystate.h \
 		$(srcdir)/Include/internal/pycore_slp_prickelpit.h \
-		$(srcdir)/Include/internal/pycore_slp_platformselect.h \
 		$(srcdir)/Include/internal/pycore_slp_switch_amd64_unix.h \
 		$(srcdir)/Include/internal/pycore_slp_switch_arm32_gcc.h \
 		$(srcdir)/Include/internal/pycore_slp_switch_arm_thumb_gcc.h \

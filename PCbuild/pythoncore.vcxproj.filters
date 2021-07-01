@@ -525,9 +525,6 @@
     <ClInclude Include="..\Include\internal\pycore_slp_pystate.h">
       <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Include\internal\pycore_slp_platformselect.h">
-      <Filter>Include</Filter>
-    </ClInclude>
     <ClInclude Include="..\Include\internal\pycore_slp_switch_x64_msvc.h">
       <Filter>Include</Filter>
     </ClInclude>
