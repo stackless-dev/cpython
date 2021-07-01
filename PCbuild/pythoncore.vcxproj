@@ -238,8 +238,8 @@
     <ClInclude Include="..\Include\internal\pycore_stackless.h" />
     <ClInclude Include="..\Include\internal\pycore_slp_pystate.h" />
     <ClInclude Include="..\Include\internal\pycore_slp_prickelpit.h" />
-    <ClInclude Include="..\Include\internal\pycore_slp_switch_x64_msvc.h" />
-    <ClInclude Include="..\Include\internal\pycore_slp_switch_x86_msvc.h" />
+    <ClInclude Include="..\Stackless\platf\switch_x64_msvc.h" />
+    <ClInclude Include="..\Stackless\platf\switch_x86_msvc.h" />
     <ClInclude Include="..\Include\stackless.h" />
     <ClInclude Include="..\Include\stackless_api.h" />
   </ItemGroup>
