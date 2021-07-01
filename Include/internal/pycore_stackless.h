@@ -823,8 +823,7 @@ long slp_parse_thread_id(PyObject *thread_id, unsigned long *id);
      (frame_)->f_executing <= SLP_FRAME_EXECUTING_YIELD_FROM)
 
 
-/* Stuff originally in pycore_slp_platformselect.h */
-
+/* Defined in slp_transfer.c */
 int
 slp_cstack_save_now(const PyThreadState *tstate, const void * pstackvar);
 #define SLP_CSTACK_SAVE_NOW(tstate, stackvar) slp_cstack_save_now((tstate), &(stackvar))
@@ -832,7 +831,7 @@ void
 slp_cstack_set_root(PyThreadState *tstate, const void * pstackvar);
 #define SLP_CSTACK_SET_ROOT(tstate, stackvar) slp_cstack_set_root((tstate), &(stackvar))
 PyObject *
-slp_climb_stack_and_eval_frame(PyFrameObject *f);
+slp_cstack_set_base_and_goodgap(PyThreadState *tstate, const void * pstackvar, PyFrameObject *f);
 
 /*
  * Call SLP_DO_NOT_OPTIMIZE_AWAY(pointer) to ensure that pointer will be

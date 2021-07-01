@@ -117,8 +117,8 @@ climb_stack_and_transfer(PyCStackObject **cstprev, PyCStackObject *cst,
     return slp_transfer(cstprev, cst, prev);
 }
 
-PyObject *
-slp_climb_stack_and_eval_frame(PyFrameObject *f)
+static PyObject *
+climb_stack_and_eval_frame(PyFrameObject *f)
 {
     /*
      * a similar case to climb_stack_and_transfer,
@@ -230,6 +230,20 @@ slp_cstack_set_root(PyThreadState *tstate, const void * pstackvar) {
     assert(tstate);
     assert(pstackvar);
     tstate->st.cstack_root = SLP_STACK_REFPLUS + (intptr_t *)pstackvar;
+}
+
+PyObject *
+slp_cstack_set_base_and_goodgap(PyThreadState *tstate, const void * pstackvar, PyFrameObject *f) {
+    intptr_t * stackref;
+    assert(tstate);
+    assert(pstackvar);
+    tstate->st.cstack_root = SLP_STACK_REFPLUS + (intptr_t *)pstackvar;
+    stackref = SLP_STACK_REFPLUS + (intptr_t *)pstackvar;
+    if (tstate->st.cstack_base == NULL)
+        tstate->st.cstack_base = stackref - SLP_CSTACK_GOODGAP;
+    if (stackref > tstate->st.cstack_base)
+        return climb_stack_and_eval_frame(f);  /* recursively calls slp_eval_frame(f) */
+    return (void *)1;
 }
 
 #ifdef Py_DEBUG

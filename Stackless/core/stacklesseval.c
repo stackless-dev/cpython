@@ -9,7 +9,7 @@
 #include "pycore_slp_prickelpit.h"
 
 /* platform specific constants */
-#include "pycore_slp_platformselect.h"
+//#include "pycore_slp_platformselect.h"
 
 /* Stackless extension for ceval.c */
 
@@ -316,7 +316,6 @@ slp_eval_frame(PyFrameObject *f)
 {
     PyThreadState *ts = _PyThreadState_GET();
     PyFrameObject *fprev = f->f_back;
-    intptr_t * stackref;
     int set_cstack_base;
     PyObject *retval;
 
@@ -345,13 +344,9 @@ slp_eval_frame(PyFrameObject *f)
         }
 
         /* mark the stack base */
-        stackref = SLP_STACK_REFPLUS + (intptr_t *) &f;
         set_cstack_base = ts->st.cstack_base == NULL;
-        if (set_cstack_base)
-            ts->st.cstack_base = stackref - SLP_CSTACK_GOODGAP;
-        if (stackref > ts->st.cstack_base) {
-            retval = slp_climb_stack_and_eval_frame(f);  /* recursively calls slp_eval_frame(f) */
-        } else {
+        retval = slp_cstack_set_base_and_goodgap(ts, &f, f);
+        if (retval == (void*)1) {
             assert(SLP_CURRENT_FRAME(ts) == NULL);  /* else we would change the current frame */
             SLP_STORE_NEXT_FRAME(ts, f);
             returning = make_initial_stub();
