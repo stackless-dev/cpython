@@ -833,51 +833,6 @@ slp_cstack_set_root(PyThreadState *tstate, const void * pstackvar);
 PyObject *
 slp_cstack_set_base_and_goodgap(PyThreadState *tstate, const void * pstackvar, PyFrameObject *f);
 
-/*
- * Call SLP_DO_NOT_OPTIMIZE_AWAY(pointer) to ensure that pointer will be
- * computed even post-optimization.  Use it for pointers that are computed but
- * otherwise are useless. The compiler tends to do a good job at eliminating
- * unused variables, and this macro fools it into thinking var is in fact
- * needed.
- */
-
-#ifndef SLP_DO_NOT_OPTIMIZE_AWAY
-
-/* Code is based on Facebook folly
- * https://github.com/facebook/folly/blob/master/folly/Benchmark.h,
- * which has an Apache 2 license.
- */
-#ifdef _MSC_VER
-
-#pragma optimize("", off)
-
-static inline void doNotOptimizeDependencySink(const void* p) {}
-
-#pragma optimize("", on)
-
-#define SLP_DO_NOT_OPTIMIZE_AWAY(pointer) doNotOptimizeDependencySink(pointer)
-#define SLP_DO_NOT_OPTIMIZE_AWAY_DEFINITIONS /* empty */
-
-#elif (defined(__GNUC__) || defined(__clang__))
-/*
- * The "r" constraint forces the compiler to make datum available
- * in a register to the asm block, which means that it must have
- * computed/loaded it.
- */
-#define SLP_DO_NOT_OPTIMIZE_AWAY(pointer) \
-    do {__asm__ volatile("" ::"r"(pointer));} while(0)
-#define SLP_DO_NOT_OPTIMIZE_AWAY_DEFINITIONS /* empty */
-#else
-/*
- * Unknown compiler
- */
-#define SLP_DO_NOT_OPTIMIZE_AWAY(pointer) \
-    do { slp_do_not_opimize_away_sink = ((void*)(pointer)); } while(0)
-extern uint8_t* volatile slp_do_not_opimize_away_sink;
-#define SLP_DO_NOT_OPTIMIZE_AWAY_DEFINITIONS uint8_t* volatile slp_do_not_opimize_away_sink;
-#endif
-#endif  /* #ifndef SLP_DO_NOT_OPTIMIZE_AWAY */
-
 
 
 #endif /* #ifdef SLP_BUILD_CORE */
