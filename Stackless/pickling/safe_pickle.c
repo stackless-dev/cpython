@@ -5,7 +5,6 @@
 
 #define SLP_BUILD_CORE
 #include "pycore_stackless.h"
-// #include "pycore_slp_platformselect.h"
 
 /* safe pickling */
 

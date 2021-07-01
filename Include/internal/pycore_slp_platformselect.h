@@ -70,9 +70,4 @@
 #define SLP_CSTACK_SUBTRACT(a, b) (b) - (a)
 #endif
 
-#define SLP_CSTACK_SAVE_NOW_to_be_deleted(tstate, stackvar) \
-        ((tstate)->st.cstack_root != NULL ? \
-         SLP_CSTACK_SUBTRACT((tstate)->st.cstack_root, \
-         (intptr_t*)&(stackvar)) > SLP_CSTACK_WATERMARK : 1)
-
 #endif  /* !STACKLESS_SLP_PLATFORM_SELECT_H */

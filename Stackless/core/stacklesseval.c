@@ -8,9 +8,6 @@
 #include "pycore_stackless.h"
 #include "pycore_slp_prickelpit.h"
 
-/* platform specific constants */
-//#include "pycore_slp_platformselect.h"
-
 /* Stackless extension for ceval.c */
 
 
@@ -242,32 +239,6 @@ make_initial_stub(void)
 
     return result;
 }
-
-//static PyObject *
-//climb_stack_and_eval_frame(PyFrameObject *f)
-//{
-//    /*
-//     * a similar case to climb_stack_and_transfer,
-//     * but here we need to incorporate a gap in the
-//     * stack into main and keep this gap on the stack.
-//     * This way, initial_stub is always valid to be
-//     * used to return to the main c stack.
-//     */
-//    PyThreadState *ts = _PyThreadState_GET();
-//    intptr_t probe;
-//    ptrdiff_t needed = &probe - ts->st.cstack_base;
-//    /* in rare cases, the need might have vanished due to the recursion */
-//    if (needed > 0) {
-//        register void * stack_ptr_tmp = alloca(needed * sizeof(intptr_t));
-//        if (stack_ptr_tmp == NULL)
-//            return NULL;
-//        /* hinder the compiler to optimise away
-//        stack_ptr_tmp and the alloca call.
-//        This happens with gcc 4.7.x and -O2 */
-//        SLP_DO_NOT_OPTIMIZE_AWAY(stack_ptr_tmp);
-//    }
-//    return slp_eval_frame(f);
-//}
 
 static PyObject * slp_frame_dispatch_top(PyObject *retval);
 

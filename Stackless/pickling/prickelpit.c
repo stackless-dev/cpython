@@ -7,9 +7,6 @@
 #include "pycore_stackless.h"
 #include "pycore_slp_prickelpit.h"
 
-/* platform specific constants */
-// #include "pycore_slp_platformselect.h"
-
 /******************************************************
 
   type template and support for pickle helper types
