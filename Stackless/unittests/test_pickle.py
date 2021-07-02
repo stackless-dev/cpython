@@ -10,8 +10,11 @@ import contextvars
 import ctypes
 import importlib.util
 import struct
+import warnings
+import subprocess
 import stackless
 
+from textwrap import dedent
 from stackless import schedule, tasklet
 
 from support import test_main  # @UnusedImport
@@ -22,6 +25,7 @@ from support import StacklessTestCase, StacklessPickleTestCase, get_reduce_frame
 # we need to make it appear that pickling them is ok, otherwise we will fail when pickling
 # closures that refer to test runner instances
 import copyreg
+from _warnings import warn
 
 
 def reduce(obj):
@@ -1361,13 +1365,81 @@ class TestCodePickling(unittest.TestCase):
         # see Python C-API documentation for PyImport_GetMagicNumber()
         self.assertEqual(reduced[1][0], struct.unpack("<l", importlib.util.MAGIC_NUMBER)[0])
 
-    def test_new_with_wrong_magic(self):
+    def test_new_with_wrong_magic_error(self):
         code = (lambda :None).__code__
         reduce = stackless._stackless._wrap.code.__reduce__
         reduced = reduce(code)
         args = (reduced[1][0] + 1,) + reduced[1][1:]
         self.assertIsInstance(reduced[0](*reduced[1]), type(code))
-        self.assertRaisesRegex(ValueError, "Wrong magic number", reduced[0], *args)
+        with self.assertRaisesRegex(RuntimeWarning, "Unpickling code object with invalid magic number"):
+            with stackless.atomic():
+                with warnings.catch_warnings():
+                    warnings.simplefilter("error", RuntimeWarning)
+                    reduced[0](*args)
+
+    def test_func_with_wrong_magic(self):
+        l = (lambda :None)
+        code = l.__code__
+        reduce = stackless._stackless._wrap.code.__reduce__
+        reduced = reduce(code)
+        args = (reduced[1][0] + 1,) + reduced[1][1:]
+        self.assertIsInstance(reduced[0](*reduced[1]), type(code))
+        with stackless.atomic():
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                code2 = reduced[0](*args)
+        code2.__setstate__(())
+        self.assertIs(type(code2), type(code))
+
+        reduce = stackless._stackless._wrap.function.__reduce__
+        reduced_func = reduce(l)
+        f = reduced_func[0](*reduced_func[1])
+        args = (code2,) + reduced_func[2][1:]
+        with self.assertRaisesRegex(RuntimeWarning, "Unpickling function with invalid code object:"):
+            with stackless.atomic():
+                with warnings.catch_warnings():
+                    warnings.simplefilter("error", RuntimeWarning)
+                    f = f.__setstate__(args)
+
+    def test_run_with_wrong_magic(self):
+        # run this test as a subprocess, because it triggers a fprintf(stderr, ...) in ceval.c
+        # and I don't like this output in our test suite.
+        args = []
+        if not stackless.enable_softswitch(None):
+            args.append("--hard")
+
+        rc = subprocess.call([sys.executable, "-s", "-S", "-E", "-c", dedent("""
+            import stackless
+            import warnings
+            import sys
+
+            sys.stderr = sys.stdout
+            if "--hard" in sys.argv:
+                stackless.enable_softswitch(False)
+            l = (lambda :None)
+            code = l.__code__
+            reduce = stackless._stackless._wrap.code.__reduce__
+            reduced = reduce(code)
+            args = (reduced[1][0] + 1,) + reduced[1][1:]
+            with stackless.atomic():
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)
+                    code2 = reduced[0](*args)
+            code2.__setstate__(())
+            assert(type(code2) is type(code))
+            # now execute code 2, first create a function from code2
+            f = type(l)(code2, globals())
+            # f should raise
+            try:
+                f()
+            except SystemError as e:
+                assert(str(e) == 'unknown opcode')
+            else:
+                assert(0, "expected exception not raised")
+            sys.exit(42)
+            """)] + args, stderr=subprocess.DEVNULL)
+        self.assertEqual(rc, 42)
+
 
 if __name__ == '__main__':
     if not sys.argv[1:]:

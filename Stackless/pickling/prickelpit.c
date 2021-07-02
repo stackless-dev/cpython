@@ -611,6 +611,18 @@ slp_from_tuple_with_nulls(PyObject **start, PyObject *tup)
  ******************************************************/
 
 #define codetuplefmt "liiiiiSOOOSSiSOO"
+/* Index of co_code in the tuple given to code_new */
+static const Py_ssize_t code_co_code_index = 5;
+
+/*
+ * An unused (invalid) opcode. See opcode.h for a list of used opcodes.
+ * If Stackless unpickles a code object with an invalid magic number, it prefixes
+ * co_code with this opcode.
+ *
+ * frame_setstate tests if the first opcode of the code of the frame is CODE_INVALID_OPCODE
+ * and eventually marks a frame as invalid.
+ */
+static const char CODE_INVALID_OPCODE = 0;
 
 static struct _typeobject wrap_PyCode_Type;
 static long bytecode_magic = 0;
@@ -668,15 +680,41 @@ code_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
-    if (bytecode_magic != magic) {
-        PyErr_SetString(PyExc_ValueError,
-                "Wrong magic number. The pickled code object was pickled with a different Python version.");
-        return NULL;
-    }
-
     args = PyTuple_GetSlice(args, 1, sizeof(codetuplefmt)-1);
     if (NULL == args)
         return NULL;
+
+    if (bytecode_magic != magic) {
+        if (PyErr_WarnFormat(PyExc_RuntimeWarning, 1, "Unpickling code object with invalid magic number %ld", magic)) {
+            Py_DECREF(args);
+            return NULL;
+        }
+
+        PyObject *code = PyTuple_GET_ITEM(args, code_co_code_index);
+        if (NULL == code) {
+            Py_DECREF(args);
+            return NULL;
+        }
+        if (!PyBytes_Check(code)) {
+            Py_DECREF(args);
+            PyErr_SetString(PyExc_TypeError,
+                            "Unpickling code object: code is not a bytes object");
+            return NULL;
+        }
+        Py_ssize_t code_len = PyBytes_Size(code);
+        assert(code_len <= INT_MAX);
+        assert(code_len % sizeof(_Py_CODEUNIT) == 0);
+
+        /* Now prepend an invalid opcode to the code.
+         */
+        PyObject *code2 = PyBytes_FromStringAndSize(NULL, code_len + sizeof(_Py_CODEUNIT));
+        assert(_Py_IS_ALIGNED(PyBytes_AS_STRING(code), sizeof(_Py_CODEUNIT)));
+        char *p = PyBytes_AS_STRING(code2);
+        p[0] = Py_BUILD_ASSERT_EXPR(sizeof(_Py_CODEUNIT) == 2) + CODE_INVALID_OPCODE;
+        p[1] = 0; /* Argument */
+        memcpy(p + sizeof(_Py_CODEUNIT), PyBytes_AS_STRING(code), code_len);
+        PyTuple_SET_ITEM(args, code_co_code_index, code2);
+    }
 
     PyObject *retval = generic_new(type, args, kwds);
     Py_DECREF(args);
@@ -822,12 +860,33 @@ func_setstate(PyObject *self, PyObject *args)
 {
     PyFunctionObject *fu;
     PyObject *args2;
+    char *pcode;
 
     if (is_wrong_type(Py_TYPE(self))) return NULL;
     Py_TYPE(self) = Py_TYPE(self)->tp_base;
+
+    /* Test for an invalid code object */
+    args2 = PyTuple_GetItem(args, 0);
+    if (NULL==args2)
+        return NULL;
+    if (! PyCode_Check(args2)) {
+        PyErr_SetString(PyExc_TypeError, "func_setstate: value for func_code is not a code object");
+        return NULL;
+    }
+    pcode = PyBytes_AsString(((PyCodeObject *) args2)->co_code);
+    if (NULL == pcode)
+        return NULL;
+    if (*pcode == CODE_INVALID_OPCODE) {
+        /* invalid code object, was pickled with a different version of python */
+        if (PyErr_WarnFormat(PyExc_RuntimeWarning, 1, "Unpickling function with invalid code object: %V",
+                PyTuple_GetItem(args, 2), "~ name is missing ~"))
+            return NULL;
+    }
+
     args2 = PyTuple_GetSlice(args, 0, 5);
     if (args2 == NULL)
         return NULL;
+
     fu = (PyFunctionObject *)
         Py_TYPE(self)->tp_new(Py_TYPE(self), args2, NULL);
     Py_DECREF(args2);
@@ -1001,6 +1060,7 @@ frame_setstate(PyFrameObject *f, PyObject *args)
     int valid, have_locals;
     char f_executing;
     Py_ssize_t tmp;
+    char *pcode;
 
     if (is_wrong_type(Py_TYPE(f))) return NULL;
 
@@ -1025,6 +1085,11 @@ frame_setstate(PyFrameObject *f, PyObject *args)
                         "invalid code object for frame_setstate");
         return NULL;
     }
+    pcode = PyBytes_AsString(((PyCodeObject *) f_code)->co_code);
+    if (NULL == pcode)
+        return NULL;
+    if (*pcode == CODE_INVALID_OPCODE)
+        valid = 0;  /* invalid code object, was pickled with a different version of python */
 
     if (have_locals) {
         Py_INCREF(f_locals);

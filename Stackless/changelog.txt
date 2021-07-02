@@ -11,8 +11,11 @@ What's New in Stackless 3.X.X?
 
 - https://github.com/stackless-dev/stackless/issues/268
   Pickled code objects now contain importlib.util.MAGIC_NUMBER. Unpickling
-  code objects pickled with an incompatible version of Python now raises a
-  ValueError exception.
+  code objects pickled with an incompatible version of Python now creates a
+  RuntimeWarning("Unpickling code object with invalid magic number"). The
+  resulting code object starts with an invalid opcode and renders unpickled
+  frames invalid. Unpickling a function whose code is invalid causes a
+  RuntimeWarning("Unpickling function with invalid code object").
 
 - https://github.com/stackless-dev/stackless/issues/270
   Stackless now uses an unmodified PyFrameObject structure. Stackless now
