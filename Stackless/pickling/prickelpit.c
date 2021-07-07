@@ -381,8 +381,7 @@ slp_cannot_execute(PyCFrameObject *f, const char *exec_name, PyObject *retval)
     if (retval != NULL) {
         Py_DECREF(retval);
         PyErr_Format(PyExc_RuntimeError, "cannot execute invalid frame with "
-                "'%.100s': frame had a C state that"
-                " can't be restored.",
+                "'%.100s': frame had a C state that can't be restored or an invalid code object.",
                 exec_name);
     }
 
@@ -663,6 +662,8 @@ code_reduce(PyCodeObject * co, PyObject *unused)
 static PyObject *
 code_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
+    long magic = 0;
+
     if (0 >= bytecode_magic) {
         bytecode_magic = PyImport_GetMagicNumber();
         if (-1 == bytecode_magic)
@@ -670,17 +671,20 @@ code_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     }
 
     assert(PyTuple_CheckExact(args));
-    if (PyTuple_GET_SIZE(args) != sizeof(codetuplefmt)-1) {
+    if (PyTuple_GET_SIZE(args) == sizeof(codetuplefmt) - 1) {
+        /*  */
+        magic = PyLong_AsLong(PyTuple_GET_ITEM(args, 0));
+        if (-1 == magic && PyErr_Occurred()) {
+            return NULL;
+        }
+        args = PyTuple_GetSlice(args, 1, sizeof(codetuplefmt) - 1);
+    } else if (PyTuple_GET_SIZE(args) == sizeof(codetuplefmt) - 2) {
+        /* Format used by Stackless versions up to 3.7 */
+        args = PyTuple_GetSlice(args, 0, sizeof(codetuplefmt) - 2);
+    } else {
         PyErr_SetString(PyExc_IndexError, "Argument tuple has wrong size.");
         return NULL;
     }
-
-    long magic = PyLong_AsLong(PyTuple_GET_ITEM(args, 0));
-    if (-1 == magic && PyErr_Occurred()) {
-        return NULL;
-    }
-
-    args = PyTuple_GetSlice(args, 1, sizeof(codetuplefmt)-1);
     if (NULL == args)
         return NULL;
 

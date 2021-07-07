@@ -1377,6 +1377,17 @@ class TestCodePickling(unittest.TestCase):
                     warnings.simplefilter("error", RuntimeWarning)
                     reduced[0](*args)
 
+    def test_new_without_magic(self):
+        code = (lambda :None).__code__
+        reduce = stackless._stackless._wrap.code.__reduce__
+        reduced = reduce(code)
+        args = reduced[1][1:]
+        with self.assertRaisesRegex(RuntimeWarning, "Unpickling code object with invalid magic number 0"):
+            with stackless.atomic():
+                with warnings.catch_warnings():
+                    warnings.simplefilter("error", RuntimeWarning)
+                    reduced[0](*args)
+
     def test_func_with_wrong_magic(self):
         l = (lambda :None)
         code = l.__code__
