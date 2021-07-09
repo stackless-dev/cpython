@@ -493,12 +493,6 @@ class TestPickledTasklets(StacklessPickleTestCase):
         m2 = self.loads(self.dumps(m1))
         self.assertEqual(m1, m2)
 
-    def testFunctionModulePreservation(self):
-        # The 'module' name on the function was not being preserved.
-        f1 = lambda: None  # @IgnorePep8
-        f2 = self.loads(self.dumps(f1))
-        self.assertEqual(f1.__module__, f2.__module__)
-
 
 class TestFramePickling(StacklessTestCase):
     def test_get_set_reduce_frame(self):
@@ -1209,9 +1203,14 @@ class TestCopy(StacklessTestCase):
         self._test(obj, 'cell_contents')
 
     def test_function(self):
-        def obj():
-            pass
-        self._test(obj, '__code__', '__globals__', '__name__', '__defaults__', '__closure__')
+        v = 123
+        def obj(a, b, c=4711, *, d=815):
+            "a test function"
+            return v
+        obj.__annotations__ = {'bla': 'fasel'}
+        self._test(obj, '__code__', '__globals__', '__name__', '__defaults__',
+                   '__closure__', '__module__', '__kwdefaults__', '__doc__',
+                   '__dict__', '__annotations__', '__qualname__')
 
     def test_frame(self):
         obj = sys._getframe()
@@ -1353,6 +1352,30 @@ class TestPickleFlags(unittest.TestCase):
 
         self.assertEqual(self.pickle_flags, 1)
         self.assertEqual(stackless.pickle_flags(), current)
+
+
+class TestFunctionPickling(StacklessPickleTestCase):
+    def setUp(self):
+        super().setUp()
+
+    def tearDown(self):
+        super().tearDown()
+
+    def testFunctionModulePreservation(self):
+        # The 'module' name on the function was not being preserved.
+        f1 = lambda: None  # @IgnorePep8
+        f2 = self.loads(self.dumps(f1))
+        self.assertEqual(f1.__module__, f2.__module__)
+
+    def test_unpickle_pre38(self):
+        def obj():
+            pass
+
+        reduced = stackless._stackless._wrap.function.__reduce__(obj)
+        obj2 = reduced[0](*reduced[1])
+        args = reduced[2][:6]
+        obj2.__setstate__(args)
+        self.assertIs(type(obj2), type(obj))
 
 
 if __name__ == '__main__':

@@ -739,25 +739,42 @@ static int init_celltype(PyObject * mod)
 
  ******************************************************/
 
-#define functuplefmt "OOOOOO"
+#define functuplefmt_pre38 "OOOOOO"
+#define functuplefmt functuplefmt_pre38 "OOOOO"
 
 static PyTypeObject wrap_PyFunction_Type;
 
 static PyObject *
 func_reduce(PyFunctionObject * func, PyObject *unused)
 {
+    /* See funcobject.c: some attribute can't be NULL. */
+    assert(func->func_code);
+    assert(func->func_globals);
+    assert(func->func_name);
+    assert(func->func_doc);
+    assert(func->func_qualname);
+
+    PyObject *dict = PyObject_GenericGetDict((PyObject *)func, NULL);
+    if (NULL == dict)
+        return NULL;
+
     PyObject *tup = Py_BuildValue(
         "(O()(" functuplefmt "))",
         &wrap_PyFunction_Type,
         /* Standard function constructor arguments. */
-        func->func_code != NULL ? func->func_code : Py_None,
-        func->func_globals != NULL ? func->func_globals : Py_None,
-        func->func_name != NULL ? func->func_name : Py_None,
+        func->func_code,
+        func->func_globals,
+        func->func_name,
         func->func_defaults != NULL ? func->func_defaults : Py_None,
         func->func_closure != NULL ? func->func_closure : Py_None,
-        /* Additional data we need to preserve. */
-        func->func_module != NULL ? func->func_module : Py_None
+        func->func_module != NULL ? func->func_module : Py_None,
+        func->func_kwdefaults != NULL ? func->func_kwdefaults : Py_None,
+        func->func_doc,
+        dict,
+        func->func_annotations != NULL ? func->func_annotations : Py_None,
+        func->func_qualname
     );
+    Py_DECREF(dict);
     return tup;
 }
 
@@ -791,25 +808,59 @@ func_setstate(PyObject *self, PyObject *args)
     args2 = PyTuple_GetSlice(args, 0, 5);
     if (args2 == NULL)
         return NULL;
-    fu = (PyFunctionObject *)
-        Py_TYPE(self)->tp_new(Py_TYPE(self), args2, NULL);
+
+    fu = (PyFunctionObject *) Py_TYPE(self)->tp_new(Py_TYPE(self), args2, NULL);
     Py_DECREF(args2);
-    if (fu != NULL) {
-        PyFunctionObject *target = (PyFunctionObject *) self;
-        COPY(fu, target, func_code);
-        COPY(fu, target, func_globals);
-        COPY(fu, target, func_name);
-        COPY(fu, target, func_defaults);
-        COPY(fu, target, func_closure);
+    if (fu == NULL)
+        return NULL;
 
-        Py_XINCREF(PyTuple_GetItem(args, 5));
-    target->func_module = PyTuple_GetItem(args, 5);
+    PyFunctionObject *target = (PyFunctionObject *) self;
+    COPY(fu, target, func_code);
+    COPY(fu, target, func_globals);
+    COPY(fu, target, func_name);
+    COPY(fu, target, func_defaults);
+    COPY(fu, target, func_closure);
+    Py_DECREF(fu);
 
-        Py_DECREF(fu);
-        Py_INCREF(self);
-        return self;
+    args2 = PyTuple_GetItem(args, 5);
+    if (NULL == args2)
+        return NULL;
+    Py_INCREF(args2);
+    Py_XSETREF(target->func_module, args2);
+
+    if (PyTuple_GET_SIZE(args) != sizeof(functuplefmt_pre38)-1) {
+        /* Stackless 3.8 and up */
+        if (PyTuple_GET_SIZE(args) != sizeof(functuplefmt)-1) {
+            PyErr_Format(PyExc_IndexError, "function.__setstate__ expects a tuple of length %d", (int)sizeof(functuplefmt)-1);
+            return NULL;
+        }
+        args2 = PyTuple_GET_ITEM(args, 6);
+        if (PyFunction_SetKwDefaults(self, args2))
+            return NULL;
+
+        args2 = PyTuple_GET_ITEM(args, 7);
+        Py_INCREF(args2);
+        Py_XSETREF(target->func_doc, args2);
+
+        args2 = PyTuple_GET_ITEM(args, 8);
+        if (args2 != Py_None && PyObject_GenericSetDict(self, args2, NULL))
+            return NULL;
+
+        args2 = PyTuple_GET_ITEM(args, 9);
+        if (PyFunction_SetAnnotations(self, args2))
+            return NULL;
+
+        args2 = PyTuple_GET_ITEM(args, 10);
+        if(!PyUnicode_Check(args2)) {
+            PyErr_SetString(PyExc_TypeError, "__qualname__ must be set to a string object");
+            return NULL;
+        }
+        Py_INCREF(args2);
+        Py_XSETREF(target->func_qualname, args2);
     }
-    return NULL;
+
+    Py_INCREF(self);
+    return self;
 }
 
 #undef COPY

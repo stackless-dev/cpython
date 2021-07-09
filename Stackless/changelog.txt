@@ -9,6 +9,12 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/284
+  Stackless supports pickling functions. But previous versions of Stackless
+  only pickled the following attributes of a function-object: '__code__',
+  '__globals__', '__name__', '__defaults__', '__closure__' and '__module__'.
+  Now Stackless pickles all attributes of a function.
+
 - https://github.com/stackless-dev/stackless/issues/269
   A failure to unpickle a frame could cause a NULL pointer access when
   deallocating the frame. This has been fixed.
