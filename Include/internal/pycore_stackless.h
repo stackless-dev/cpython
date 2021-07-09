@@ -23,14 +23,6 @@ extern "C" {
 #endif
 #include "pycore_slp_prickelpit.h"
 
-#undef STACKLESS_SPY
-/*
- * if a platform wants to support self-inspection via _peek,
- * it must provide a function or macro SLP_CANNOT_READ_MEM(adr, len)
- * which allows to spy at memory without causing exceptions.
- * This would usually be done in place with the assembly macros.
- */
-
 #ifndef SLP_END_OF_OLD_CYTHON_HACK_VERSION
 /*
  * If PY_VERSION_HEX < SLP_END_OF_OLD_CYTHON_VERSION_HEX support for

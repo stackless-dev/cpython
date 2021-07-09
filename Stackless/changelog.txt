@@ -9,6 +9,9 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/287
+  The experimental STACKLESS_SPY feature has been removed.
+
 - https://github.com/stackless-dev/stackless/issues/283
   Platform dependent source code is now completely in "Stackless/platf". The
   API header files do not depend on the platform any longer and the header

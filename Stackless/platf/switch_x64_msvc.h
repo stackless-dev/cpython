@@ -22,8 +22,6 @@
  *      Initial final version after lots of iterations for i386.
  */
 
-#define SLP_USE_NATIVE_BITFIELD_LAYOUT 1
-
 #define SLP_STACK_REFPLUS 1
 #define SLP_STACK_MAGIC 0
 
@@ -34,21 +32,3 @@
 /* This always uses the external masm assembly file. */
 #endif
 
-/*
- * further self-processing support
- */
-
-/* we have IsBadReadPtr available, so we can peek at objects */
-#define STACKLESS_SPY
-
-#ifdef IMPLEMENT_STACKLESSMODULE
-#define SLP_CANNOT_READ_MEM(p, bytes) IsBadReadPtr(p, bytes)
-
-static int SLP_IS_ON_STACK(void*p)
-{
-    int stackref;
-    intptr_t stackbase = ((intptr_t)&stackref) & 0xfffff000;
-    return (intptr_t)p >= stackbase && (intptr_t)p < stackbase + 0x00100000;
-}
-
-#endif
