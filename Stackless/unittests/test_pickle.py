@@ -8,6 +8,7 @@ import contextlib
 import threading
 import contextvars
 import ctypes
+import numbers
 import stackless
 
 from stackless import schedule, tasklet
@@ -1163,7 +1164,12 @@ class TestCopy(StacklessTestCase):
 
     def _test(self, obj, *attributes, **kw):
         expected_type = kw.get("expected_type", type(obj))
-        c = copy.copy(obj)
+        copier = copy._copy_dispatch.pop(type(obj), None)
+        try:
+            c = copy.copy(obj)
+        finally:
+            if copier is not None:
+                copy._copy_dispatch[type(obj)] = copier
         try:
             obj_hash = hash(obj)
         except TypeError:
@@ -1178,7 +1184,10 @@ class TestCopy(StacklessTestCase):
             value_c = getattr(c, name)
             # it is a shallow copy, therefore the attributes should
             # refer to the same objects
-            self.assertIs(value_c, value_obj)
+            if type(value_obj) is type(value_c) and isinstance(value_obj, numbers.Number):
+                self.assertEqual(value_c, value_obj, "{!r} != {!r} (attribute {})".format(value_c, value_obj, name))
+            else:
+                self.assertIs(value_c, value_obj, "{!r} is not {!r} (attribute {})".format(value_c, value_obj, name))
         return c
 
     def test_module_stackless(self):
