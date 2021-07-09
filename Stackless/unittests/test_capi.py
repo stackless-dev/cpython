@@ -33,6 +33,7 @@ import os
 import subprocess
 import glob
 import pickle
+import types
 import _teststackless
 from support import test_main  # @UnusedImport
 from support import (StacklessTestCase, withThreads, require_one_thread,
@@ -373,6 +374,77 @@ class TestDemoExtensions(unittest.TestCase):
                 raise
             if self.verbose:
                 sys.stdout.buffer.write(output)
+
+
+class Test_pep523_frame_hook(StacklessTestCase):
+    def setUp(self):
+        super().setUp()
+        self.is_done = False
+    def tearDown(self):
+        super().tearDown()
+        _teststackless.test_install_PEP523_eval_frame_hook(reset=True)
+        self.is_done = None
+
+    def record_done(self, fail=False):
+        self.is_done = sys._getframe()
+        if fail:
+            4711 / 0
+        return id(self)
+
+    def test_hook_delegates_to__PyEval_EvalFrameDefault(self):
+        # test, that the hook function delegates to _PyEval_EvalFrameDefault
+        args = []
+        r1 = _teststackless.test_install_PEP523_eval_frame_hook(store_args=args.append)
+        try:
+            r2 = self.record_done()
+        finally:
+            r3 = _teststackless.test_install_PEP523_eval_frame_hook(reset=True)
+
+        self.assertIs(r1, ...)
+        self.assertIsInstance(self.is_done, types.FrameType)
+        self.assertEqual(r2, id(self))
+        self.assertEqual(r3, r2)
+        self.assertListEqual(args, [(self.is_done, 0)])
+
+    def test_hook_delegates_to__PyEval_EvalFrameDefault_exc(self):
+        # test, that the hook function delegates to _PyEval_EvalFrameDefault
+        args = []
+        r1 = _teststackless.test_install_PEP523_eval_frame_hook(store_args=args.append)
+        try:
+            try:
+                self.record_done(fail=True)
+            finally:
+                r2 = _teststackless.test_install_PEP523_eval_frame_hook(reset=True)
+        except ZeroDivisionError as e:
+            self.assertEqual(str(e), "division by zero")
+        else:
+            self.fail("Expected exception")
+
+        self.assertIs(r1, ...)
+        self.assertIsInstance(self.is_done, types.FrameType)
+        self.assertEqual(r2, NotImplemented)
+        self.assertListEqual(args, [(self.is_done, 0)])
+
+    def test_hook_raises_exception(self):
+        # test, that the hook function delegates to _PyEval_EvalFrameDefault
+        args = []
+        _teststackless.test_install_PEP523_eval_frame_hook(store_args=args.append,
+                                                           throw=ZeroDivisionError("0/0"))
+        try:
+            try:
+                self.record_done()
+            finally:
+                r = _teststackless.test_install_PEP523_eval_frame_hook(reset=True)
+        except ZeroDivisionError as e:
+            self.assertEqual(str(e), "0/0")
+        else:
+            self.fail("Expected exception")
+
+        self.assertIs(self.is_done, False)
+        self.assertEqual(r, ...)
+        self.assertEqual(len(args), 1)
+        self.assertIsInstance(args[0][0], types.FrameType)
+        self.assertEqual(args[0][1], 0)
 
 
 if __name__ == "__main__":

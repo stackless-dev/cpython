@@ -825,6 +825,9 @@ long slp_parse_thread_id(PyObject *thread_id, unsigned long *id);
     ((frame_)->f_executing >= SLP_FRAME_EXECUTING_VALUE && \
      (frame_)->f_executing <= SLP_FRAME_EXECUTING_YIELD_FROM)
 
+/* Frame is executing, ignore value in retval.
+ * This is used, if the eval_frame hook is in use. */
+#define SLP_FRAME_EXECUTING_HOOK 100
 
 #endif /* #ifdef SLP_BUILD_CORE */
 

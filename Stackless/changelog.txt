@@ -9,6 +9,11 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/275
+  Add limited support for the eval_frame-hook introduced by PEP-523.
+  Stackless can't fully support all use-cases. Currently the hook can be used
+  by a debugger (i.e. pydevd) to modify the Python byte-code.
+
 - https://github.com/stackless-dev/stackless/issues/270
   Stackless now uses an unmodified PyFrameObject structure. Stackless now
   stores more state information in the field f->f_executing than C-Python.
