@@ -5,7 +5,6 @@
 
 #define SLP_BUILD_CORE
 #include "pycore_stackless.h"
-#include "pycore_slp_platformselect.h"
 
 /* safe pickling */
 
@@ -31,7 +30,7 @@ pickle_callback(PyCFrameObject *cf, int exc, PyObject *retval)
      * ourselves in an infinite loop of stack spilling.
      */
     saved_base = ts->st.cstack_root;
-    ts->st.cstack_root = SLP_STACK_REFPLUS + (intptr_t *) &f;
+    SLP_CSTACK_SET_ROOT(ts, f);
     if (retval) {
         Py_DECREF(retval);
         cf->i = cPickle_save(cf->ob1, cf->ob2, cf->n);
@@ -128,7 +127,7 @@ pickle_M(PyObject *self, PyObject *args, int pers_save)
     _self = self;
     _args = args;
     _pers_save = pers_save;
-    ts->st.cstack_root = SLP_STACK_REFPLUS + (intptr_t *) &self;
+    SLP_CSTACK_SET_ROOT(ts, self);
     ret = slp_int_wrapper(slp_eval_frame((PyFrameObject *)cf));
     return ret;
 }

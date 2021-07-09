@@ -380,8 +380,6 @@ PyAPI_FUNC(PyObject *) PyEval_EvalFrameEx_slp(struct _frame *, int, PyObject *);
 /* eval_frame with stack overflow, triggered there with a macro */
 PyObject * slp_eval_frame_newstack(struct _frame *f, int throwflag, PyObject *retval);
 
-/* other eval_frame functions from module/scheduling.c */
-PyObject * slp_restore_tracing(PyCFrameObject *cf, int exc, PyObject *retval);
 /* other eval_frame functions from Objects/typeobject.c */
 PyObject * slp_tp_init_callback(PyCFrameObject *cf, int exc, PyObject *retval);
 /* functions related to pickling */
@@ -754,7 +752,6 @@ int slp_prepare_slots(PyTypeObject*);
 Py_tracefunc slp_get_sys_profile_func(void);
 Py_tracefunc slp_get_sys_trace_func(void);
 int slp_encode_ctrace_functions(Py_tracefunc c_tracefunc, Py_tracefunc c_profilefunc);
-PyTaskletTStateStruc * slp_get_saved_tstate(PyTaskletObject *task);
 
 /*
  * Channel related prototypes
@@ -824,6 +821,18 @@ long slp_parse_thread_id(PyObject *thread_id, unsigned long *id);
 #define SLP_FRAME_IS_EXECUTING(frame_) \
     ((frame_)->f_executing >= SLP_FRAME_EXECUTING_VALUE && \
      (frame_)->f_executing <= SLP_FRAME_EXECUTING_YIELD_FROM)
+
+
+/* Defined in slp_transfer.c */
+int
+slp_cstack_save_now(const PyThreadState *tstate, const void * pstackvar);
+#define SLP_CSTACK_SAVE_NOW(tstate, stackvar) slp_cstack_save_now((tstate), &(stackvar))
+void
+slp_cstack_set_root(PyThreadState *tstate, const void * pstackvar);
+#define SLP_CSTACK_SET_ROOT(tstate, stackvar) slp_cstack_set_root((tstate), &(stackvar))
+PyObject *
+slp_cstack_set_base_and_goodgap(PyThreadState *tstate, const void * pstackvar, PyFrameObject *f);
+
 
 
 #endif /* #ifdef SLP_BUILD_CORE */

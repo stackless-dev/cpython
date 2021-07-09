@@ -9,6 +9,30 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/283
+  Platform dependent source code is now completely in "Stackless/platf". The
+  API header files do not depend on the platform any longer and the header
+  "pycore_slp_platformselect.h" does not exist any more.
+
+- https://github.com/stackless-dev/stackless/issues/281
+  Per tasklet profiling and tracing state information is now stored in the
+  tasklet itself. This increases the size of tasklet objects a bit, but saves a
+  lot of code.
+
+- https://github.com/stackless-dev/stackless/issues/284
+  Stackless supports pickling functions. But previous versions of Stackless
+  only pickled the following attributes of a function-object: '__code__',
+  '__globals__', '__name__', '__defaults__', '__closure__' and '__module__'.
+  Now Stackless pickles all attributes of a function.
+
+- https://github.com/stackless-dev/stackless/issues/268
+  Pickled code objects now contain importlib.util.MAGIC_NUMBER. Unpickling
+  code objects pickled with an incompatible version of Python now creates a
+  RuntimeWarning("Unpickling code object with invalid magic number"). The
+  resulting code object starts with an invalid opcode and renders unpickled
+  frames invalid. Unpickling a function whose code is invalid causes a
+  RuntimeWarning("Unpickling function with invalid code object").
+
 - https://github.com/stackless-dev/stackless/issues/270
   Stackless now uses an unmodified PyFrameObject structure. Stackless now
   stores more state information in the field f->f_executing than C-Python.

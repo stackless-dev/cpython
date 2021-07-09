@@ -7,7 +7,6 @@
 #include "pycore_stackless.h"
 
 #define IMPLEMENT_STACKLESSMODULE
-#include "pycore_slp_platformselect.h"
 #include "pycore_slp_prickelpit.h"
 #include <stddef.h>  /* for offsetof() */
 

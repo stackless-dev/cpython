@@ -332,16 +332,19 @@ class TestTracingState(StacklessTestCase):
             return
 
         # test if the tracing cframe is present / not present
-        reduce_frame = get_reduce_frame()
-        self.assertListEqual(reduced_tasklet1[2][3], [reduce_frame(frame)])
-        self.assertEqual(len(reduced_tasklet2[2][3]), 2)
-        self.assertIs(reduced_tasklet2[2][3][0], reduce_frame(frame))
-        self.assertIsInstance(reduced_tasklet2[2][3][1], stackless.cframe)
+        self.assertIsInstance(reduced_tasklet1[2][8], int)
+        self.assertEqual(reduced_tasklet1[2][8], 0)
+        self.assertIsInstance(reduced_tasklet1[2][9], int)
+        self.assertEqual(reduced_tasklet1[2][9], 0)
+        self.assertIsNone(reduced_tasklet1[2][10])
+        self.assertIsNone(reduced_tasklet1[2][11])
 
-        cf = reduced_tasklet2[2][3][1]
-        reduced_cframe = cf.__reduce__()
-        self.assertEqual(reduced_cframe[2][1], 'slp_restore_tracing')
-        self.assertIs(reduced_cframe[2][2][1].__func__, self.Callback.__func__)
+        self.assertIsInstance(reduced_tasklet2[2][8], int)
+        self.assertEqual(reduced_tasklet2[2][8], 0)
+        self.assertIsInstance(reduced_tasklet2[2][9], int)
+        self.assertEqual(reduced_tasklet2[2][9], 1)
+        self.assertIsNone(reduced_tasklet2[2][10])
+        self.assertIs(reduced_tasklet2[2][11].__func__, self.Callback.__func__)
 
 if __name__ == '__main__':
     if not sys.argv[1:]:

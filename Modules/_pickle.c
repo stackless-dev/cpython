@@ -12,7 +12,7 @@
 #define SLP_BUILD_CORE
 #include "stackless_api.h"
 #include "pycore_slp_prickelpit.h"
-#include "pycore_slp_platformselect.h" /* for stack saving */
+#include "pycore_stackless.h"
 #endif
 
 PyDoc_STRVAR(pickle_module_doc,
@@ -3962,7 +3962,7 @@ save(PicklerObject *self, PyObject *obj, int pers_save)
 #ifdef STACKLESS
     /* but we save the stack after a fixed watermark */
     {
-        /* use a variable, because SLP_CSTACK_SAVE_NOW evaluates ts several times. */
+        /* use a variable, because SLP_CSTACK_SAVE_NOW may evaluate ts several times. */
         PyThreadState *ts = PyThreadState_GET();
         if (SLP_CSTACK_SAVE_NOW(ts, self)) {
             int res;

@@ -147,6 +147,19 @@ types:
 C-types PyAsyncGenASend and PyAsyncGenAThrow (see :pep:`525`) as well as
 all kinds of :ref:`Dictionary view objects <dict-views>`.
 
+Code
+====
+
+|SLP| can pickle :data:`~types.CodeType` objects.
+
+.. versionchanged:: 3.8
+   The pickled representation of a code object contains the bytecode version number (:data:`~importlib.util.MAGIC_NUMBER`).
+   If a program tries to unpickle a code object with a wrong bytecode version number, then |SLP|
+
+   * emits a ``RuntimeWarning('Unpickling code object with invalid magic number %ld')`` and
+   * prepends the *co_code* attribute of the unpickled code object with an invalid |PY| bytecode instruction. This way any attempt
+     to execute the code object raises :exc:`SystemError`.
+
 Frames
 ======
 
@@ -155,6 +168,25 @@ tasklet, a traceback-object, a generator, a coroutine or an asynchronous
 generator. |SLP| does not register a "reduction" function for
 :data:`~types.FrameType`. This way |SLP| stays compatible with application
 code that registers its own "reduction" function for :data:`~types.FrameType`.
+
+It is not possible to execute an unpickled frame, if the tasklet the original frame belonged to was
+not :attr:`~tasklet.restorable`. In this case the frame is marked as invalid and any attempt
+to execute it raises
+
+.. versionchanged:: 3.8
+   If a program tries to unpickle a frame using a code object whose first bytecode instruction is invalid, then |SLP|
+   marks the frame as invalid. Any attempt to execute the frame raises :exc:`RuntimeError`.
+
+
+Functions
+=========
+
+|SLP| can pickle functions including lambda-objects objects by value.
+
+.. versionchanged:: 3.8
+   If a program tries to unpickle a function using a code object whose first bytecode instruction is invalid, then |SLP|
+   emits a ``RuntimeWarning('Unpickling function with invalid code object: %V')``. Any attempt
+   to execute the function raises :exc:`SystemError`.
 
 .. _slp_pickling_asyncgen:
 

@@ -101,16 +101,6 @@ typedef struct _tasklet_flags {
     unsigned int pending_irq: SLP_TASKLET_FLAGS_BITS_pending_irq;
 } PyTaskletFlagStruc;
 
-/* a partial copy of PyThreadState. Used to preserve 
-   the state of a hard switched tasklet */
-typedef struct _tasklet_tstate {
-    int tracing;
-    Py_tracefunc c_profilefunc;
-    Py_tracefunc c_tracefunc;
-    PyObject *c_profileobj;
-    PyObject *c_traceobj;
-} PyTaskletTStateStruc;
-
 typedef struct _tasklet {
     PyObject_HEAD
     struct _tasklet *next;
@@ -133,9 +123,20 @@ typedef struct _tasklet {
     int recursion_depth;
     PyObject *def_globals;
     PyObject *tsk_weakreflist;
-    /* If the tasklet is current: NULL. (The context of a current tasklet is always in ts->tasklet.)
+    /* If the tasklet is current: NULL. (The context of a current tasklet is
+     *  always in ts->context.)
      * If the tasklet is not current: the context for the tasklet */
     PyObject *context;
+
+    /* If the tasklet is current: NULL. (The profile and tracing state of a
+     *  current tasklet is stored in the thread state.)
+     * If the tasklet is not current: the profile and tracing state for the tasklet.
+     */
+    Py_tracefunc profilefunc;
+    Py_tracefunc tracefunc;
+    PyObject *profileobj;
+    PyObject *traceobj;
+    int tracing;
 } PyTaskletObject;
 
 

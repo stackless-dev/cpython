@@ -8,9 +8,6 @@
 #include "pycore_stackless.h"
 #include "pycore_slp_prickelpit.h"
 
-/* platform specific constants */
-#include "pycore_slp_platformselect.h"
-
 /* Stackless extension for ceval.c */
 
 
@@ -243,32 +240,6 @@ make_initial_stub(void)
     return result;
 }
 
-static PyObject *
-climb_stack_and_eval_frame(PyFrameObject *f)
-{
-    /*
-     * a similar case to climb_stack_and_transfer,
-     * but here we need to incorporate a gap in the
-     * stack into main and keep this gap on the stack.
-     * This way, initial_stub is always valid to be
-     * used to return to the main c stack.
-     */
-    PyThreadState *ts = _PyThreadState_GET();
-    intptr_t probe;
-    ptrdiff_t needed = &probe - ts->st.cstack_base;
-    /* in rare cases, the need might have vanished due to the recursion */
-    if (needed > 0) {
-        register void * stack_ptr_tmp = alloca(needed * sizeof(intptr_t));
-        if (stack_ptr_tmp == NULL)
-            return NULL;
-        /* hinder the compiler to optimise away
-        stack_ptr_tmp and the alloca call.
-        This happens with gcc 4.7.x and -O2 */
-        SLP_DO_NOT_OPTIMIZE_AWAY(stack_ptr_tmp);
-    }
-    return slp_eval_frame(f);
-}
-
 static PyObject * slp_frame_dispatch_top(PyObject *retval);
 
 static PyObject *
@@ -316,7 +287,7 @@ slp_eval_frame(PyFrameObject *f)
 {
     PyThreadState *ts = _PyThreadState_GET();
     PyFrameObject *fprev = f->f_back;
-    intptr_t * stackref;
+    int set_cstack_base;
     PyObject *retval;
 
     if (fprev == NULL && ts->st.main == NULL) {
@@ -344,52 +315,55 @@ slp_eval_frame(PyFrameObject *f)
         }
 
         /* mark the stack base */
-        stackref = SLP_STACK_REFPLUS + (intptr_t *) &f;
-        if (ts->st.cstack_base == NULL)
-            ts->st.cstack_base = stackref - SLP_CSTACK_GOODGAP;
-        if (stackref > ts->st.cstack_base) {
-                        PyCStackObject *initial_stub;
-            retval = climb_stack_and_eval_frame(f);
-                        initial_stub = ts->st.initial_stub;
-                        /* cst might be NULL in OOM conditions */
-                        if (ts->interp != _PyRuntime.interpreters.main && initial_stub != NULL) {
-                PyCStackObject *cst;
-                register int found = 0;
-                assert(initial_stub->startaddr == ts->st.cstack_base);
-                for (cst = initial_stub->next; cst != initial_stub; cst = cst->next) {
-                    if (Py_SIZE(cst) != 0 && cst->task != NULL &&
-                            cst->tstate == ts) {
-                        assert(cst->startaddr == ts->st.cstack_base);
-                        found = 1;
-                        break;
-                    }
-                }
-                if (!found) {
-                    Py_CLEAR(ts->st.initial_stub);
-                    ts->st.cstack_base = NULL;
-                    ts->st.cstack_root = NULL;
-                }
+        set_cstack_base = ts->st.cstack_base == NULL;
+        retval = slp_cstack_set_base_and_goodgap(ts, &f, f);
+        if (retval == (void*)1) {
+            assert(SLP_CURRENT_FRAME(ts) == NULL);  /* else we would change the current frame */
+            SLP_STORE_NEXT_FRAME(ts, f);
+            returning = make_initial_stub();
+            if (returning < 0)
+                return NULL;
+            /* returning will be 1 if we "switched back" to this stub, and 0
+             * if this is the original call that just created the stub.
+             * If the stub is being reused, the argument, i.e. the frame,
+             * is in ts->frame
+             */
+            SLP_ASSERT_FRAME_IN_TRANSFER(ts);
+            if (returning != 1) {
+                assert(f == SLP_PEEK_NEXT_FRAME(ts));
             }
-            return retval;
+            assert(ts->interp->st.initial_tstate != NULL);
+            assert(ts->interp->st.mem_bomb != NULL);
+
+            retval = slp_run_tasklet();
         }
 
-        assert(SLP_CURRENT_FRAME(ts) == NULL);  /* else we would change the current frame */
-        SLP_STORE_NEXT_FRAME(ts, f);
-        returning = make_initial_stub();
-        if (returning < 0)
-            return NULL;
-        /* returning will be 1 if we "switched back" to this stub, and 0
-         * if this is the original call that just created the stub.
-         * If the stub is being reused, the argument, i.e. the frame,
-         * is in ts->frame
-         */
-        SLP_ASSERT_FRAME_IN_TRANSFER(ts);
-        if (returning != 1) {
-            assert(f == SLP_PEEK_NEXT_FRAME(ts));
+        /* Clear the initial stub, except for the main interpreter.
+         * Without this code, terminating sub-interpreters would leak references. */
+        if (set_cstack_base  /* only for the outermost call */
+                && ts->interp != _PyRuntime.interpreters.main  /* not for the main interpreter */
+                && ts->st.initial_stub != NULL) /* not yet cleared */
+        {
+            PyCStackObject *initial_stub = ts->st.initial_stub;
+            PyCStackObject *cst;
+            register int found = 0;
+            assert(initial_stub->startaddr == ts->st.cstack_base);
+            for (cst = initial_stub->next; cst != initial_stub; cst = cst->next) {
+                if (Py_SIZE(cst) != 0 && cst->task != NULL &&
+                        cst->tstate == ts) {
+                    assert(cst->startaddr == ts->st.cstack_base);
+                    found = 1;  /* Initial stub is still in use. */
+                    break;
+                }
+            }
+            if (!found) {
+                /* This initial stub is no longer in use, free it */
+                Py_CLEAR(ts->st.initial_stub);
+                ts->st.cstack_base = NULL;
+                ts->st.cstack_root = NULL;
+            }
         }
-        assert(ts->interp->st.initial_tstate != NULL);
-        assert(ts->interp->st.mem_bomb != NULL);
-        return slp_run_tasklet();
+        return retval;
     }
     assert(ts->interp->st.initial_tstate != NULL);
     assert(ts->interp->st.mem_bomb != NULL); /* see above */
@@ -865,7 +839,7 @@ eval_frame_callback(PyCFrameObject *cf, int exc, PyObject *retval)
      * ourselves in an infinite loop of stack spilling.
      */
     saved_base = ts->st.cstack_root;
-    ts->st.cstack_root = SLP_STACK_REFPLUS + (intptr_t *) &f;
+    SLP_CSTACK_SET_ROOT(ts, f);
 
     /* pull in the right retval and tempval from the arguments */
     Py_SETREF(retval, cf->ob1);
@@ -928,14 +902,14 @@ slp_eval_frame_newstack(PyFrameObject *f, int exc, PyObject *retval)
          * magic here will clear that exception.
          */
         intptr_t *old = ts->st.cstack_root;
-        ts->st.cstack_root = SLP_STACK_REFPLUS + (intptr_t *) &f;
+        SLP_CSTACK_SET_ROOT(ts, f);
         retval = PyEval_EvalFrameEx_slp(f, exc, retval);
         ts->st.cstack_root = old;
         return retval;
     }
     if (ts->st.cstack_root == NULL) {
         /* this is a toplevel call.  Store the root of stack spilling */
-        ts->st.cstack_root = SLP_STACK_REFPLUS + (intptr_t *) &f;
+        SLP_CSTACK_SET_ROOT(ts, f);
         retval = PyEval_EvalFrameEx_slp(f, exc, retval);
         /* and reset it.  We may reenter stackless at a completely different
          * depth later

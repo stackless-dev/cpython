@@ -339,7 +339,7 @@ PYTHON_OBJS=	\
 		Python/bltinmodule.o \
 		Python/ceval.o \
 		Stackless/core/cframeobject.o \
-		Stackless/core/slp_transfer.o \
+		Stackless/platf/slp_transfer.o \
 		Stackless/core/stacklesseval.o \
 		Stackless/core/stackless_util.o \
 		Stackless/module/channelobject.o \
@@ -989,8 +989,8 @@ regen-typeslots:
 		$(srcdir)/Objects/typeslots.inc.new
 	$(UPDATE_FILE) $(srcdir)/Objects/typeslots.inc $(srcdir)/Objects/typeslots.inc.new
 
-Stackless/core/slp_transfer.o: $(srcdir)/Stackless/core/slp_transfer.c
-		$(CC) -c $(PY_CORE_CFLAGS) $(SLPFLAGS) -o $@ $(srcdir)/Stackless/core/slp_transfer.c
+Stackless/platf/slp_transfer.o: $(srcdir)/Stackless/platf/slp_transfer.c
+		$(CC) -c $(PY_CORE_CFLAGS) $(SLPFLAGS) -o $@ $(srcdir)/Stackless/platf/slp_transfer.c
 
 ############################################################################
 # Header files
@@ -1093,19 +1093,18 @@ PYTHON_HEADERS= \
 		$(srcdir)/Include/internal/pycore_stackless.h \
 		$(srcdir)/Include/internal/pycore_slp_pystate.h \
 		$(srcdir)/Include/internal/pycore_slp_prickelpit.h \
-		$(srcdir)/Include/internal/pycore_slp_platformselect.h \
-		$(srcdir)/Include/internal/pycore_slp_switch_amd64_unix.h \
-		$(srcdir)/Include/internal/pycore_slp_switch_arm32_gcc.h \
-		$(srcdir)/Include/internal/pycore_slp_switch_arm_thumb_gcc.h \
-		$(srcdir)/Include/internal/pycore_slp_switch_mips_unix.h \
-		$(srcdir)/Include/internal/pycore_slp_switch_ppc_macosx.h \
-		$(srcdir)/Include/internal/pycore_slp_switch_ppc_unix.h \
-		$(srcdir)/Include/internal/pycore_slp_switch_ps3_SNTools.h \
-		$(srcdir)/Include/internal/pycore_slp_switch_s390_unix.h \
-		$(srcdir)/Include/internal/pycore_slp_switch_sparc_sun_gcc.h \
-		$(srcdir)/Include/internal/pycore_slp_switch_x64_msvc.h \
-		$(srcdir)/Include/internal/pycore_slp_switch_x86_msvc.h \
-		$(srcdir)/Include/internal/pycore_slp_switch_x86_unix.h \
+		$(srcdir)/Stackless/platf/switch_amd64_unix.h \
+		$(srcdir)/Stackless/platf/switch_arm32_gcc.h \
+		$(srcdir)/Stackless/platf/switch_arm_thumb_gcc.h \
+		$(srcdir)/Stackless/platf/switch_mips_unix.h \
+		$(srcdir)/Stackless/platf/switch_ppc_macosx.h \
+		$(srcdir)/Stackless/platf/switch_ppc_unix.h \
+		$(srcdir)/Stackless/platf/switch_ps3_SNTools.h \
+		$(srcdir)/Stackless/platf/switch_s390_unix.h \
+		$(srcdir)/Stackless/platf/switch_sparc_sun_gcc.h \
+		$(srcdir)/Stackless/platf/switch_x64_msvc.h \
+		$(srcdir)/Stackless/platf/switch_x86_msvc.h \
+		$(srcdir)/Stackless/platf/switch_x86_unix.h \
 		\
 		pyconfig.h \
 		$(PARSER_HEADERS) \

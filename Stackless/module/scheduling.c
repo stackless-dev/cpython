@@ -6,7 +6,6 @@
 #ifdef STACKLESS
 #include "pycore_stackless.h"
 
-
 /******************************************************
 
   The Bomb object -- making exceptions convenient
@@ -322,118 +321,6 @@ slp_init_bombtype(void)
     return PyType_Ready(&PyBomb_Type);
 }
 
-/*******************************************************************
-
-  Exception handling revised.
-
-  Every tasklet has its own exception state. The thread state
-  exists only once for the current thread, so we need to simulate
-  ownership.
-
-  Whenever a tasklet is run for the first time, it should clear
-  the exception variables and start with a clean state.
-
-  When it dies normally, it should clean up these.
-
-  When a transfer occours from one tasklet to another,
-  the first tasklet should save its exception in local variables,
-  and the other one should restore its own.
-
-  When a tasklet dies with an uncaught exception, this will
-  be passed on to the main tasklet. The main tasklet must
-  clear its exception state, if any, and take over those of
-  the tasklet resting in peace.
-
-  2002-08-08 This was a misconception. This is not the current
-  exception, but the one which ceval provides for exception
-  handlers. That means, sharing of this variable is totally
-  unrelated to the current error, and we always swap the data.
-
-  Added support for trace/profile as well.
-
- ********************************************************************/
-
-
-typedef struct {
-    intptr_t magic1;
-    PyTaskletTStateStruc s;
-    intptr_t magic2;
-} saved_tstat_with_magic_t;
-
-/* not a valid ptr and not a common integer */
-#define SAVED_TSTATE_MAGIC1 (((intptr_t)transfer_with_tracing)+1)
-#define SAVED_TSTATE_MAGIC2 (-1*((intptr_t)transfer_with_tracing))
-
-static int
-transfer_with_tracing(PyCStackObject **cstprev, PyCStackObject *cst, PyTaskletObject *prev)
-{
-    PyThreadState *ts = _PyThreadState_GET();
-    int ret;
-
-    saved_tstat_with_magic_t sm;
-    sm.magic1 = SAVED_TSTATE_MAGIC1;
-    sm.magic2 = SAVED_TSTATE_MAGIC2;
-
-    /* prevent overly compiler optimisation.
-    We store the address of sm into a global variable.
-    This way the optimizer can't change the layout of the structure. */
-    SLP_DO_NOT_OPTIMIZE_AWAY(&sm);
-
-    sm.s.tracing = ts->tracing;
-    sm.s.c_profilefunc = ts->c_profilefunc;
-    sm.s.c_tracefunc = ts->c_tracefunc;
-    sm.s.c_profileobj = ts->c_profileobj;
-    sm.s.c_traceobj = ts->c_traceobj;
-    Py_XINCREF(sm.s.c_profileobj);
-    Py_XINCREF(sm.s.c_traceobj);
-
-    PyEval_SetTrace(NULL, NULL);
-    PyEval_SetProfile(NULL, NULL);
-    ts->tracing = 0;
-
-    ret = slp_transfer(cstprev, cst, prev);
-
-    ts->tracing = sm.s.tracing;
-    PyEval_SetTrace(sm.s.c_tracefunc, sm.s.c_traceobj);
-    PyEval_SetProfile(sm.s.c_profilefunc, sm.s.c_profileobj);
-
-    sm.magic1 = 0;
-    sm.magic2 = 0;
-    Py_XDECREF(sm.s.c_profileobj);
-    Py_XDECREF(sm.s.c_traceobj);
-
-    return ret;
-}
-
-PyTaskletTStateStruc *
-slp_get_saved_tstate(PyTaskletObject *task) {
-    /* typical offset of the structure from cstate->stack
-     * is about 20. Therefore 100 should be enough */
-    static const Py_ssize_t max_search_size = 100;
-    PyCStackObject *cst = task->cstate;
-    Py_ssize_t *p, *p_max;
-
-    if (cst->tstate && cst->tstate->st.current == task)
-        /* task is current */
-        return NULL;
-    if (cst->task != task)
-        return NULL;
-    assert(Py_SIZE(cst) >= 0);
-    if (Py_SIZE(cst) > max_search_size)
-        p_max = &(cst->stack[max_search_size]);
-    else
-        p_max = &(cst->stack[Py_SIZE(cst)]);
-    for (p=cst->stack; p!=p_max; p++) {
-        if (SAVED_TSTATE_MAGIC1 == *p) {
-            saved_tstat_with_magic_t *sm = (saved_tstat_with_magic_t *)p;
-            assert(sm->magic1 == SAVED_TSTATE_MAGIC1);
-            if (sm->magic2 == SAVED_TSTATE_MAGIC2)
-                /* got it */
-                return &(sm->s);
-        }
-    }
-    return NULL;
-}
 
 /* scheduler monitoring */
 
@@ -555,33 +442,6 @@ kill_wrap_bad_guy(PyTaskletObject *prev, PyTaskletObject *bad_guy)
 /* slp_schedule_task is moved down and merged with soft switching */
 
 /* non-recursive scheduling */
-
-PyObject *
-slp_restore_tracing(PyCFrameObject *cf, int exc, PyObject *retval)
-{
-    PyThreadState *ts = _PyThreadState_GET();
-
-    if (NULL == cf->any1 && NULL == cf->any2) {
-        /* frame was created by unpickling */
-        if (cf->n & 1) {
-            Py_tracefunc func = slp_get_sys_trace_func();
-            if (NULL == func)
-                return NULL;
-            cf->any1 = func;
-        }
-        if (cf->n & 2) {
-            Py_tracefunc func = slp_get_sys_profile_func();
-            if (NULL == func)
-                return NULL;
-            cf->any2 = func;
-        }
-    }
-    ts->tracing = cf->i;
-    PyEval_SetTrace((Py_tracefunc)cf->any1, cf->ob1);
-    PyEval_SetProfile((Py_tracefunc)cf->any2, cf->ob2);
-    SLP_STORE_NEXT_FRAME(ts, cf->f_back);
-    return STACKLESS_PACK(ts, retval);
-}
 
 int
 slp_encode_ctrace_functions(Py_tracefunc c_tracefunc, Py_tracefunc c_profilefunc)
@@ -771,6 +631,54 @@ Py_LOCAL_INLINE(void) SLP_UPDATE_TSTATE_ON_SWITCH(PyThreadState *tstate, PyTaskl
     tstate->context = next->context;
     tstate->context_ver++;
     next->context = NULL;
+    /* And now the same for the trace and profile state:
+     * - save the state form tstate to prev
+     * - move the state from next to tstate
+     */
+    assert(prev->profilefunc == NULL);
+    assert(prev->tracefunc == NULL);
+    assert(prev->profileobj == NULL);
+    assert(prev->traceobj == NULL);
+    assert(prev->tracing == 0);
+    if (tstate->c_profilefunc || next->profilefunc) {
+        prev->profilefunc = tstate->c_profilefunc;
+        prev->profileobj = tstate->c_profileobj;
+        Py_XINCREF(prev->profileobj);
+        if (prev->profileobj)
+            assert(Py_REFCNT(prev->profileobj) >= 2);  /* won't drop to zero in PyEval_SetProfile */
+        PyEval_SetProfile(next->profilefunc, next->profileobj);
+        next->profilefunc = NULL;
+        if (next->profileobj)
+            assert(Py_REFCNT(next->profileobj) >= 2);  /* won't drop to zero */
+        Py_CLEAR(next->profileobj);
+    } else {
+        /* If you use a Python profileobj, profilefunc is sysmodule.c profile_trampoline().
+         * Therefore, if profilefunc is NULL, profileobj must be NULL too.
+         */
+        assert(tstate->c_profileobj == NULL);
+        assert(next->profileobj == NULL);
+    }
+    if (tstate->c_tracefunc || next->tracefunc) {
+        prev->tracefunc = tstate->c_tracefunc;
+        prev->traceobj = tstate->c_traceobj;
+        Py_XINCREF(prev->traceobj);
+        if (prev->traceobj)
+            assert(Py_REFCNT(prev->traceobj) >= 2);  /* won't drop to zero in PyEval_SetTrace */
+        prev->tracing = tstate->tracing;
+        tstate->tracing = next->tracing;
+        PyEval_SetTrace(next->tracefunc, next->traceobj);
+        next->tracefunc = NULL;
+        if (next->traceobj)
+            assert(Py_REFCNT(next->traceobj) >= 2);  /* won't drop to zero */
+        Py_CLEAR(next->traceobj);
+        next->tracing = 0;
+    } else {
+        /* If you use a Python traceobj, tracefunc is sysmodule.c trace_trampoline().
+         * Therefore, if tracefunc is NULL, traceobj must be NULL too.
+         */
+        assert(tstate->c_traceobj == NULL);
+        assert(next->traceobj == NULL);
+    }
 }
 #else
 #define SLP_UPDATE_TSTATE_ON_SWITCH(tstate__, prev_, next_) \
@@ -784,6 +692,51 @@ Py_LOCAL_INLINE(void) SLP_UPDATE_TSTATE_ON_SWITCH(PyThreadState *tstate, PyTaskl
         ts__->context = next__->context; \
         ts__->context_ver++; \
         next__->context = NULL; \
+        /* And now the same for the trace and profile state: */ \
+        /* - save the state form tstate to prev */ \
+        /* - move the state from next to tstate */ \
+        assert(prev__->profilefunc == NULL); \
+        assert(prev__->tracefunc == NULL); \
+        assert(prev__->profileobj == NULL); \
+        assert(prev__->traceobj == NULL); \
+        assert(prev__->tracing == 0); \
+        if (ts__->c_profilefunc || next__->profilefunc) { \
+            prev__->profilefunc = ts__->c_profilefunc; \
+            prev__->profileobj = ts__->c_profileobj; \
+            Py_XINCREF(prev__->profileobj); \
+            if (prev__->profileobj) \
+                assert(Py_REFCNT(prev__->profileobj) >= 2);  /* won't drop to zero in PyEval_SetProfile */ \
+            PyEval_SetProfile(next__->profilefunc, next__->profileobj); \
+            next__->profilefunc = NULL; \
+            if (next__->profileobj) \
+                assert(Py_REFCNT(next__->profileobj) >= 2);  /* won't drop to zero */ \
+            Py_CLEAR(next__->profileobj); \
+        } else { \
+            /* If you use a Python profileobj, profilefunc is sysmodule.c profile_trampoline(). */ \
+            /* Therefore, if profilefunc is NULL, profileobj must be NULL too. */ \
+            assert(ts__->c_profileobj == NULL); \
+            assert(next__->profileobj == NULL); \
+        } \
+        if (ts__->c_tracefunc || next__->tracefunc) { \
+            prev__->tracefunc = ts__->c_tracefunc; \
+            prev__->traceobj = ts__->c_traceobj; \
+            Py_XINCREF(prev__->traceobj); \
+            if (prev__->traceobj) \
+                assert(Py_REFCNT(prev__->traceobj) >= 2);  /* won't drop to zero in PyEval_SetTrace */ \
+            prev__->tracing = ts__->tracing; \
+            ts__->tracing = next__->tracing; \
+            PyEval_SetTrace(next__->tracefunc, next__->traceobj); \
+            next__->tracefunc = NULL; \
+            if (next__->traceobj) \
+                assert(Py_REFCNT(next__->traceobj) >= 2);  /* won't drop to zero */ \
+            Py_CLEAR(next__->traceobj); \
+            next__->tracing = 0; \
+        } else { \
+            /* If you use a Python traceobj, tracefunc is sysmodule.c trace_trampoline(). */ \
+            /* Therefore, if tracefunc is NULL, traceobj must be NULL too. */ \
+            assert(ts__->c_traceobj == NULL); \
+            assert(next__->traceobj == NULL); \
+        } \
     } while(0)
 #endif
 
@@ -1078,7 +1031,6 @@ slp_schedule_task_prepared(PyThreadState *ts, PyObject **result, PyTaskletObject
 {
     PyCStackObject **cstprev;
     PyObject *retval;
-    int (*transfer)(PyCStackObject **, PyCStackObject *, PyTaskletObject *);
     int transfer_result;
 
     /* remove the no-soft-irq flag from the runflags */
@@ -1121,31 +1073,6 @@ slp_schedule_task_prepared(PyThreadState *ts, PyObject **result, PyTaskletObject
             return -1;
     }
 
-    if (ts->use_tracing || ts->tracing) {
-        /* build a shadow frame if we are returning here */
-        if (prev->f.frame != NULL) {
-            PyCFrameObject *f = slp_cframe_new(slp_restore_tracing, 0);
-            int c_functions = slp_encode_ctrace_functions(ts->c_tracefunc, ts->c_profilefunc);
-            if (f == NULL || c_functions == -1)
-                return -1;
-            f->any1 = ts->c_tracefunc;
-            f->any2 = ts->c_profilefunc;
-            f->i = ts->tracing;
-            f->n = c_functions;
-            assert(NULL == f->ob1);
-            assert(NULL == f->ob2);
-            f->ob1 = ts->c_traceobj;
-            f->ob2 = ts->c_profileobj;
-            Py_XINCREF(f->ob1);
-            Py_XINCREF(f->ob2);
-            assert(f->f_back == NULL);
-            f->f_back = prev->f.frame;  /* steal the reference */
-            prev->f.frame = (PyFrameObject *) f;
-        }
-        PyEval_SetTrace(NULL, NULL);
-        PyEval_SetProfile(NULL, NULL);
-        ts->tracing = 0;
-    }
     assert(next->cstate != NULL);
 
     if (next->cstate->nesting_level != 0) {
@@ -1213,14 +1140,10 @@ hard_switching:
     Py_CLEAR(next->f.frame);
 
     ++ts->st.nesting_level;
-    if (ts->use_tracing || ts->tracing)
-        transfer = transfer_with_tracing;
-    else
-        transfer = slp_transfer;
 
     SLP_UPDATE_TSTATE_ON_SWITCH(ts, prev, next);
 
-    transfer_result = transfer(cstprev, next->cstate, prev);
+    transfer_result = slp_transfer(cstprev, next->cstate, prev);
     /* Note: If the transfer was successful from here on "prev" holds the
      *       currently executing tasklet and "next" is the previous tasklet.
      */
@@ -1237,29 +1160,6 @@ hard_switching:
             *did_switch = 1;
         *result = retval;
 
-        /* Now evaluate any pending (slp_restore_tracing) cframes.
-         * They were inserted by tasklet_set_trace_function or
-         * tasklet_set_profile_function. We must process them here, because the
-         * restored cstack doesn't contain them.
-         * (For now there is at most a single pending cframe.)
-         */
-        if (prev->cstate->nesting_level > 0 && f && PyCFrame_Check(f) &&
-            ((PyCFrameObject *)f)->f_execute == slp_restore_tracing) {
-            PyObject *retval;
-            PyFrameObject *f2;
-
-            /* the next frame must be a real frame */
-            assert(f->f_back && PyFrame_Check(f->f_back));
-
-            retval = CALL_FRAME_FUNCTION(f, 0, Py_None);
-            STACKLESS_UNPACK(ts, retval);
-            assert(retval == Py_None);
-            f2 = SLP_CLAIM_NEXT_FRAME(ts);
-            assert(f2 == f->f_back);
-            Py_DECREF(f);
-            f = f2;
-            assert(PyFrame_Check(SLP_CURRENT_FRAME(ts)));
-        }
         assert(f == NULL || Py_REFCNT(f) >= 2);
         Py_XDECREF(f);
         return 0;
@@ -1389,8 +1289,14 @@ schedule_task_destruct(PyObject **retval, PyTaskletObject *prev, PyTaskletObject
         }
         fail = slp_schedule_task(retval, prev, next, 1, &switched);
         /* it should either fail or switch */
-        if (!fail)
+        if (!fail) {
             assert(switched);
+            /* clear tracing and profiling state for compatibility with Stackless versions < 3.8 */
+            prev->profilefunc = prev->tracefunc = NULL;
+            prev->tracing = 0;
+            Py_CLEAR(prev->profileobj);
+            Py_CLEAR(prev->traceobj);
+        }
         if (fail) {
             /* something happened, cancel our decref manipulations. */
             if (tempval != NULL) {
