@@ -8,8 +8,14 @@ import contextlib
 import threading
 import contextvars
 import ctypes
+import importlib.util
+import struct
+import warnings
+import subprocess
+import numbers
 import stackless
 
+from textwrap import dedent
 from stackless import schedule, tasklet
 
 from support import test_main  # @UnusedImport
@@ -20,6 +26,7 @@ from support import StacklessTestCase, StacklessPickleTestCase, get_reduce_frame
 # we need to make it appear that pickling them is ok, otherwise we will fail when pickling
 # closures that refer to test runner instances
 import copyreg
+from _warnings import warn
 
 
 def reduce(obj):
@@ -491,12 +498,6 @@ class TestPickledTasklets(StacklessPickleTestCase):
         m1 = xml.sax
         m2 = self.loads(self.dumps(m1))
         self.assertEqual(m1, m2)
-
-    def testFunctionModulePreservation(self):
-        # The 'module' name on the function was not being preserved.
-        f1 = lambda: None  # @IgnorePep8
-        f2 = self.loads(self.dumps(f1))
-        self.assertEqual(f1.__module__, f2.__module__)
 
 
 class TestFramePickling(StacklessTestCase):
@@ -1163,7 +1164,12 @@ class TestCopy(StacklessTestCase):
 
     def _test(self, obj, *attributes, **kw):
         expected_type = kw.get("expected_type", type(obj))
-        c = copy.copy(obj)
+        copier = copy._copy_dispatch.pop(type(obj), None)
+        try:
+            c = copy.copy(obj)
+        finally:
+            if copier is not None:
+                copy._copy_dispatch[type(obj)] = copier
         try:
             obj_hash = hash(obj)
         except TypeError:
@@ -1178,7 +1184,10 @@ class TestCopy(StacklessTestCase):
             value_c = getattr(c, name)
             # it is a shallow copy, therefore the attributes should
             # refer to the same objects
-            self.assertIs(value_c, value_obj)
+            if type(value_obj) is type(value_c) and isinstance(value_obj, numbers.Number):
+                self.assertEqual(value_c, value_obj, "{!r} != {!r} (attribute {})".format(value_c, value_obj, name))
+            else:
+                self.assertIs(value_c, value_obj, "{!r} is not {!r} (attribute {})".format(value_c, value_obj, name))
         return c
 
     def test_module_stackless(self):
@@ -1200,9 +1209,14 @@ class TestCopy(StacklessTestCase):
         self._test(obj, 'cell_contents')
 
     def test_function(self):
-        def obj():
-            pass
-        self._test(obj, '__code__', '__globals__', '__name__', '__defaults__', '__closure__')
+        v = 123
+        def obj(a, b, c=4711, *, d=815):
+            "a test function"
+            return v
+        obj.__annotations__ = {'bla': 'fasel'}
+        self._test(obj, '__code__', '__globals__', '__name__', '__defaults__',
+                   '__closure__', '__module__', '__kwdefaults__', '__doc__',
+                   '__dict__', '__annotations__', '__qualname__')
 
     def test_frame(self):
         obj = sys._getframe()
@@ -1344,6 +1358,130 @@ class TestPickleFlags(unittest.TestCase):
 
         self.assertEqual(self.pickle_flags, 1)
         self.assertEqual(stackless.pickle_flags(), current)
+
+
+class TestCodePickling(unittest.TestCase):
+    def test_reduce_magic(self):
+        code = (lambda :None).__code__
+        reduce = stackless._stackless._wrap.code.__reduce__
+        reduced = reduce(code)
+        self.assertIsInstance(reduced, tuple)
+        self.assertEqual(len(reduced), 3)
+        self.assertIsInstance(reduced[1], tuple)
+        self.assertGreater(len(reduced[1]), 0)
+        self.assertIsInstance(reduced[1][0], int)
+        # see Python C-API documentation for PyImport_GetMagicNumber()
+        self.assertEqual(reduced[1][0], struct.unpack("<l", importlib.util.MAGIC_NUMBER)[0])
+
+    def test_new_with_wrong_magic_error(self):
+        code = (lambda :None).__code__
+        reduce = stackless._stackless._wrap.code.__reduce__
+        reduced = reduce(code)
+        args = (reduced[1][0] + 1,) + reduced[1][1:]
+        self.assertIsInstance(reduced[0](*reduced[1]), type(code))
+        with self.assertRaisesRegex(RuntimeWarning, "Unpickling code object with invalid magic number"):
+            with stackless.atomic():
+                with warnings.catch_warnings():
+                    warnings.simplefilter("error", RuntimeWarning)
+                    reduced[0](*args)
+
+    def test_new_without_magic(self):
+        code = (lambda :None).__code__
+        reduce = stackless._stackless._wrap.code.__reduce__
+        reduced = reduce(code)
+        args = reduced[1][1:]
+        with self.assertRaisesRegex(RuntimeWarning, "Unpickling code object with invalid magic number 0"):
+            with stackless.atomic():
+                with warnings.catch_warnings():
+                    warnings.simplefilter("error", RuntimeWarning)
+                    reduced[0](*args)
+
+    def test_func_with_wrong_magic(self):
+        l = (lambda :None)
+        code = l.__code__
+        reduce = stackless._stackless._wrap.code.__reduce__
+        reduced = reduce(code)
+        args = (reduced[1][0] + 1,) + reduced[1][1:]
+        self.assertIsInstance(reduced[0](*reduced[1]), type(code))
+        with stackless.atomic():
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                code2 = reduced[0](*args)
+        code2.__setstate__(())
+        self.assertIs(type(code2), type(code))
+
+        reduce = stackless._stackless._wrap.function.__reduce__
+        reduced_func = reduce(l)
+        f = reduced_func[0](*reduced_func[1])
+        args = (code2,) + reduced_func[2][1:]
+        with self.assertRaisesRegex(RuntimeWarning, "Unpickling function with invalid code object:"):
+            with stackless.atomic():
+                with warnings.catch_warnings():
+                    warnings.simplefilter("error", RuntimeWarning)
+                    f = f.__setstate__(args)
+
+    def test_run_with_wrong_magic(self):
+        # run this test as a subprocess, because it triggers a fprintf(stderr, ...) in ceval.c
+        # and I don't like this output in our test suite.
+        args = []
+        if not stackless.enable_softswitch(None):
+            args.append("--hard")
+
+        rc = subprocess.call([sys.executable, "-s", "-S", "-E", "-c", dedent("""
+            import stackless
+            import warnings
+            import sys
+
+            sys.stderr = sys.stdout
+            if "--hard" in sys.argv:
+                stackless.enable_softswitch(False)
+            l = (lambda :None)
+            code = l.__code__
+            reduce = stackless._stackless._wrap.code.__reduce__
+            reduced = reduce(code)
+            args = (reduced[1][0] + 1,) + reduced[1][1:]
+            with stackless.atomic():
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)
+                    code2 = reduced[0](*args)
+            code2.__setstate__(())
+            assert(type(code2) is type(code))
+            # now execute code 2, first create a function from code2
+            f = type(l)(code2, globals())
+            # f should raise
+            try:
+                f()
+            except SystemError as e:
+                assert(str(e) == 'unknown opcode')
+            else:
+                assert(0, "expected exception not raised")
+            sys.exit(42)
+            """)] + args, stderr=subprocess.DEVNULL)
+        self.assertEqual(rc, 42)
+
+
+class TestFunctionPickling(StacklessPickleTestCase):
+    def setUp(self):
+        super().setUp()
+
+    def tearDown(self):
+        super().tearDown()
+
+    def testFunctionModulePreservation(self):
+        # The 'module' name on the function was not being preserved.
+        f1 = lambda: None  # @IgnorePep8
+        f2 = self.loads(self.dumps(f1))
+        self.assertEqual(f1.__module__, f2.__module__)
+
+    def test_unpickle_pre38(self):
+        def obj():
+            pass
+
+        reduced = stackless._stackless._wrap.function.__reduce__(obj)
+        obj2 = reduced[0](*reduced[1])
+        args = reduced[2][:6]
+        obj2.__setstate__(args)
+        self.assertIs(type(obj2), type(obj))
 
 
 if __name__ == '__main__':

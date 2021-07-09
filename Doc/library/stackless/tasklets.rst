@@ -263,14 +263,24 @@ The ``tasklet`` class
       t3 id=36413872, next.id=36413744, main.id=36413680, main.scheduled=False
       t1 id=36413744, next.id=36413808, main.id=36413680, main.scheduled=False
       ...
-      Traceback (most recent call last):
+      ​Traceback (most recent call last):
         File "<stdin>", line 1, in <module>
         File "<stdin>", line 6, in f
       KeyboardInterrupt
       >>>
 
+   ..
+      Note, the previous doctest block looks syntactically incorrect, because
+      it ends with an empty prompt ``>>>``. Usually this causes the following
+      warning::
+
+         WARNING: Could not lex literal_block as "python3". Highlighting skipped.
+
+      To avoid this warning I added a Unicode ZWSP \u200b in front of the word
+      ``Traceback``. Please do not remove this character.
+
    What you see here is that the main tasklet was removed from the scheduler.
-   Therefore the scheduler runs until it got interrupted by a keyboard interrupt.
+   Therefore the scheduler ran until it got interrupted by a keyboard interrupt.
 
 .. method:: tasklet.raise_exception(exc_class, *args)
 
