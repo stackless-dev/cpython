@@ -1,3 +1,3 @@
 [submodule "Include/internal/stackman"]
-	path = Include/internal/stackman
+	path = Stackless/platf/stackman
 	url = https://github.com/stackless-dev/stackman.git
