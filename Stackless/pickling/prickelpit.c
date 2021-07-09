@@ -381,8 +381,7 @@ slp_cannot_execute(PyCFrameObject *f, const char *exec_name, PyObject *retval)
     if (retval != NULL) {
         Py_DECREF(retval);
         PyErr_Format(PyExc_RuntimeError, "cannot execute invalid frame with "
-                "'%.100s': frame had a C state that"
-                " can't be restored.",
+                "'%.100s': frame had a C state that can't be restored or an invalid code object.",
                 exec_name);
     }
 
@@ -610,16 +609,36 @@ slp_from_tuple_with_nulls(PyObject **start, PyObject *tup)
 
  ******************************************************/
 
-#define codetuplefmt "iiiiiSOOOSSiSOO"
+#define codetuplefmt "liiiiiSOOOSSiSOO"
+/* Index of co_code in the tuple given to code_new */
+static const Py_ssize_t code_co_code_index = 5;
+
+/*
+ * An unused (invalid) opcode. See opcode.h for a list of used opcodes.
+ * If Stackless unpickles a code object with an invalid magic number, it prefixes
+ * co_code with this opcode.
+ *
+ * frame_setstate tests if the first opcode of the code of the frame is CODE_INVALID_OPCODE
+ * and eventually marks a frame as invalid.
+ */
+static const char CODE_INVALID_OPCODE = 0;
 
 static struct _typeobject wrap_PyCode_Type;
+static long bytecode_magic = 0;
 
 static PyObject *
 code_reduce(PyCodeObject * co, PyObject *unused)
 {
+    if (0 >= bytecode_magic) {
+        bytecode_magic = PyImport_GetMagicNumber();
+        if (-1 == bytecode_magic)
+            return NULL;
+    }
+
     PyObject *tup = Py_BuildValue(
         "(O(" codetuplefmt ")())",
         &wrap_PyCode_Type,
+        bytecode_magic,
         co->co_argcount,
         co->co_kwonlyargcount,
         co->co_nlocals,
@@ -640,7 +659,75 @@ code_reduce(PyCodeObject * co, PyObject *unused)
     return tup;
 }
 
-MAKE_WRAPPERTYPE(PyCode_Type, code, "code", code_reduce, generic_new,
+static PyObject *
+code_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    long magic = 0;
+
+    if (0 >= bytecode_magic) {
+        bytecode_magic = PyImport_GetMagicNumber();
+        if (-1 == bytecode_magic)
+            return NULL;
+    }
+
+    assert(PyTuple_CheckExact(args));
+    if (PyTuple_GET_SIZE(args) == sizeof(codetuplefmt) - 1) {
+        /*  */
+        magic = PyLong_AsLong(PyTuple_GET_ITEM(args, 0));
+        if (-1 == magic && PyErr_Occurred()) {
+            return NULL;
+        }
+        args = PyTuple_GetSlice(args, 1, sizeof(codetuplefmt) - 1);
+    } else if (PyTuple_GET_SIZE(args) == sizeof(codetuplefmt) - 2) {
+        /* Format used by Stackless versions up to 3.7 */
+        args = PyTuple_GetSlice(args, 0, sizeof(codetuplefmt) - 2);
+    } else {
+        PyErr_SetString(PyExc_IndexError, "Argument tuple has wrong size.");
+        return NULL;
+    }
+    if (NULL == args)
+        return NULL;
+
+    if (bytecode_magic != magic) {
+        if (PyErr_WarnFormat(PyExc_RuntimeWarning, 1, "Unpickling code object with invalid magic number %ld", magic)) {
+            Py_DECREF(args);
+            return NULL;
+        }
+
+        PyObject *code = PyTuple_GET_ITEM(args, code_co_code_index);
+        if (NULL == code) {
+            Py_DECREF(args);
+            return NULL;
+        }
+        if (!PyBytes_Check(code)) {
+            Py_DECREF(args);
+            PyErr_SetString(PyExc_TypeError,
+                            "Unpickling code object: code is not a bytes object");
+            return NULL;
+        }
+        Py_ssize_t code_len = PyBytes_Size(code);
+        assert(code_len <= INT_MAX);
+        assert(code_len % sizeof(_Py_CODEUNIT) == 0);
+
+        /* Now prepend an invalid opcode to the code.
+         */
+        PyObject *code2 = PyBytes_FromStringAndSize(NULL, code_len + sizeof(_Py_CODEUNIT));
+        char *p = PyBytes_AS_STRING(code2);
+        p[0] = Py_BUILD_ASSERT_EXPR(sizeof(_Py_CODEUNIT) == 2) + CODE_INVALID_OPCODE;
+        p[1] = 0; /* Argument */
+        memcpy(p + sizeof(_Py_CODEUNIT), PyBytes_AS_STRING(code), code_len);
+        if (PyTuple_SetItem(args, code_co_code_index, code2)) {
+            Py_DECREF(args);
+            return NULL;
+        }
+    }
+
+    PyObject *retval = generic_new(type, args, kwds);
+    Py_DECREF(args);
+    return retval;
+}
+
+MAKE_WRAPPERTYPE(PyCode_Type, code, "code", code_reduce, code_new,
                  generic_setstate)
 
 static int init_codetype(PyObject * mod)
@@ -733,25 +820,42 @@ static int init_celltype(PyObject * mod)
 
  ******************************************************/
 
-#define functuplefmt "OOOOOO"
+#define functuplefmt_pre38 "OOOOOO"
+#define functuplefmt functuplefmt_pre38 "OOOOO"
 
 static PyTypeObject wrap_PyFunction_Type;
 
 static PyObject *
 func_reduce(PyFunctionObject * func, PyObject *unused)
 {
+    /* See funcobject.c: some attribute can't be NULL. */
+    assert(func->func_code);
+    assert(func->func_globals);
+    assert(func->func_name);
+    assert(func->func_doc);
+    assert(func->func_qualname);
+
+    PyObject *dict = PyObject_GenericGetDict((PyObject *)func, NULL);
+    if (NULL == dict)
+        return NULL;
+
     PyObject *tup = Py_BuildValue(
         "(O()(" functuplefmt "))",
         &wrap_PyFunction_Type,
         /* Standard function constructor arguments. */
-        func->func_code != NULL ? func->func_code : Py_None,
-        func->func_globals != NULL ? func->func_globals : Py_None,
-        func->func_name != NULL ? func->func_name : Py_None,
+        func->func_code,
+        func->func_globals,
+        func->func_name,
         func->func_defaults != NULL ? func->func_defaults : Py_None,
         func->func_closure != NULL ? func->func_closure : Py_None,
-        /* Additional data we need to preserve. */
-        func->func_module != NULL ? func->func_module : Py_None
+        func->func_module != NULL ? func->func_module : Py_None,
+        func->func_kwdefaults != NULL ? func->func_kwdefaults : Py_None,
+        func->func_doc,
+        dict,
+        func->func_annotations != NULL ? func->func_annotations : Py_None,
+        func->func_qualname
     );
+    Py_DECREF(dict);
     return tup;
 }
 
@@ -779,31 +883,85 @@ func_setstate(PyObject *self, PyObject *args)
 {
     PyFunctionObject *fu;
     PyObject *args2;
+    char *pcode;
 
     if (is_wrong_type(Py_TYPE(self))) return NULL;
     Py_TYPE(self) = Py_TYPE(self)->tp_base;
+
+    /* Test for an invalid code object */
+    args2 = PyTuple_GetItem(args, 0);
+    if (NULL==args2)
+        return NULL;
+    if (! PyCode_Check(args2)) {
+        PyErr_SetString(PyExc_TypeError, "func_setstate: value for func_code is not a code object");
+        return NULL;
+    }
+    pcode = PyBytes_AsString(((PyCodeObject *) args2)->co_code);
+    if (NULL == pcode)
+        return NULL;
+    if (*pcode == CODE_INVALID_OPCODE) {
+        /* invalid code object, was pickled with a different version of python */
+        if (PyErr_WarnFormat(PyExc_RuntimeWarning, 1, "Unpickling function with invalid code object: %V",
+                PyTuple_GetItem(args, 2), "~ name is missing ~"))
+            return NULL;
+    }
+
     args2 = PyTuple_GetSlice(args, 0, 5);
     if (args2 == NULL)
         return NULL;
-    fu = (PyFunctionObject *)
-        Py_TYPE(self)->tp_new(Py_TYPE(self), args2, NULL);
+
+    fu = (PyFunctionObject *) Py_TYPE(self)->tp_new(Py_TYPE(self), args2, NULL);
     Py_DECREF(args2);
-    if (fu != NULL) {
-        PyFunctionObject *target = (PyFunctionObject *) self;
-        COPY(fu, target, func_code);
-        COPY(fu, target, func_globals);
-        COPY(fu, target, func_name);
-        COPY(fu, target, func_defaults);
-        COPY(fu, target, func_closure);
+    if (fu == NULL)
+        return NULL;
 
-        Py_XINCREF(PyTuple_GetItem(args, 5));
-    target->func_module = PyTuple_GetItem(args, 5);
+    PyFunctionObject *target = (PyFunctionObject *) self;
+    COPY(fu, target, func_code);
+    COPY(fu, target, func_globals);
+    COPY(fu, target, func_name);
+    COPY(fu, target, func_defaults);
+    COPY(fu, target, func_closure);
+    Py_DECREF(fu);
 
-        Py_DECREF(fu);
-        Py_INCREF(self);
-        return self;
+    args2 = PyTuple_GetItem(args, 5);
+    if (NULL == args2)
+        return NULL;
+    Py_INCREF(args2);
+    Py_XSETREF(target->func_module, args2);
+
+    if (PyTuple_GET_SIZE(args) != sizeof(functuplefmt_pre38)-1) {
+        /* Stackless 3.8 and up */
+        if (PyTuple_GET_SIZE(args) != sizeof(functuplefmt)-1) {
+            PyErr_Format(PyExc_IndexError, "function.__setstate__ expects a tuple of length %d", (int)sizeof(functuplefmt)-1);
+            return NULL;
+        }
+        args2 = PyTuple_GET_ITEM(args, 6);
+        if (PyFunction_SetKwDefaults(self, args2))
+            return NULL;
+
+        args2 = PyTuple_GET_ITEM(args, 7);
+        Py_INCREF(args2);
+        Py_XSETREF(target->func_doc, args2);
+
+        args2 = PyTuple_GET_ITEM(args, 8);
+        if (args2 != Py_None && PyObject_GenericSetDict(self, args2, NULL))
+            return NULL;
+
+        args2 = PyTuple_GET_ITEM(args, 9);
+        if (PyFunction_SetAnnotations(self, args2))
+            return NULL;
+
+        args2 = PyTuple_GET_ITEM(args, 10);
+        if(!PyUnicode_Check(args2)) {
+            PyErr_SetString(PyExc_TypeError, "__qualname__ must be set to a string object");
+            return NULL;
+        }
+        Py_INCREF(args2);
+        Py_XSETREF(target->func_qualname, args2);
     }
-    return NULL;
+
+    Py_INCREF(self);
+    return self;
 }
 
 #undef COPY
@@ -957,6 +1115,7 @@ frame_setstate(PyFrameObject *f, PyObject *args)
     int valid, have_locals;
     char f_executing;
     Py_ssize_t tmp;
+    char *pcode;
 
     if (is_wrong_type(Py_TYPE(f))) return NULL;
 
@@ -981,6 +1140,11 @@ frame_setstate(PyFrameObject *f, PyObject *args)
                         "invalid code object for frame_setstate");
         return NULL;
     }
+    pcode = PyBytes_AsString(((PyCodeObject *) f_code)->co_code);
+    if (NULL == pcode)
+        return NULL;
+    if (*pcode == CODE_INVALID_OPCODE)
+        valid = 0;  /* invalid code object, was pickled with a different version of python */
 
     if (have_locals) {
         Py_INCREF(f_locals);
