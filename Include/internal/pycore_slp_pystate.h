@@ -16,6 +16,10 @@
 
 /* This include file is included from pycore_pystate.h only */
 
+/* how many cstacks to cache at all */
+#ifndef SLP_CSTACK_MAXCACHE
+#define SLP_CSTACK_MAXCACHE     100
+#endif
 
 /* adjust slots to typical size of a few recursions on your system */
 #ifndef SLP_CSTACK_SLOTS
