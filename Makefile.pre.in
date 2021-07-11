@@ -1790,7 +1790,7 @@ docclean:
 	-rm -rf Doc/tools/sphinx Doc/tools/pygments Doc/tools/docutils
 
 clean: pycremoval
-	find . -path '*Stackless/platf/stackman/*.a' -prune -o -name '*.[oa]' -exec rm -f {} ';'
+	find . -path '*Stackless/stackman/*.a' -prune -o -name '*.[oa]' -exec rm -f {} ';'
 	find . -name '*.s[ol]' -exec rm -f {} ';'
 	find . -name '*.so.[0-9]*.[0-9]*' -exec rm -f {} ';'
 	find build -name 'fficonfig.h' -exec rm -f {} ';' || true

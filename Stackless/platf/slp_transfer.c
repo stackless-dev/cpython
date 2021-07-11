@@ -39,11 +39,13 @@
  */
 #define SLP_EVAL  /* enable code generation in the included header */
 
+#ifndef SLP_NO_STACKMAN  /* defined by configure --without-stackman */
 /* First, see if stackman an implementation without external
  * assembler, use that if possible
  */
 #define STACKMAN_OPTIONAL
-#include "stackman/stackman/stackman.h"
+#include "stackman/stackman.h"
+#endif  /* #ifndef SLP_NO_STACKMAN */
 #if defined(STACKMAN_PLATFORM) && !defined(STACKMAN_EXTERNAL_ASM)
 #include "switch_stackman.h"
 #else  /* use traditional stackless switching */

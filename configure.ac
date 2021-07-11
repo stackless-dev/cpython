@@ -437,17 +437,6 @@ if test "$cross_compiling" = yes; then
 	_PYTHON_HOST_PLATFORM="$MACHDEP${_host_cpu:+-$_host_cpu}"
 fi
 
-# Stackless flags for compiling the hard switching code
-case $MACHDEP in
-	darwin)
-		SLPFLAGS="-fomit-frame-pointer -fno-inline-functions"
-		;;
-	*)
-		SLPFLAGS="-fno-omit-frame-pointer -fno-inline-functions"
-		;;
-esac
-AC_SUBST(SLPFLAGS)
-
 # Some systems cannot stand _XOPEN_SOURCE being defined at all; they
 # disable features if it is defined, without any means to access these
 # features as extensions. For these systems, we skip the definition of
@@ -2921,6 +2910,47 @@ LIBS="$withval $LIBS"
 [AC_MSG_RESULT(no)])
 
 PKG_PROG_PKG_CONFIG
+
+# Stackless flags for compiling the hard switching code
+case $MACHDEP in
+	darwin)
+		SLPFLAGS="-fomit-frame-pointer -fno-inline-functions"
+		;;
+	*)
+		SLPFLAGS="-fno-omit-frame-pointer -fno-inline-functions"
+		;;
+esac
+
+# Check for use of an external or no stackman library
+AC_MSG_CHECKING(for --with-stackman)
+AC_ARG_WITH(stackman,
+            AS_HELP_STRING([--with-stackman], [build python with an external stackman library or without using stackman at all]),,,)
+
+case "$with_stackman" in
+	"")
+		with_stackman="yes"
+		;;
+	"yes"|"no")
+		;;
+	"*")
+		if test -f "$with_stackman"/Makefile ; then
+		    :
+		else
+			AC_MSG_ERROR([--with-stackman argument must be a directory containing the stackman project])
+		fi
+		;;
+esac
+AC_MSG_RESULT($with_stackman)
+
+if test "$with_stackman" = "yes" ; then
+	with_stackman="Stackless/stackman"
+fi
+if test "$with_stackman" = "no" ; then
+	SLPFLAGS="-DSLP_NO_STACKMAN $SLPFLAGS"
+else
+	SLPFLAGS="-I$with_stackman $SLPFLAGS"
+fi
+AC_SUBST(SLPFLAGS)
 
 # Check for use of the system expat library
 AC_MSG_CHECKING(for --with-system-expat)

@@ -62,5 +62,5 @@ slp_switch(void)
     return error;
 }
 
-#include "stackman/stackman/stackman_impl.h"
+#include "stackman/stackman_impl.h"
 #endif
