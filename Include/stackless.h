@@ -41,12 +41,16 @@ extern "C" {
     /* an option to switch it off */
 #elif defined(MS_WIN32) && !defined(MS_WIN64) && defined(_M_IX86)
     /* MS Visual Studio on X86 */
+#   define SLP_USE_NATIVE_BITFIELD_LAYOUT 1
 #elif defined(_WIN64) && defined(_M_X64)
     /* microsoft on 64 bit x64 thingies */
+#   define SLP_USE_NATIVE_BITFIELD_LAYOUT 1
 #elif defined(__GNUC__) && defined(__i386__)
     /* gcc on X86 */
+#   define SLP_USE_NATIVE_BITFIELD_LAYOUT 1
 #elif defined(__GNUC__) && defined(__amd64__)
     /* gcc on AMD64 */
+#   define SLP_USE_NATIVE_BITFIELD_LAYOUT 1
 #elif defined(__GNUC__) && defined(__PPC__) && defined(__linux__)
     /* gcc on PowerPC */
 #elif defined(__GNUC__) && defined(__ppc__) && defined(__APPLE__)

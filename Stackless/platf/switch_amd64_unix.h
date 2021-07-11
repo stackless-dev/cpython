@@ -29,8 +29,6 @@
  *      Ported from i386.
  */
 
-#define SLP_USE_NATIVE_BITFIELD_LAYOUT 1
-
 #define SLP_STACK_REFPLUS 1
 
 #ifdef SLP_EVAL
@@ -140,13 +138,3 @@ slp_switch(void)
 
 #undef REGS_CLOBBERED
 #endif
-/*
- * further self-processing support
- */
-
-/* 
- * if you want to add self-inspection tools, place them
- * here. See the x86_msvc for the necessary defines.
- * These features are highly experimental und not
- * essential yet.
- */

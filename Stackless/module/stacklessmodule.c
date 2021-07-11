@@ -1435,57 +1435,6 @@ get_channel_callback(PyObject *self, PyObject *unused)
 
  ******************************************************/
 
-#ifdef STACKLESS_SPY
-
-static PyObject *
-_peek(PyObject *self, PyObject *v)
-{
-    static PyObject *o;
-    PyTypeObject *t;
-    int i;
-
-    if (v == Py_None) {
-        return PyLong_FromVoidPtr((void *)_peek);
-    }
-    if (PyCode_Check(v)) {
-        return PyLong_FromVoidPtr((void *)(((PyCodeObject*)v)->co_code));
-    }
-    if (PyLong_Check(v) && PyLong_AsLong(v) == 0) {
-        return PyLong_FromVoidPtr((void *)(&PyEval_EvalFrameEx_slp));
-    }
-    if (!PyLong_Check(v)) goto noobject;
-    o = (PyObject*) PyLong_AsVoidPtr(v);
-    /* this is plain heuristics, use for now */
-    if (SLP_CANNOT_READ_MEM(o, sizeof(PyObject))) goto noobject;
-    if (SLP_IS_ON_STACK(o)) goto noobject;
-    if (Py_REFCNT(o) < 1 || Py_REFCNT(o) > 10000) goto noobject;
-    t = Py_TYPE(o);
-    for (i=0; i<100; i++) {
-        if (t == &PyType_Type)
-            break;
-        if (SLP_CANNOT_READ_MEM(t, sizeof(PyTypeObject))) goto noobject;
-        if (SLP_IS_ON_STACK(o)) goto noobject;
-        if (Py_REFCNT(t) < 1 || Py_REFCNT(t) > 10000) goto noobject;
-        if (!(isalpha(t->tp_name[0])||t->tp_name[0]=='_'))
-            goto noobject;
-        t = Py_TYPE(t);
-    }
-    Py_INCREF(o);
-    return o;
-noobject:
-    Py_INCREF(v);
-    return v;
-}
-
-PyDoc_STRVAR(_peek__doc__,
-"_peek(adr) -- try to find an object at adr.\n\
-When no object is found, the address is returned.\n\
-_peek(None)  _peek's address.\n\
-_peek(0)     PyEval_EvalFrame's address.\n\
-_peek(frame) frame's tstate address.\n\
-Internal, considered dangerous!");
-
-#endif
 
 /* finding refcount problems */
 
@@ -1701,10 +1650,6 @@ static PyMethodDef stackless_methods[] = {
     _gc_untrack__doc__},
     {"_gc_track",                   (PCF)_gc_track,             METH_O,
     _gc_untrack__doc__},
-#ifdef STACKLESS_SPY
-    {"_peek",                       (PCF)_peek,                 METH_O,
-     _peek__doc__},
-#endif
 #if defined(Py_TRACE_REFS)
     {"_get_refinfo",                (PCF)_get_refinfo,          METH_NOARGS,
      _get_refinfo__doc__},

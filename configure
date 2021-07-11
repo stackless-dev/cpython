@@ -16551,7 +16551,7 @@ do
 done
 
 
-SRCDIRS="Parser Objects Python Modules Programs Stackless Stackless/core Stackless/module Stackless/pickling"
+SRCDIRS="Parser Objects Python Modules Programs Stackless/core Stackless/module Stackless/pickling Stackless/platf"
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for build directories" >&5
 $as_echo_n "checking for build directories... " >&6; }
 for dir in $SRCDIRS; do

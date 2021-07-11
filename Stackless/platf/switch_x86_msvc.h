@@ -22,8 +22,6 @@
  *      Initial final version after lots of iterations for i386.
  */
 
-#define SLP_USE_NATIVE_BITFIELD_LAYOUT 1
-
 #define SLP_STACK_REFPLUS 1
 
 /* switching related stuff */
@@ -57,21 +55,3 @@ slp_switch(void)
 
 #endif
 
-/*
- * further self-processing support
- */
-
-/* we have IsBadReadPtr available, so we can peek at objects */
-#define STACKLESS_SPY
-
-#ifdef IMPLEMENT_STACKLESSMODULE
-#define SLP_CANNOT_READ_MEM(p, bytes) IsBadReadPtr(p, bytes)
-
-static int SLP_IS_ON_STACK(void*p)
-{
-    int stackref;
-    int stackbase = ((int)&stackref) & 0xfffff000;
-    return (int)p >= stackbase && (int)p < stackbase + 0x00100000;
-}
-
-#endif
