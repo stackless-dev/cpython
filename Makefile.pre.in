@@ -732,11 +732,11 @@ $(SLP_STACKMAN_OBJS): $(SLP_STACKMAN_LIB)
 	cd Stackless/platf && $(AR) x libstackman.a && rm libstackman.a
 
 Stackless/platf/slp_transfer.o: $(srcdir)/Stackless/platf/slp_transfer.c
-		$(CC) -c $(PY_CORE_CFLAGS) $(SLPFLAGS) -o $@ $(srcdir)/Stackless/platf/slp_transfer.c
+	$(CC) -c $(PY_CORE_CFLAGS) $(SLPFLAGS) -o $@ $(srcdir)/Stackless/platf/slp_transfer.c
 
 .PHONY: teststackless
 teststackless:	@DEF_MAKE_RULE@ platform
-		$(TESTPYTHON) -E $(srcdir)/Stackless/unittests/runAll.py
+	$(TESTPYTHON) -E $(srcdir)/Stackless/unittests/runAll.py
 
 ############################################################################
 # Importlib
