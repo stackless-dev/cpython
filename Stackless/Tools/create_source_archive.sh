@@ -14,7 +14,7 @@ if [ $# != 3 ] ; then
    exit 1
 fi
 
-: ${excludes:=.gitignore .git* .hg* .bzrignore .mention-bot .travis.yml .readthedocs.yml .azure-pipelines}
+: ${excludes:=.gitignore .git* .mention-bot .travis.yml .readthedocs.yml .azure-pipelines Stackless/stackman/.git* }
  
 git_python_dir="$1" ; shift
 if [ "x$1" = "x-v" ] ; then
@@ -42,6 +42,7 @@ mkdir "$tmpdir"
 cd "$git_python_dir"
 git archive --format=tar --prefix="${srcdir}/" "$tag" | \
   ( cd "${tmpdir}" && tar xf - )
+git submodule foreach --recursive "git archive --format=tar --prefix=${srcdir}/\$path/ HEAD | ( cd \"${tmpdir}\" && tar xf - )"
 cd "${tmpdir}"
 ( cd "${srcdir}" && set +f && rm -rf $excludes )
 
