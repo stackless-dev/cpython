@@ -2945,12 +2945,25 @@ AC_MSG_RESULT($with_stackman)
 if test "$with_stackman" = "yes" ; then
 	with_stackman="Stackless/stackman"
 fi
+SLP_STACKMAN_LIB=
+SLP_STACKMAN_OBJS=
 if test "$with_stackman" = "no" ; then
 	SLPFLAGS="-DSLP_NO_STACKMAN $SLPFLAGS"
 else
 	SLPFLAGS="-I$with_stackman $SLPFLAGS"
+	slp_stackman_abiname=`cd "$with_stackman" && make -s CC="$CC" CXX="$CXX" AR="$AR" abiname 2>/dev/null`
+	if test "X$slp_stackman_abiname" != "X" ; then
+		if test -f "$with_stackman/lib/$slp_stackman_abiname/libstackman.a" ; then
+			SLP_STACKMAN_LIB="$with_stackman/lib/$slp_stackman_abiname/libstackman.a"
+			SLP_STACKMAN_OBJS=`$AR t "$SLP_STACKMAN_LIB" | sed -e 's|^|Stackless/platf/|' | tr '\n' ' '`
+		else
+			AC_MSG_ERROR([Stackman library not found: $with_stackman/lib/$slp_stackman_abiname/libstackman.a])
+		fi
+	fi
 fi
 AC_SUBST(SLPFLAGS)
+AC_SUBST(SLP_STACKMAN_LIB)
+AC_SUBST(SLP_STACKMAN_OBJS)
 
 # Check for use of the system expat library
 AC_MSG_CHECKING(for --with-system-expat)
