@@ -66,6 +66,11 @@
     
     <!-- Full path of the resulting python.exe binary -->
     <PythonExe Condition="'$(PythonExe)' == ''">$(BuildPath)python$(PyDebugExt).exe</PythonExe>
+
+    <!-- Stackless stackman directory. Set this property to 'no', to build without Stackman -->
+    <stackmanDir Condition="'$(stackmanDir)' == ''">$(PySourcePath)Stackless\stackman\</stackmanDir>
+    <stackmanDir Condition="'$(stackmanDir)' != 'no' And !HasTrailingSlash($(stackmanDir))">$(stackmanDir)\</stackmanDir>
+    <stackmanLib Condition="'$(stackmanDir)' != 'no'">stackman.lib;</stackmanLib>
   </PropertyGroup>
   
   <PropertyGroup Condition="$(DefaultWindowsSDKVersion) == ''">

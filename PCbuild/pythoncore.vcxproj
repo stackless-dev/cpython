@@ -72,9 +72,13 @@
       <AdditionalIncludeDirectories Condition="$(IncludeExternals)">$(zlibDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_USRDLL;Py_BUILD_CORE;Py_ENABLE_SHARED;MS_DLL_ID="$(SysWinVer)";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="$(IncludeExternals)">_Py_HAVE_ZLIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(stackmanDir)' == 'no'">SLP_NO_STACKMAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>version.lib;shlwapi.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>version.lib;shlwapi.lib;ws2_32.lib;$(stackmanLib)%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories Condition="'$(stackmanLib)'!='' And '$(Platform)'=='x64'">$(stackmanDir)lib\win_x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories Condition="'$(stackmanLib)'!='' And '$(Platform)'=='Win32'">$(stackmanDir)lib\win_x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <ImageHasSafeExceptionHandlers Condition="'$(stackmanLib)'!='' And '$(Platform)'=='Win32'">false</ImageHasSafeExceptionHandlers>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -438,7 +442,9 @@
     <ClCompile Include="..\Python\thread.c" />
     <ClCompile Include="..\Python\traceback.c" />
     <ClCompile Include="..\Stackless\core\cframeobject.c" />
-    <ClCompile Include="..\Stackless\platf\slp_transfer.c" />
+    <ClCompile Include="..\Stackless\platf\slp_transfer.c">
+      <AdditionalIncludeDirectories Condition="'$(stackmanDir)'!='no'">$(stackmanDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
     <ClCompile Include="..\Stackless\core\stacklesseval.c" />
     <ClCompile Include="..\Stackless\core\stackless_util.c" />
     <ClCompile Include="..\Stackless\module\channelobject.c" />
@@ -470,23 +476,12 @@
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\Stackless\platf\switch_x64_masm.asm">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='PGInstrument|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='PGUpdate|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Platform)'!='x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Platform)'=='x64' And '$(stackmanDir)'!='no'">true</ExcludedFromBuild>
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ml64 /nologo /c /Zi /Fo "$(IntDir)%(Filename) .obj" "%(FullPath)"</Command>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Running ml64</Message>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)%(Filename) .obj;%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='PGInstrument|x64'">ml64 /nologo /c /Zi /Fo "$(IntDir)%(Filename) .obj" "%(FullPath)"</Command>
-      <Message Condition="'$(Configuration)|$(Platform)'=='PGInstrument|x64'">Running ml64</Message>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='PGInstrument|x64'">$(IntDir)%(Filename) .obj;%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='PGUpdate|x64'">ml64 /nologo /c /Zi /Fo "$(IntDir)%(Filename) .obj" "%(FullPath)"</Command>
-      <Message Condition="'$(Configuration)|$(Platform)'=='PGUpdate|x64'">Running ml64</Message>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='PGUpdate|x64'">$(IntDir)%(Filename) .obj;%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ml64 /nologo /c /Zi /Fo "$(IntDir)%(Filename) .obj" "%(FullPath)"</Command>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Running ml64</Message>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)%(Filename) .obj;%(Outputs)</Outputs>
+      <Command Condition="'$(Platform)'=='x64'">ml64 /nologo /c /Zi /Fo "$(IntDir)%(Filename) .obj" "%(FullPath)"</Command>
+      <Message Condition="'$(Platform)'=='x64'">Running ml64</Message>
+      <Outputs Condition="'$(Platform)'=='x64'">$(IntDir)%(Filename) .obj;%(Outputs)</Outputs>
     </CustomBuild>
     <None Include="..\Stackless\readme.txt" />
   </ItemGroup>
