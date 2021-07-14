@@ -21,7 +21,8 @@
 static int slp_stackman_cb_save(void *sp, intptr_t *pdiff)
 {
     intptr_t diff;
-    SLP_SAVE_STATE(sp, diff);
+    /* first argument must be a pointer to a "stack word", not a void* */
+    SLP_SAVE_STATE(((intptr_t *)sp), diff);
     *pdiff = diff;
     return 1;
 }
