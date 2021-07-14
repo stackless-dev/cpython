@@ -9,6 +9,11 @@ What's New in Stackless 3.X.X?
 
 *Release date: 20XX-XX-XX*
 
+- https://github.com/stackless-dev/stackless/issues/278
+  Stackless now uses Stackman https://github.com/stackless-dev/stackman for
+  stack switching / hard tasklet switching. The legacy stack switching code
+  is still available. See 'readme.txt' for details.
+
 - https://github.com/stackless-dev/stackless/issues/288
   Starting from commit b73166e building Stackless on Windows was broken. This
   has been fixed.

@@ -27,13 +27,26 @@ It is the ultimate truth. Read it at https://github.com/stackless-dev/stackless
 Building Stackless
 ------------------
 
-Just follow the build instructions for regular Python. If you define
-the C-preprocessor symbol STACKLESS_OFF, you get a Python interpreter
-without Stackless. It should behave exactly like the corresponding
-version of regular Python. Any difference constitutes a bug.
-(Windows 64bit only: if you define STACKLESS_OFF, you also need
-to clear the content of the file Stackless\platf\switch_x64_masm.asm:
-  c:\> echo END > Stackless\platf\switch_x64_masm.asm )
+Just follow the build instructions for regular C-Python.
+
+To more easily support new platforms and CPU architectures, Stackless Python
+now commonly uses Stackman (https://github.com/stackless-dev/stackman)
+for stack switching / hard switching between tasklets. Stackman is a
+lightweight library for stack manipulation. The Stackless source archive
+already contains a copy of Stackman, which is normally used automatically.
+However, the legacy Stackless switching code can still be used without
+restrictions. To do this, Stackless must be configured with
+`configure --without-stackman` or built under Windows with
+`build.bat "/p:stackmanDir=no"`.
+
+It is also possible to use your own version of Stackman instead of the copy
+bundled with Stackless. To do this configure Stackless with
+`configure --with-stackman=/path/to/your/stackman` or built under Windows
+with `build.bat "/p:stackmanDir=X:\path\to\your\stackman"`.
+
+If you define the C-preprocessor symbol STACKLESS_OFF in Include/stackless.h,
+you get a Python interpreter without Stackless. It should behave exactly like
+the corresponding version of regular Python. Any difference constitutes a bug.
 
 Contributing
 ------------
