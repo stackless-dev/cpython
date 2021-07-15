@@ -119,6 +119,8 @@ CFLAGS_ALIASING=@CFLAGS_ALIASING@
 
 # Special C flags for slp_transfer.c
 SLPFLAGS=	@SLPFLAGS@
+SLP_STACKMAN_LIB= @SLP_STACKMAN_LIB@
+SLP_STACKMAN_OBJS= @SLP_STACKMAN_OBJS@
 
 # Machine-dependent subdirectories
 MACHDEP=	@MACHDEP@
@@ -348,6 +350,7 @@ PYTHON_OBJS=	\
 		Stackless/module/taskletobject.o \
 		Stackless/pickling/prickelpit.o \
 		Stackless/pickling/safe_pickle.o \
+		$(SLP_STACKMAN_OBJS) \
 		Python/codecs.o \
 		Python/compile.o \
 		Python/coreconfig.o \
@@ -724,6 +727,17 @@ $(srcdir)/Include/cpython/slp_exttype.h: $(srcdir)/Objects/typeobject.c
 	$(PYTHON_FOR_REGEN) $(srcdir)/Stackless/Tools/extract_slp_info.py
 	$(UPDATE_FILE) $(srcdir)/Include/cpython/slp_exttype.h $(srcdir)/Include/cpython/slp_exttype.h.new
 
+$(SLP_STACKMAN_OBJS): $(SLP_STACKMAN_LIB)
+	cp $(SLP_STACKMAN_LIB) Stackless/platf/libstackman.a
+	cd Stackless/platf && $(AR) x libstackman.a && rm libstackman.a
+
+Stackless/platf/slp_transfer.o: $(srcdir)/Stackless/platf/slp_transfer.c
+	$(CC) -c $(PY_CORE_CFLAGS) $(SLPFLAGS) -o $@ $(srcdir)/Stackless/platf/slp_transfer.c
+
+.PHONY: teststackless
+teststackless:	@DEF_MAKE_RULE@ platform
+	$(TESTPYTHON) -E $(srcdir)/Stackless/unittests/runAll.py
+
 ############################################################################
 # Importlib
 
@@ -990,9 +1004,6 @@ regen-typeslots:
 		$(srcdir)/Objects/typeslots.inc.new
 	$(UPDATE_FILE) $(srcdir)/Objects/typeslots.inc $(srcdir)/Objects/typeslots.inc.new
 
-Stackless/platf/slp_transfer.o: $(srcdir)/Stackless/platf/slp_transfer.c
-		$(CC) -c $(PY_CORE_CFLAGS) $(SLPFLAGS) -o $@ $(srcdir)/Stackless/platf/slp_transfer.c
-
 ############################################################################
 # Header files
 
@@ -1150,7 +1161,7 @@ TESTPYTHON=	$(RUNSHARED) ./$(BUILDPYTHON) $(TESTPYTHONOPTS)
 TESTRUNNER=	$(TESTPYTHON) $(srcdir)/Tools/scripts/run_tests.py
 TESTTIMEOUT=	1200
 
-.PHONY: test testall testuniversal buildbottest pythoninfo teststackless
+.PHONY: test testall testuniversal buildbottest pythoninfo
 
 # Run a basic set of regression tests.
 # This excludes some tests that are particularly resource-intensive.
@@ -1170,9 +1181,6 @@ testall:	@DEF_MAKE_RULE@ platform
 		-find $(srcdir)/Lib -name '*.py[co]' -print | xargs rm -f
 		-$(TESTRUNNER) -u all $(TESTOPTS)
 		$(TESTRUNNER) -u all $(TESTOPTS)
-
-teststackless:	@DEF_MAKE_RULE@ platform
-		$(TESTPYTHON) -E $(srcdir)/Stackless/unittests/runAll.py
 
 # Run the test suite for both architectures in a Universal build on OSX.
 # Must be run on an Intel box.
@@ -1791,7 +1799,7 @@ docclean:
 	-rm -rf Doc/tools/sphinx Doc/tools/pygments Doc/tools/docutils
 
 clean: pycremoval
-	find . -name '*.[oa]' -exec rm -f {} ';'
+	find . -path '*Stackless/stackman/*.a' -prune -o -name '*.[oa]' -exec rm -f {} ';'
 	find . -name '*.s[ol]' -exec rm -f {} ';'
 	find . -name '*.so.[0-9]*.[0-9]*' -exec rm -f {} ';'
 	find build -name 'fficonfig.h' -exec rm -f {} ';' || true

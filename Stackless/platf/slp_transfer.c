@@ -39,6 +39,16 @@
  */
 #define SLP_EVAL  /* enable code generation in the included header */
 
+#ifndef SLP_NO_STACKMAN  /* defined by configure --without-stackman */
+/* First, see if stackman an implementation without external
+ * assembler, use that if possible
+ */
+#define STACKMAN_OPTIONAL
+#include "stackman/stackman.h"
+#endif  /* #ifndef SLP_NO_STACKMAN */
+#if defined(STACKMAN_PLATFORM) && !defined(STACKMAN_EXTERNAL_ASM)
+#include "switch_stackman.h"
+#else  /* use traditional stackless switching */
 #if   defined(MS_WIN32) && !defined(MS_WIN64) && defined(_M_IX86)
 #include "switch_x86_msvc.h" /* MS Visual Studio on X86 */
 #elif defined(MS_WIN64) && defined(_M_X64)
@@ -74,6 +84,7 @@ Please provide an implementation of the switch_XXX.h
 or disable the STACKLESS flag.
 **********
 #endif
+#endif  /* use traditional stackless switching */
 
 /* default definitions if not defined in above files */
 

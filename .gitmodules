@@ -1,0 +1,3 @@
+[submodule "Stackless/platf/stackman"]
+	path = Stackless/stackman
+	url = https://github.com/stackless-dev/stackman.git
