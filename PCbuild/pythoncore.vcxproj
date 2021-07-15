@@ -94,6 +94,8 @@
       <AdditionalDependencies>version.lib;shlwapi.lib;ws2_32.lib;$(stackmanLib)%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories Condition="'$(stackmanLib)'!='' And '$(Platform)'=='x64'">$(stackmanDir)lib\win_x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalLibraryDirectories Condition="'$(stackmanLib)'!='' And '$(Platform)'=='Win32'">$(stackmanDir)lib\win_x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories Condition="'$(stackmanLib)'!='' And '$(Platform)'=='ARM'">$(stackmanDir)lib\win_arm;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories Condition="'$(stackmanLib)'!='' And '$(Platform)'=='ARM64'">$(stackmanDir)lib\win_arm64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ImageHasSafeExceptionHandlers Condition="'$(stackmanLib)'!='' And '$(Platform)'=='Win32'">false</ImageHasSafeExceptionHandlers>
     </Link>
   </ItemDefinitionGroup>
