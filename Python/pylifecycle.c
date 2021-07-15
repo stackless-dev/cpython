@@ -68,6 +68,7 @@ static void call_py_exitfuncs(PyInterpreterState *);
 static void wait_for_thread_shutdown(void);
 static void call_ll_exitfuncs(void);
 
+int _Py_UnhandledKeyboardInterrupt = 0;
 _PyRuntimeState _PyRuntime = _PyRuntimeState_INIT;
 
 _PyInitError
@@ -1471,7 +1472,31 @@ Py_EndInterpreter(PyThreadState *tstate)
     if (tstate->frame != NULL)
         Py_FatalError("Py_EndInterpreter: thread still has a frame");
 
+    // Mark as finalizing.
+    if (interp->ceval.pending.lock != NULL) {
+        PyThread_acquire_lock(interp->ceval.pending.lock, 1);
+    }
+    interp->finalizing = 1;
+    if (interp->ceval.pending.lock != NULL) {
+        PyThread_release_lock(interp->ceval.pending.lock);
+    }
+
+    // Wrap up existing threads.
     wait_for_thread_shutdown();
+
+    // Make any pending calls.
+    if (_Py_atomic_load_relaxed(
+                &(interp->ceval.pending.calls_to_do)))
+    {
+        // XXX Ensure that the interpreter is running in the current thread?
+        if (_Py_MakePendingCalls(interp) < 0) {
+            PyObject *exc, *val, *tb;
+            PyErr_Fetch(&exc, &val, &tb);
+            PyErr_BadInternalCall();
+            _PyErr_ChainExceptions(exc, val, tb);
+            PyErr_Print();
+        }
+    }
 
     call_py_exitfuncs(interp);
 

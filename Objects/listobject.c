@@ -476,14 +476,6 @@ list_slice(PyListObject *a, Py_ssize_t ilow, Py_ssize_t ihigh)
     PyListObject *np;
     PyObject **src, **dest;
     Py_ssize_t i, len;
-    if (ilow < 0)
-        ilow = 0;
-    else if (ilow > Py_SIZE(a))
-        ilow = Py_SIZE(a);
-    if (ihigh < ilow)
-        ihigh = ilow;
-    else if (ihigh > Py_SIZE(a))
-        ihigh = Py_SIZE(a);
     len = ihigh - ilow;
     np = (PyListObject *) list_new_prealloc(len);
     if (np == NULL)
@@ -506,6 +498,18 @@ PyList_GetSlice(PyObject *a, Py_ssize_t ilow, Py_ssize_t ihigh)
     if (!PyList_Check(a)) {
         PyErr_BadInternalCall();
         return NULL;
+    }
+    if (ilow < 0) {
+        ilow = 0;
+    }
+    else if (ilow > Py_SIZE(a)) {
+        ilow = Py_SIZE(a);
+    }
+    if (ihigh < ilow) {
+        ihigh = ilow;
+    }
+    else if (ihigh > Py_SIZE(a)) {
+        ihigh = Py_SIZE(a);
     }
     return list_slice((PyListObject *)a, ilow, ihigh);
 }
@@ -2329,6 +2333,9 @@ list_sort_impl(PyListObject *self, PyObject *keyfunc, int reverse)
             }
             else if ((ms.key_richcompare = key_type->tp_richcompare) != NULL) {
                 ms.key_compare = unsafe_object_compare;
+            }
+            else {
+                ms.key_compare = safe_object_compare;
             }
         }
         else {

@@ -12,6 +12,7 @@
 
 #include "Python-ast.h"
 #undef Yield   /* undefine macro conflicting with <winbase.h> */
+#include "pycore_pylifecycle.h"
 #include "pycore_pystate.h"
 #include "grammar.h"
 #include "node.h"
@@ -1049,6 +1050,28 @@ flush_io(void)
 }
 
 static PyObject *
+run_eval_code_obj(PyCodeObject *co, PyObject *globals, PyObject *locals)
+{
+    PyObject *v;
+    /*
+     * We explicitly re-initialize _Py_UnhandledKeyboardInterrupt every eval
+     * _just in case_ someone is calling into an embedded Python where they
+     * don't care about an uncaught KeyboardInterrupt exception (why didn't they
+     * leave config.install_signal_handlers set to 0?!?) but then later call
+     * Py_Main() itself (which _checks_ this flag and dies with a signal after
+     * its interpreter exits).  We don't want a previous embedded interpreter's
+     * uncaught exception to trigger an unexplained signal exit from a future
+     * Py_Main() based one.
+     */
+    _Py_UnhandledKeyboardInterrupt = 0;
+    v = PyEval_EvalCode((PyObject*)co, globals, locals);
+    if (!v && PyErr_Occurred() == PyExc_KeyboardInterrupt) {
+        _Py_UnhandledKeyboardInterrupt = 1;
+    }
+    return v;
+}
+
+static PyObject *
 run_mod(mod_ty mod, PyObject *filename, PyObject *globals, PyObject *locals,
             PyCompilerFlags *flags, PyArena *arena)
 {
@@ -1059,7 +1082,7 @@ run_mod(mod_ty mod, PyObject *filename, PyObject *globals, PyObject *locals,
     if (co == NULL)
         return NULL;
     STACKLESS_PROMOTE_ALL();
-    v = PyEval_EvalCode((PyObject*)co, globals, locals);
+    v = run_eval_code_obj(co, globals, locals);
     STACKLESS_ASSERT();
     Py_DECREF(co);
     return v;
@@ -1097,7 +1120,7 @@ run_pyc_file(FILE *fp, const char *filename, PyObject *globals,
     }
     fclose(fp);
     co = (PyCodeObject *)v;
-    v = PyEval_EvalCode((PyObject*)co, globals, locals);
+    v = run_eval_code_obj(co, globals, locals);
     if (v && flags)
         flags->cf_flags |= (co->co_flags & PyCF_MASK);
     Py_DECREF(co);

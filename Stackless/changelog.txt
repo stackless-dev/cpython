@@ -14,6 +14,9 @@ What's New in Stackless 3.X.X?
   stack switching / hard tasklet switching. The legacy stack switching code
   is still available. See 'readme.txt' for details.
 
+- https://github.com/stackless-dev/stackless/issues/254
+  The Stackless version is now "3.8".
+
 - https://github.com/stackless-dev/stackless/issues/288
   Starting from commit b73166e building Stackless on Windows was broken. This
   has been fixed.

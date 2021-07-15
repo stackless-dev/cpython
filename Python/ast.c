@@ -702,6 +702,8 @@ static string
 new_type_comment(const char *s, struct compiling *c)
 {
     PyObject *res = PyUnicode_DecodeUTF8(s, strlen(s), NULL);
+    if (res == NULL)
+        return NULL;
     if (PyArena_AddPyObject(c->c_arena, res) < 0) {
         Py_DECREF(res);
         return NULL;
@@ -1082,7 +1084,7 @@ set_context(struct compiling *c, expr_ty e, expr_context_ty ctx, const node *n)
                 return 0;
             break;
         case Name_kind:
-            if (ctx == Store) {
+            if (ctx == Store || ctx == NamedStore) {
                 if (forbidden_name(c, e->v.Name.id, n, 0))
                     return 0; /* forbidden_name() calls ast_error() */
             }
@@ -1366,7 +1368,7 @@ handle_keywordonly_args(struct compiling *c, const node *n, int start,
     PyObject *argname;
     node *ch;
     expr_ty expression, annotation;
-    arg_ty arg;
+    arg_ty arg = NULL;
     int i = start;
     int j = 0; /* index for kwdefaults and kwonlyargs */
 
@@ -1462,7 +1464,7 @@ ast_for_arguments(struct compiling *c, const node *n)
     int nposdefaults = 0, found_default = 0;
     asdl_seq *posargs, *posdefaults, *kwonlyargs, *kwdefaults;
     arg_ty vararg = NULL, kwarg = NULL;
-    arg_ty arg;
+    arg_ty arg = NULL;
     node *ch;
 
     if (TYPE(n) == parameters) {
@@ -3870,12 +3872,9 @@ ast_for_suite(struct compiling *c, const node *n)
 static void
 get_last_end_pos(asdl_seq *s, int *end_lineno, int *end_col_offset)
 {
-    int tot = asdl_seq_LEN(s);
-    // Suite should not be empty, but it is safe to just ignore it
-    // if it will ever occur.
-    if (!tot) {
-        return;
-    }
+    Py_ssize_t tot = asdl_seq_LEN(s);
+    // There must be no empty suites.
+    assert(tot > 0);
     stmt_ty last = asdl_seq_GET(s, tot - 1);
     *end_lineno = last->end_lineno;
     *end_col_offset = last->end_col_offset;
